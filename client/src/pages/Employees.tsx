@@ -5,26 +5,43 @@ import { employeesApi } from '../services/api';
 import { usePermissions } from '../hooks/usePermissions';
 import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
-import { StatusBadge } from '../components/ui/Badge';
 import { Search, Plus, Filter } from 'lucide-react';
 import type { Employee, PaginatedResponse } from '../types';
+
+// Team-Farben basierend auf Rang-Level
+function getTeamInfo(rankLevel: number): { name: string; bgClass: string; textClass: string } {
+  if (rankLevel >= 16) {
+    // 16-17: White
+    return { name: 'White', bgClass: 'bg-white', textClass: 'text-slate-900' };
+  } else if (rankLevel >= 13) {
+    // 13-15: Red
+    return { name: 'Red', bgClass: 'bg-red-600', textClass: 'text-white' };
+  } else if (rankLevel >= 10) {
+    // 10-12: Gold
+    return { name: 'Gold', bgClass: 'bg-yellow-500', textClass: 'text-slate-900' };
+  } else if (rankLevel >= 6) {
+    // 6-9: Silver
+    return { name: 'Silver', bgClass: 'bg-slate-400', textClass: 'text-slate-900' };
+  } else {
+    // 1-5: Green
+    return { name: 'Green', bgClass: 'bg-green-600', textClass: 'text-white' };
+  }
+}
 
 export default function Employees() {
   const navigate = useNavigate();
   const { canEditEmployees } = usePermissions();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
   const [department, setDepartment] = useState('');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['employees', page, search, status, department],
+    queryKey: ['employees', page, search, department],
     queryFn: () =>
       employeesApi.getAll({
         page: String(page),
         limit: '20',
         ...(search && { search }),
-        ...(status && { status }),
         ...(department && { department }),
       }),
   });
@@ -40,17 +57,14 @@ export default function Employees() {
           <img
             src={
               employee.user?.avatar ||
-              `https://ui-avatars.com/api/?name=${employee.user?.username}&background=random`
+              `https://ui-avatars.com/api/?name=${employee.user?.displayName || employee.user?.username}&background=random`
             }
-            alt={employee.user?.username}
+            alt={employee.user?.displayName}
             className="h-10 w-10 rounded-full"
           />
-          <div>
-            <p className="font-medium text-white">
-              {employee.user?.displayName || employee.user?.username}
-            </p>
-            <p className="text-sm text-slate-400">@{employee.user?.username}</p>
-          </div>
+          <p className="font-medium text-white">
+            {employee.user?.displayName || employee.user?.username}
+          </p>
         </div>
       ),
     },
@@ -62,6 +76,18 @@ export default function Employees() {
       ),
     },
     {
+      key: 'rankLevel',
+      header: 'Team',
+      render: (employee: Employee) => {
+        const team = getTeamInfo(employee.rankLevel || 0);
+        return (
+          <span className={`px-2 py-0.5 rounded text-xs font-medium ${team.bgClass} ${team.textClass}`}>
+            {team.name}
+          </span>
+        );
+      },
+    },
+    {
       key: 'rank',
       header: 'Rang',
       render: (employee: Employee) => (
@@ -71,14 +97,21 @@ export default function Employees() {
     {
       key: 'department',
       header: 'Abteilung',
-      render: (employee: Employee) => (
-        <span className="text-slate-300">{employee.department}</span>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (employee: Employee) => <StatusBadge status={employee.status} />,
+      render: (employee: Employee) => {
+        const departments = employee.department?.split(', ').filter(Boolean) || ['Patrol'];
+        return (
+          <div className="flex flex-wrap gap-1">
+            {departments.map((dept, idx) => (
+              <span
+                key={idx}
+                className="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-200"
+              >
+                {dept}
+              </span>
+            ))}
+          </div>
+        );
+      },
     },
   ];
 
@@ -115,28 +148,23 @@ export default function Employees() {
           </div>
 
           <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="input w-auto"
-          >
-            <option value="">Alle Status</option>
-            <option value="ACTIVE">Aktiv</option>
-            <option value="INACTIVE">Inaktiv</option>
-            <option value="ON_LEAVE">Abwesend</option>
-            <option value="SUSPENDED">Suspendiert</option>
-          </select>
-
-          <select
             value={department}
             onChange={(e) => setDepartment(e.target.value)}
             className="input w-auto"
           >
             <option value="">Alle Abteilungen</option>
             <option value="Patrol">Patrol</option>
-            <option value="Detective">Detective</option>
-            <option value="SWAT">SWAT</option>
-            <option value="Traffic">Traffic</option>
+            <option value="S.W.A.T.">S.W.A.T.</option>
+            <option value="Detectives">Detectives</option>
+            <option value="Highway Patrol">Highway Patrol</option>
             <option value="Air Support">Air Support</option>
+            <option value="Internal Affairs">Internal Affairs</option>
+            <option value="Human Resources">Human Resources</option>
+            <option value="Police Academy">Police Academy</option>
+            <option value="BIKERS">BIKERS</option>
+            <option value="Quality Assurance">Quality Assurance</option>
+            <option value="Management">Management</option>
+            <option value="Leadership">Leadership</option>
           </select>
 
           <button className="btn-ghost">

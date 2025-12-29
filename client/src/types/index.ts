@@ -36,6 +36,7 @@ export interface Employee {
   user?: User;
   badgeNumber: string | null;
   rank: string;
+  rankLevel: number;
   department: string;
   status: EmployeeStatus;
   hireDate: string;

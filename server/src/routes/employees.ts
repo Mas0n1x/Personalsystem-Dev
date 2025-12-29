@@ -50,7 +50,7 @@ router.get('/', authMiddleware, requirePermission('employees.view'), async (req:
         },
         skip,
         take: parseInt(limit as string),
-        orderBy: { createdAt: 'desc' },
+        orderBy: { rankLevel: 'desc' }, // Sortierung nach Rang-Level (17 oben, 1 unten)
       }),
       prisma.employee.count({ where }),
     ]);

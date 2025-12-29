@@ -49,6 +49,15 @@ export default function Settings() {
     },
   });
 
+  const syncMembersMutation = useMutation({
+    mutationFn: adminApi.syncMembers,
+    onSuccess: (response) => {
+      const data = response.data.data;
+      queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
+      toast.success(`Sync abgeschlossen: ${data.created} erstellt, ${data.updated} aktualisiert`);
+    },
+  });
+
   const handleSave = () => {
     updateSettingsMutation.mutate(settings);
   };
@@ -134,14 +143,27 @@ export default function Settings() {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => syncRolesMutation.mutate()}
-                  disabled={syncRolesMutation.isLoading}
-                  className="btn-secondary w-full"
-                >
-                  <RefreshCw className={`h-4 w-4 ${syncRolesMutation.isLoading ? 'animate-spin' : ''}`} />
-                  Rollen synchronisieren
-                </button>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => syncMembersMutation.mutate()}
+                    disabled={syncMembersMutation.isPending}
+                    className="btn-primary w-full"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${syncMembersMutation.isPending ? 'animate-spin' : ''}`} />
+                    Mitglieder synchronisieren (Rang 1-17)
+                  </button>
+                  <p className="text-xs text-slate-400 text-center">
+                    Automatische Synchronisation alle 5 Minuten aktiv
+                  </p>
+                  <button
+                    onClick={() => syncRolesMutation.mutate()}
+                    disabled={syncRolesMutation.isPending}
+                    className="btn-secondary w-full"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${syncRolesMutation.isPending ? 'animate-spin' : ''}`} />
+                    Discord-Rollen synchronisieren
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="text-center py-4 text-slate-400">

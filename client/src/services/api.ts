@@ -94,6 +94,7 @@ export const adminApi = {
   // Discord
   getDiscordInfo: () => api.get('/admin/discord/info'),
   syncRoles: () => api.post('/admin/discord/sync-roles'),
+  syncMembers: () => api.post('/admin/discord/sync-members'),
 
   // Audit Logs
   getAuditLogs: (params?: Record<string, string>) => api.get('/admin/audit-logs', { params }),

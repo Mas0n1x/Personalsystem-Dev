@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
-import { getGuildInfo, syncAllRoles } from '../services/discordBot.js';
+import { getGuildInfo, syncAllRoles, syncDiscordMembers } from '../services/discordBot.js';
 
 const router = Router();
 
@@ -211,6 +211,27 @@ router.post('/discord/sync-roles', authMiddleware, requirePermission('admin.full
   } catch (error) {
     console.error('Sync roles error:', error);
     res.status(500).json({ error: 'Fehler beim Synchronisieren der Rollen' });
+  }
+});
+
+// Discord-Mitglieder als Mitarbeiter synchronisieren
+router.post('/discord/sync-members', authMiddleware, requirePermission('admin.full'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const result = await syncDiscordMembers();
+
+    res.json({
+      success: true,
+      message: 'Synchronisation abgeschlossen',
+      data: {
+        created: result.created,
+        updated: result.updated,
+        total: result.total,
+        errors: result.errors,
+      },
+    });
+  } catch (error) {
+    console.error('Sync members error:', error);
+    res.status(500).json({ error: 'Fehler beim Synchronisieren der Discord-Mitglieder' });
   }
 });
 

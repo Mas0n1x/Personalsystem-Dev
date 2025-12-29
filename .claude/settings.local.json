@@ -17,7 +17,10 @@
       "Bash(findstr:*)",
       "Bash(timeout /t 3 /nobreak)",
       "Bash(ping:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(npx tsx:*)",
+      "Bash(timeout /t 8 /nobreak)",
+      "Bash(powershell:*)"
     ]
   }
 }
