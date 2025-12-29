@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { employeesApi } from '../services/api';
 import { usePermissions } from '../hooks/usePermissions';
 import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
-import { Search, Plus, Filter } from 'lucide-react';
+import { Search, Plus, Filter, ChevronUp, ChevronDown, Users, UserX, X, Check } from 'lucide-react';
+import toast from 'react-hot-toast';
 import type { Employee, PaginatedResponse } from '../types';
 
 // Team-Farben basierend auf Rang-Level
@@ -28,12 +29,31 @@ function getTeamInfo(rankLevel: number): { name: string; bgClass: string; textCl
   }
 }
 
+interface UnitRole {
+  id: string;
+  name: string;
+  unit: string;
+  isBase: boolean;
+  order: number;
+  position: number;
+  active: boolean;
+}
+
 export default function Employees() {
   const navigate = useNavigate();
-  const { canEditEmployees } = usePermissions();
+  const queryClient = useQueryClient();
+  const { canEditEmployees, canDeleteEmployees } = usePermissions();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState('');
+
+  // Modal States
+  const [unitsModalOpen, setUnitsModalOpen] = useState(false);
+  const [terminateModalOpen, setTerminateModalOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [selectedUnitRoles, setSelectedUnitRoles] = useState<string[]>([]);
+  const [unitRoles, setUnitRoles] = useState<UnitRole[]>([]);
+  const [terminateReason, setTerminateReason] = useState('');
 
   const { data, isLoading } = useQuery({
     queryKey: ['employees', page, search, department],
@@ -48,6 +68,133 @@ export default function Employees() {
 
   const response = data?.data as PaginatedResponse<Employee> | undefined;
 
+  // Mutations
+  const uprankMutation = useMutation({
+    mutationFn: (id: string) => employeesApi.uprank(id),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast.success(`Befördert zu ${res.data.newRank}`);
+    },
+    onError: () => {
+      toast.error('Beförderung fehlgeschlagen');
+    },
+  });
+
+  const downrankMutation = useMutation({
+    mutationFn: (id: string) => employeesApi.downrank(id),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast.success(`Degradiert zu ${res.data.newRank}`);
+    },
+    onError: () => {
+      toast.error('Degradierung fehlgeschlagen');
+    },
+  });
+
+  const setUnitsMutation = useMutation({
+    mutationFn: ({ id, unitRoleIds }: { id: string; unitRoleIds: string[] }) =>
+      employeesApi.setUnits(id, unitRoleIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast.success('Units aktualisiert');
+      setUnitsModalOpen(false);
+    },
+    onError: () => {
+      toast.error('Units-Update fehlgeschlagen');
+    },
+  });
+
+  const terminateMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      employeesApi.terminate(id, reason),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast.success(res.data.message);
+      setTerminateModalOpen(false);
+    },
+    onError: () => {
+      toast.error('Kündigung fehlgeschlagen');
+    },
+  });
+
+  // Handlers
+  const handleUprank = (e: React.MouseEvent, employee: Employee) => {
+    e.stopPropagation();
+    if (employee.rankLevel >= 17) {
+      toast.error('Höchster Rang bereits erreicht');
+      return;
+    }
+    uprankMutation.mutate(employee.id);
+  };
+
+  const handleDownrank = (e: React.MouseEvent, employee: Employee) => {
+    e.stopPropagation();
+    if (employee.rankLevel <= 1) {
+      toast.error('Niedrigster Rang bereits erreicht');
+      return;
+    }
+    downrankMutation.mutate(employee.id);
+  };
+
+  const handleOpenUnits = async (e: React.MouseEvent, employee: Employee) => {
+    e.stopPropagation();
+    setSelectedEmployee(employee);
+
+    try {
+      const res = await employeesApi.getUnits(employee.id);
+      const roles = res.data.unitRoles as UnitRole[];
+      setUnitRoles(roles);
+      setSelectedUnitRoles(roles.filter(r => r.active).map(r => r.id));
+      setUnitsModalOpen(true);
+    } catch {
+      toast.error('Fehler beim Laden der Units');
+    }
+  };
+
+  const handleOpenTerminate = (e: React.MouseEvent, employee: Employee) => {
+    e.stopPropagation();
+    setSelectedEmployee(employee);
+    setTerminateReason('');
+    setTerminateModalOpen(true);
+  };
+
+  const handleSaveUnits = () => {
+    if (!selectedEmployee) return;
+    setUnitsMutation.mutate({
+      id: selectedEmployee.id,
+      unitRoleIds: selectedUnitRoles,
+    });
+  };
+
+  const handleConfirmTerminate = () => {
+    if (!selectedEmployee) return;
+    terminateMutation.mutate({
+      id: selectedEmployee.id,
+      reason: terminateReason || undefined,
+    });
+  };
+
+  const toggleUnitRole = (roleId: string) => {
+    setSelectedUnitRoles(prev =>
+      prev.includes(roleId) ? prev.filter(id => id !== roleId) : [...prev, roleId]
+    );
+  };
+
+  // Rollen nach Unit gruppieren und sortieren (Basis-Rolle zuerst, dann nach order)
+  const groupedUnitRoles = unitRoles.reduce<Record<string, UnitRole[]>>((acc, role) => {
+    if (!acc[role.unit]) acc[role.unit] = [];
+    acc[role.unit].push(role);
+    return acc;
+  }, {});
+
+  // Innerhalb jeder Gruppe sortieren
+  Object.values(groupedUnitRoles).forEach(roles => {
+    roles.sort((a, b) => {
+      if (a.isBase !== b.isBase) return a.isBase ? -1 : 1;
+      return a.order - b.order;
+    });
+  });
+
   const columns = [
     {
       key: 'user',
@@ -59,7 +206,7 @@ export default function Employees() {
               employee.user?.avatar ||
               `https://ui-avatars.com/api/?name=${employee.user?.displayName || employee.user?.username}&background=random`
             }
-            alt={employee.user?.displayName}
+            alt={employee.user?.displayName || employee.user?.username}
             className="h-10 w-10 rounded-full"
           />
           <p className="font-medium text-white">
@@ -113,6 +260,57 @@ export default function Employees() {
         );
       },
     },
+    ...(canEditEmployees
+      ? [
+          {
+            key: 'actions',
+            header: 'Aktionen',
+            render: (employee: Employee) => (
+              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                {/* Uprank */}
+                <button
+                  onClick={(e) => handleUprank(e, employee)}
+                  disabled={uprankMutation.isPending || employee.rankLevel >= 17}
+                  className="p-1.5 rounded hover:bg-green-600/20 text-green-400 hover:text-green-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Befördern"
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </button>
+
+                {/* Downrank */}
+                <button
+                  onClick={(e) => handleDownrank(e, employee)}
+                  disabled={downrankMutation.isPending || employee.rankLevel <= 1}
+                  className="p-1.5 rounded hover:bg-orange-600/20 text-orange-400 hover:text-orange-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Degradieren"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+
+                {/* Units */}
+                <button
+                  onClick={(e) => handleOpenUnits(e, employee)}
+                  className="p-1.5 rounded hover:bg-blue-600/20 text-blue-400 hover:text-blue-300 transition-colors"
+                  title="Units bearbeiten"
+                >
+                  <Users className="h-4 w-4" />
+                </button>
+
+                {/* Terminate */}
+                {canDeleteEmployees && (
+                  <button
+                    onClick={(e) => handleOpenTerminate(e, employee)}
+                    className="p-1.5 rounded hover:bg-red-600/20 text-red-400 hover:text-red-300 transition-colors"
+                    title="Kündigen"
+                  >
+                    <UserX className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -193,6 +391,177 @@ export default function Employees() {
           total={response.total}
           limit={response.limit}
         />
+      )}
+
+      {/* Units Modal */}
+      {unitsModalOpen && selectedEmployee && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-2xl mx-4 border border-slate-700 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">
+                Units bearbeiten - {selectedEmployee.user?.displayName || selectedEmployee.user?.username}
+              </h2>
+              <button
+                onClick={() => setUnitsModalOpen(false)}
+                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {Object.entries(groupedUnitRoles).map(([unit, roles]) => (
+                <div key={unit}>
+                  <h3 className="text-lg font-semibold text-white mb-3">{unit}</h3>
+                  <div className="space-y-2">
+                    {/* Basis-Mitgliedsrolle */}
+                    {roles.filter(r => r.isBase).map((role) => (
+                      <button
+                        key={role.id}
+                        onClick={() => toggleUnitRole(role.id)}
+                        className={`flex items-center gap-3 p-3 rounded-lg border transition-colors w-full ${
+                          selectedUnitRoles.includes(role.id)
+                            ? 'bg-green-600/20 border-green-500 text-green-400'
+                            : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        <div
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                            selectedUnitRoles.includes(role.id)
+                              ? 'border-green-500 bg-green-500'
+                              : 'border-slate-500'
+                          }`}
+                        >
+                          {selectedUnitRoles.includes(role.id) && (
+                            <Check className="h-3 w-3 text-white" />
+                          )}
+                        </div>
+                        <span className="text-sm font-medium">{role.name.replace('» ', '')}</span>
+                        <span className="text-xs text-slate-400 ml-auto">(Basis-Mitglied)</span>
+                      </button>
+                    ))}
+                    {/* Rang-Rollen innerhalb der Unit */}
+                    {roles.filter(r => !r.isBase).length > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-4 border-l-2 border-slate-600">
+                        {roles.filter(r => !r.isBase).map((role) => (
+                          <button
+                            key={role.id}
+                            onClick={() => toggleUnitRole(role.id)}
+                            className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                              selectedUnitRoles.includes(role.id)
+                                ? 'bg-primary-600/20 border-primary-500 text-primary-400'
+                                : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >
+                            <div
+                              className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                                selectedUnitRoles.includes(role.id)
+                                  ? 'border-primary-500 bg-primary-500'
+                                  : 'border-slate-500'
+                              }`}
+                            >
+                              {selectedUnitRoles.includes(role.id) && (
+                                <Check className="h-3 w-3 text-white" />
+                              )}
+                            </div>
+                            <span className="text-sm">{role.name.replace('» ', '')}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-700">
+              <button
+                onClick={() => setUnitsModalOpen(false)}
+                className="btn-ghost"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleSaveUnits}
+                disabled={setUnitsMutation.isPending}
+                className="btn-primary"
+              >
+                {setUnitsMutation.isPending ? 'Speichert...' : 'Speichern'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Terminate Modal */}
+      {terminateModalOpen && selectedEmployee && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md mx-4 border border-slate-700">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-red-400">Mitarbeiter kündigen</h2>
+              <button
+                onClick={() => setTerminateModalOpen(false)}
+                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <div className="flex items-center gap-3 p-4 bg-slate-700/50 rounded-lg mb-4">
+                <img
+                  src={
+                    selectedEmployee.user?.avatar ||
+                    `https://ui-avatars.com/api/?name=${selectedEmployee.user?.username}&background=random`
+                  }
+                  alt={selectedEmployee.user?.displayName || selectedEmployee.user?.username}
+                  className="h-12 w-12 rounded-full"
+                />
+                <div>
+                  <p className="font-medium text-white">
+                    {selectedEmployee.user?.displayName || selectedEmployee.user?.username}
+                  </p>
+                  <p className="text-sm text-slate-400">
+                    {selectedEmployee.rank} - {selectedEmployee.badgeNumber || 'Kein Badge'}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-slate-300 mb-4">
+                Dieser Mitarbeiter wird aus dem System gelöscht und vom Discord-Server gekickt.
+                Diese Aktion kann nicht rückgängig gemacht werden.
+              </p>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Kündigungsgrund (optional)
+                </label>
+                <textarea
+                  value={terminateReason}
+                  onChange={(e) => setTerminateReason(e.target.value)}
+                  className="input w-full h-24 resize-none"
+                  placeholder="z.B. Inaktivität, Regelverstoß..."
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setTerminateModalOpen(false)}
+                className="btn-ghost"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleConfirmTerminate}
+                disabled={terminateMutation.isPending}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                {terminateMutation.isPending ? 'Wird gekündigt...' : 'Kündigen'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

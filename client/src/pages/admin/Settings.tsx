@@ -15,10 +15,13 @@ export default function Settings() {
   const queryClient = useQueryClient();
   const [settings, setSettings] = useState<Record<string, string>>({});
 
-  const { data: settingsData, isLoading: settingsLoading } = useQuery({
+  const { isLoading: settingsLoading } = useQuery({
     queryKey: ['settings'],
-    queryFn: adminApi.getSettings,
-    onSuccess: (data) => setSettings(data.data || {}),
+    queryFn: async () => {
+      const res = await adminApi.getSettings();
+      setSettings(res.data || {});
+      return res;
+    },
   });
 
   const { data: discordData, isLoading: discordLoading } = useQuery({
@@ -226,7 +229,7 @@ export default function Settings() {
 
             <button
               onClick={handleSave}
-              disabled={updateSettingsMutation.isLoading}
+              disabled={updateSettingsMutation.isPending}
               className="btn-primary w-full"
             >
               <Save className="h-4 w-4" />

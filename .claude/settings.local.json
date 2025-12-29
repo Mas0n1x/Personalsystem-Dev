@@ -20,7 +20,8 @@
       "Bash(curl:*)",
       "Bash(npx tsx:*)",
       "Bash(timeout /t 8 /nobreak)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(timeout:*)"
     ]
   }
 }

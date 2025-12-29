@@ -72,3 +72,25 @@ export interface PaginatedResponse<T> {
   limit: number;
   totalPages: number;
 }
+
+export interface Evaluation {
+  id: string;
+  type: string;
+  rating: number;
+  comment: string | null;
+  evaluator: {
+    username: string;
+    displayName: string | null;
+  } | null;
+  createdAt: string;
+}
+
+export interface Absence {
+  id: string;
+  type: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  reason: string | null;
+  createdAt: string;
+}

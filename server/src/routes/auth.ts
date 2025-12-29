@@ -53,7 +53,7 @@ router.post('/discord/callback', async (req, res: Response) => {
       return;
     }
 
-    const tokens: DiscordTokenResponse = await tokenResponse.json();
+    const tokens = await tokenResponse.json() as DiscordTokenResponse;
 
     // Benutzerinfo von Discord holen
     const userResponse = await fetch(`${DISCORD_API}/users/@me`, {
@@ -67,7 +67,7 @@ router.post('/discord/callback', async (req, res: Response) => {
       return;
     }
 
-    const discordUser: DiscordUserInfo = await userResponse.json();
+    const discordUser = await userResponse.json() as DiscordUserInfo;
 
     // Avatar URL generieren
     const avatarUrl = discordUser.avatar
@@ -109,7 +109,7 @@ router.post('/discord/callback', async (req, res: Response) => {
         username: user.username,
       },
       process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      { expiresIn: '7d' }
     );
 
     // Token als HttpOnly Cookie setzen

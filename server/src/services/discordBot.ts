@@ -26,33 +26,84 @@ function extractRankFromRoleName(roleName: string): { level: number; rank: strin
 }
 
 // Bekannte Unit/Abteilungs-Rollen (ohne Nummer, nur "» Name")
-const UNIT_ROLES: Record<string, string> = {
-  '» Special Weapons and Tactics': 'S.W.A.T.',
-  '» S.W.A.T. Officer': 'S.W.A.T.',
-  '» S.W.A.T. Sergeant': 'S.W.A.T.',
-  '» S.W.A.T. Commander': 'S.W.A.T.',
-  '» S.W.A.T. Rookie': 'S.W.A.T.',
-  '» Detectives': 'Detectives',
-  '» Detective Member': 'Detectives',
-  '» Detective Trainee': 'Detectives',
-  '» Detective Instructor': 'Detectives',
-  '» State Highway Patrol': 'Highway Patrol',
-  '» S.H.P. Rookie': 'Highway Patrol',
-  '» S.H.P. Trooper': 'Highway Patrol',
-  '» S.H.P. Senior Trooper': 'Highway Patrol',
-  '» S.H.P. Head Trooper': 'Highway Patrol',
-  '» Air Support Division': 'Air Support',
-  '» A.S.D. Flight Student': 'Air Support',
-  '» A.S.D. Flight Officer': 'Air Support',
-  '» A.S.D. Flight Instructor': 'Air Support',
-  '» Internal Affairs': 'Internal Affairs',
-  '» Human Resources': 'Human Resources',
-  '» Police Academy': 'Police Academy',
-  '» BIKERS': 'BIKERS',
-  '» Member of BIKERS': 'BIKERS',
-  '» Quality Assurance': 'Quality Assurance',
-  '» Management': 'Management',
-  '» Leadership': 'Leadership',
+// Format: { unit: 'Unit Name', isBase: true/false } - isBase = Basis-Mitgliedsrolle
+const UNIT_ROLES: Record<string, { unit: string; isBase: boolean; order: number }> = {
+  // S.W.A.T.
+  '» Special Weapons and Tactics': { unit: 'S.W.A.T.', isBase: true, order: 0 },
+  '» S.W.A.T. Rookie': { unit: 'S.W.A.T.', isBase: false, order: 1 },
+  '» S.W.A.T. Officer': { unit: 'S.W.A.T.', isBase: false, order: 2 },
+  '» S.W.A.T. Sergeant': { unit: 'S.W.A.T.', isBase: false, order: 3 },
+  '» S.W.A.T. Commander': { unit: 'S.W.A.T.', isBase: false, order: 4 },
+  '» Co-Director of S.W.A.T.': { unit: 'S.W.A.T.', isBase: false, order: 5 },
+  '» Director of S.W.A.T.': { unit: 'S.W.A.T.', isBase: false, order: 6 },
+
+  // Detectives
+  '» Detectives': { unit: 'Detectives', isBase: true, order: 0 },
+  '» Detective Trainee': { unit: 'Detectives', isBase: false, order: 1 },
+  '» Detective Member': { unit: 'Detectives', isBase: false, order: 2 },
+  '» Detective Instructor': { unit: 'Detectives', isBase: false, order: 3 },
+  '» Co. Director of Detectives': { unit: 'Detectives', isBase: false, order: 4 },
+  '» Director of Detectives': { unit: 'Detectives', isBase: false, order: 5 },
+
+  // Highway Patrol
+  '» State Highway Patrol': { unit: 'Highway Patrol', isBase: true, order: 0 },
+  '» S.H.P. Rookie': { unit: 'Highway Patrol', isBase: false, order: 1 },
+  '» S.H.P. Trooper': { unit: 'Highway Patrol', isBase: false, order: 2 },
+  '» S.H.P. Senior Trooper': { unit: 'Highway Patrol', isBase: false, order: 3 },
+  '» S.H.P. Head Trooper': { unit: 'Highway Patrol', isBase: false, order: 4 },
+  '» Co-Director of S.H.P': { unit: 'Highway Patrol', isBase: false, order: 5 },
+  '» Director of S.H.P': { unit: 'Highway Patrol', isBase: false, order: 6 },
+
+  // Air Support Division
+  '» Air Support Division': { unit: 'Air Support', isBase: true, order: 0 },
+  '» A.S.D. Flight Student': { unit: 'Air Support', isBase: false, order: 1 },
+  '» A.S.D. Flight Officer': { unit: 'Air Support', isBase: false, order: 2 },
+  '» A.S.D. Flight Instructor': { unit: 'Air Support', isBase: false, order: 3 },
+  '» Co-Director of ASD': { unit: 'Air Support', isBase: false, order: 4 },
+  '» Director of ASD': { unit: 'Air Support', isBase: false, order: 5 },
+
+  // BIKERS
+  '» BIKERS': { unit: 'BIKERS', isBase: true, order: 0 },
+  '» Member of BIKERS': { unit: 'BIKERS', isBase: false, order: 1 },
+  '» Instructor of BIKERS': { unit: 'BIKERS', isBase: false, order: 2 },
+  '» Co-Director of BIKERS': { unit: 'BIKERS', isBase: false, order: 3 },
+  '» Director of BIKERS': { unit: 'BIKERS', isBase: false, order: 4 },
+
+  // Internal Affairs
+  '» Internal Affairs': { unit: 'Internal Affairs', isBase: true, order: 0 },
+  '» Instructor of Internal Affairs': { unit: 'Internal Affairs', isBase: false, order: 1 },
+  '» Co. Director of Internal Affairs': { unit: 'Internal Affairs', isBase: false, order: 2 },
+  '» Director of Internal Affairs': { unit: 'Internal Affairs', isBase: false, order: 3 },
+
+  // Human Resources
+  '» Human Resources': { unit: 'Human Resources', isBase: true, order: 0 },
+  '» Instructor of H.R.': { unit: 'Human Resources', isBase: false, order: 1 },
+  '» Co. Director of H.R.': { unit: 'Human Resources', isBase: false, order: 2 },
+  '» Director of Human Resources': { unit: 'Human Resources', isBase: false, order: 3 },
+
+  // Police Academy
+  '» Police Academy': { unit: 'Police Academy', isBase: true, order: 0 },
+  '» Instructor of Police Academy': { unit: 'Police Academy', isBase: false, order: 1 },
+  '» Co. Director of P.A.': { unit: 'Police Academy', isBase: false, order: 2 },
+  '» Director of Police Academy': { unit: 'Police Academy', isBase: false, order: 3 },
+
+  // Quality Assurance
+  '» Quality Assurance': { unit: 'Quality Assurance', isBase: true, order: 0 },
+  '» Instructor of Quality Assurance': { unit: 'Quality Assurance', isBase: false, order: 1 },
+  '» Co. Director of Quality Assurance': { unit: 'Quality Assurance', isBase: false, order: 2 },
+  '» Director of Quality Assurance': { unit: 'Quality Assurance', isBase: false, order: 3 },
+
+  // Flugschein (Lizenzen)
+  '» Flugschein (★)': { unit: 'Flugschein', isBase: false, order: 1 },
+  '» Flugschein (★★)': { unit: 'Flugschein', isBase: false, order: 2 },
+  '» Flugschein (★★★)': { unit: 'Flugschein', isBase: false, order: 3 },
+  '» Flugschein (★★★★)': { unit: 'Flugschein', isBase: false, order: 4 },
+  '» Flugschein (★★★★★)': { unit: 'Flugschein', isBase: false, order: 5 },
+  '» LSPD | Flugausbilder': { unit: 'Flugschein', isBase: false, order: 6 },
+
+  // Management & Leadership
+  '» Management': { unit: 'Management', isBase: true, order: 0 },
+  '» Leadership': { unit: 'Leadership', isBase: true, order: 0 },
 };
 
 // Extract badge number from display name (e.g., "[PD-104] Jack Ripper" -> "PD-104")
@@ -67,8 +118,9 @@ function extractDepartmentsFromRoles(roles: Map<string, { name: string }>): stri
   const departments: Set<string> = new Set();
 
   for (const [, role] of roles) {
-    if (UNIT_ROLES[role.name]) {
-      departments.add(UNIT_ROLES[role.name]);
+    const unitInfo = UNIT_ROLES[role.name];
+    if (unitInfo) {
+      departments.add(unitInfo.unit);
     }
   }
 
@@ -122,12 +174,22 @@ export async function initializeDiscordBot(): Promise<void> {
           const initialResult = await syncDiscordMembers();
           console.log(`Discord-Sync: ${initialResult.created} erstellt, ${initialResult.updated} aktualisiert, ${initialResult.total} Mitglieder`);
 
+          // Debug: Zeige fehlende Unit-Rollen
+          const allUnitStyleRoles = getAllDiscordUnitStyleRoles();
+          const unmapped = allUnitStyleRoles.filter(r => !r.mapped);
+          if (unmapped.length > 0) {
+            console.log(`⚠️ Fehlende Unit-Rollen im Mapping (${unmapped.length}):`);
+            unmapped.forEach(r => console.log(`   - "${r.name}"`));
+          }
+
           // Periodischer Sync alle 5 Minuten
           const SYNC_INTERVAL = 5 * 60 * 1000; // 5 Minuten
           setInterval(async () => {
             try {
               // Cache periodisch aktualisieren
-              await guild.members.fetch();
+              if (guild) {
+                await guild.members.fetch();
+              }
             } catch (e) {
               // Ignorieren, nutze bestehenden Cache
             }
@@ -195,6 +257,62 @@ export async function syncUserRole(
     return true;
   } catch (error) {
     console.error(`Error syncing role for ${discordId}:`, error);
+    return false;
+  }
+}
+
+// Discord-Nickname aktualisieren
+export async function updateDiscordNickname(discordId: string, newNickname: string): Promise<boolean> {
+  console.log(`\n=== Discord Nickname Update Start ===`);
+  console.log(`Target Discord ID: ${discordId}`);
+  console.log(`New Nickname: ${newNickname}`);
+
+  if (!guild) {
+    console.error('Guild nicht verfügbar für Nickname-Update');
+    return false;
+  }
+
+  try {
+    const member = await guild.members.fetch(discordId);
+    if (!member) {
+      console.error(`Mitglied ${discordId} nicht gefunden`);
+      return false;
+    }
+
+    console.log(`Member gefunden: ${member.user.tag}`);
+    console.log(`Aktueller Nickname: ${member.nickname || '(kein Nickname)'}`);
+
+    // Debug: Rollen-Hierarchie prüfen BEVOR wir versuchen zu ändern
+    const botMember = guild.members.me;
+    if (botMember) {
+      const botHighestRole = botMember.roles.highest;
+      const memberHighestRole = member.roles.highest;
+      console.log(`\n--- Rollen-Hierarchie ---`);
+      console.log(`Bot-Rolle: "${botHighestRole.name}" (Position: ${botHighestRole.position})`);
+      console.log(`Member-Rolle: "${memberHighestRole.name}" (Position: ${memberHighestRole.position})`);
+      console.log(`Bot kann Nickname ändern: ${botHighestRole.position > memberHighestRole.position ? 'JA' : 'NEIN'}`);
+
+      if (memberHighestRole.position >= botHighestRole.position) {
+        console.log(`\n⚠️ WARNUNG: Member hat höhere/gleiche Rolle als Bot!`);
+        console.log(`Der Bot kann keine Nicknames für Mitglieder mit höherer/gleicher Rolle ändern.`);
+        console.log(`Lösung: Die Bot-Rolle muss im Discord Server ÜBER der höchsten Rolle des Mitglieds platziert werden.`);
+        return false;
+      }
+    } else {
+      console.log(`⚠️ Bot-Member nicht gefunden in Guild!`);
+    }
+
+    // Nickname setzen (max 32 Zeichen)
+    const nickname = newNickname.substring(0, 32);
+    console.log(`\nVersuche Nickname zu setzen: "${nickname}"`);
+    await member.setNickname(nickname);
+    console.log(`✅ Discord-Nickname erfolgreich geändert!`);
+    console.log(`=== Discord Nickname Update Ende ===\n`);
+    return true;
+  } catch (error) {
+    console.error(`\n❌ Fehler beim Ändern des Discord-Nicknames für ${discordId}:`);
+    console.error(error);
+    console.log(`=== Discord Nickname Update Ende (mit Fehler) ===\n`);
     return false;
   }
 }
@@ -442,6 +560,230 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
   }
 
   return result;
+}
+
+// Alle Rang-Rollen abrufen (» 1 | ... bis » 17 | ...)
+export function getAllRankRoles(): { id: string; name: string; level: number; rank: string; position: number }[] {
+  if (!guild) return [];
+
+  const rankRoles: { id: string; name: string; level: number; rank: string; position: number }[] = [];
+
+  for (const [, role] of guild.roles.cache) {
+    const extracted = extractRankFromRoleName(role.name);
+    if (extracted) {
+      rankRoles.push({
+        id: role.id,
+        name: role.name,
+        level: extracted.level,
+        rank: extracted.rank,
+        position: role.position,
+      });
+    }
+  }
+
+  // Nach Level sortieren
+  return rankRoles.sort((a, b) => a.level - b.level);
+}
+
+// Debug: Alle Discord-Rollen mit "»" ausgeben (für fehlende Unit-Rollen)
+export function getAllDiscordUnitStyleRoles(): { id: string; name: string; position: number; mapped: boolean }[] {
+  if (!guild) return [];
+
+  const roles: { id: string; name: string; position: number; mapped: boolean }[] = [];
+
+  for (const [, role] of guild.roles.cache) {
+    // Alle Rollen die mit "»" beginnen aber KEINE Rang-Rollen sind (keine Nummer)
+    if (role.name.startsWith('»') && !extractRankFromRoleName(role.name)) {
+      roles.push({
+        id: role.id,
+        name: role.name,
+        position: role.position,
+        mapped: !!UNIT_ROLES[role.name],
+      });
+    }
+  }
+
+  return roles.sort((a, b) => b.position - a.position);
+}
+
+// Alle Unit-Rollen abrufen
+export function getAllUnitRoles(): { id: string; name: string; unit: string; isBase: boolean; order: number; position: number }[] {
+  if (!guild) return [];
+
+  const unitRoles: { id: string; name: string; unit: string; isBase: boolean; order: number; position: number }[] = [];
+
+  for (const [, role] of guild.roles.cache) {
+    const unitInfo = UNIT_ROLES[role.name];
+    if (unitInfo) {
+      unitRoles.push({
+        id: role.id,
+        name: role.name,
+        unit: unitInfo.unit,
+        isBase: unitInfo.isBase,
+        order: unitInfo.order,
+        position: role.position,
+      });
+    }
+  }
+
+  // Sortieren: Erst nach Unit-Name, dann Basis-Rolle zuerst, dann nach order
+  return unitRoles.sort((a, b) => {
+    if (a.unit !== b.unit) return a.unit.localeCompare(b.unit);
+    if (a.isBase !== b.isBase) return a.isBase ? -1 : 1;
+    return a.order - b.order;
+  });
+}
+
+// Rang ändern (Uprank/Downrank)
+export async function changeRank(
+  discordId: string,
+  direction: 'up' | 'down'
+): Promise<{ success: boolean; newRank?: string; newLevel?: number; error?: string }> {
+  if (!guild) {
+    return { success: false, error: 'Guild nicht verfügbar' };
+  }
+
+  try {
+    const member = await guild.members.fetch(discordId);
+    if (!member) {
+      return { success: false, error: 'Mitglied nicht gefunden' };
+    }
+
+    // Aktuelle Rang-Rolle finden
+    let currentRankRole: { role: ReturnType<typeof guild.roles.cache.get>; level: number; rank: string } | null = null;
+
+    for (const [, role] of member.roles.cache) {
+      const extracted = extractRankFromRoleName(role.name);
+      if (extracted) {
+        if (!currentRankRole || extracted.level > currentRankRole.level) {
+          currentRankRole = { role, ...extracted };
+        }
+      }
+    }
+
+    if (!currentRankRole) {
+      return { success: false, error: 'Keine Rang-Rolle gefunden' };
+    }
+
+    const newLevel = direction === 'up' ? currentRankRole.level + 1 : currentRankRole.level - 1;
+
+    if (newLevel < 1 || newLevel > 17) {
+      return { success: false, error: `Rang ${newLevel} existiert nicht (1-17)` };
+    }
+
+    // Neue Rang-Rolle finden
+    const allRankRoles = getAllRankRoles();
+    const newRankRole = allRankRoles.find(r => r.level === newLevel);
+
+    if (!newRankRole) {
+      return { success: false, error: `Rolle für Rang ${newLevel} nicht gefunden` };
+    }
+
+    // Alte Rolle entfernen, neue hinzufügen
+    console.log(`Rang-Änderung für ${member.user.tag}: ${currentRankRole.rank} (${currentRankRole.level}) -> ${newRankRole.rank} (${newLevel})`);
+
+    await member.roles.remove(currentRankRole.role!.id);
+    await member.roles.add(newRankRole.id);
+
+    console.log(`✅ Rang erfolgreich geändert!`);
+
+    return {
+      success: true,
+      newRank: newRankRole.rank,
+      newLevel: newRankRole.level,
+    };
+  } catch (error) {
+    console.error(`Fehler bei Rang-Änderung für ${discordId}:`, error);
+    return { success: false, error: String(error) };
+  }
+}
+
+// Unit-Rollen setzen
+export async function setUnitRoles(
+  discordId: string,
+  unitRoleIds: string[]
+): Promise<{ success: boolean; error?: string }> {
+  if (!guild) {
+    return { success: false, error: 'Guild nicht verfügbar' };
+  }
+
+  try {
+    const member = await guild.members.fetch(discordId);
+    if (!member) {
+      return { success: false, error: 'Mitglied nicht gefunden' };
+    }
+
+    // Alle Unit-Rollen-IDs sammeln
+    const allUnitRoleIds = new Set<string>();
+    for (const [, role] of guild.roles.cache) {
+      if (UNIT_ROLES[role.name]) {
+        allUnitRoleIds.add(role.id);
+      }
+    }
+
+    // Aktuelle Unit-Rollen entfernen
+    for (const [, role] of member.roles.cache) {
+      if (allUnitRoleIds.has(role.id)) {
+        await member.roles.remove(role.id);
+      }
+    }
+
+    // Neue Unit-Rollen hinzufügen
+    for (const roleId of unitRoleIds) {
+      if (allUnitRoleIds.has(roleId)) {
+        await member.roles.add(roleId);
+      }
+    }
+
+    console.log(`✅ Unit-Rollen für ${member.user.tag} aktualisiert`);
+
+    return { success: true };
+  } catch (error) {
+    console.error(`Fehler beim Setzen der Unit-Rollen für ${discordId}:`, error);
+    return { success: false, error: String(error) };
+  }
+}
+
+// Mitglied kicken
+export async function kickMember(
+  discordId: string,
+  reason?: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!guild) {
+    return { success: false, error: 'Guild nicht verfügbar' };
+  }
+
+  try {
+    const member = await guild.members.fetch(discordId);
+    if (!member) {
+      return { success: false, error: 'Mitglied nicht gefunden' };
+    }
+
+    await member.kick(reason || 'Kündigung über Personalsystem');
+    console.log(`✅ ${member.user.tag} wurde gekickt`);
+
+    return { success: true };
+  } catch (error) {
+    console.error(`Fehler beim Kicken von ${discordId}:`, error);
+    return { success: false, error: String(error) };
+  }
+}
+
+// Member Rollen abrufen
+export async function getMemberRoles(discordId: string): Promise<{ id: string; name: string }[]> {
+  if (!guild) return [];
+
+  try {
+    const member = await guild.members.fetch(discordId);
+    if (!member) return [];
+
+    return Array.from(member.roles.cache.values())
+      .filter(r => r.name !== '@everyone')
+      .map(r => ({ id: r.id, name: r.name }));
+  } catch (error) {
+    console.error(`Fehler beim Abrufen der Rollen für ${discordId}:`, error);
+    return [];
+  }
 }
 
 export { client };

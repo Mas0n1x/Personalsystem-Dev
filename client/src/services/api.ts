@@ -69,6 +69,11 @@ export const employeesApi = {
   update: (id: string, data: Record<string, unknown>) => api.put(`/employees/${id}`, data),
   delete: (id: string) => api.delete(`/employees/${id}`),
   getStats: () => api.get('/employees/stats/overview'),
+  uprank: (id: string) => api.post(`/employees/${id}/uprank`),
+  downrank: (id: string) => api.post(`/employees/${id}/downrank`),
+  getUnits: (id: string) => api.get(`/employees/${id}/units`),
+  setUnits: (id: string, unitRoleIds: string[]) => api.post(`/employees/${id}/units`, { unitRoleIds }),
+  terminate: (id: string, reason?: string) => api.post(`/employees/${id}/terminate`, { reason }),
 };
 
 // Dashboard API

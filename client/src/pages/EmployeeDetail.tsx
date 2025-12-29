@@ -1,13 +1,23 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeesApi } from '../services/api';
 import { StatusBadge } from '../components/ui/Badge';
-import { ArrowLeft, Edit, Star, Calendar, Clock } from 'lucide-react';
+import { ArrowLeft, Edit, Star, Calendar, Clock, X, Save } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import type { Employee, Evaluation, Absence } from '../types';
+import type { Evaluation, Absence } from '../types';
 
-interface EmployeeDetailData extends Employee {
+interface EmployeeDetailData {
+  id: string;
+  userId: string;
+  badgeNumber: string | null;
+  rank: string;
+  rankLevel: number;
+  department: string;
+  status: string;
+  hireDate: string;
+  notes: string | null;
   user: {
     id: string;
     username: string;
@@ -22,6 +32,13 @@ interface EmployeeDetailData extends Employee {
 export default function EmployeeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    badgeNumber: '',
+    displayName: '',
+    status: '',
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['employee', id],
@@ -30,6 +47,36 @@ export default function EmployeeDetail() {
   });
 
   const employee = data?.data as EmployeeDetailData | undefined;
+
+  const updateMutation = useMutation({
+    mutationFn: (data: typeof editForm) => employeesApi.update(id!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employee', id] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      setIsEditModalOpen(false);
+    },
+  });
+
+  // Namen ohne Badge-Prefix extrahieren
+  const cleanDisplayName = (name: string | null | undefined) => {
+    if (!name) return '';
+    return name.replace(/^\[[A-Z]+-\d+\]\s*/, '').trim();
+  };
+
+  const openEditModal = () => {
+    if (employee) {
+      setEditForm({
+        badgeNumber: employee.badgeNumber || '',
+        displayName: cleanDisplayName(employee.user?.displayName),
+        status: employee.status || 'ACTIVE',
+      });
+      setIsEditModalOpen(true);
+    }
+  };
+
+  const handleSave = () => {
+    updateMutation.mutate(editForm);
+  };
 
   if (isLoading) {
     return (
@@ -63,7 +110,7 @@ export default function EmployeeDetail() {
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-white">Mitarbeiter Details</h1>
         </div>
-        <button className="btn-secondary">
+        <button onClick={openEditModal} className="btn-secondary">
           <Edit className="h-4 w-4" />
           Bearbeiten
         </button>
@@ -206,6 +253,85 @@ export default function EmployeeDetail() {
           </div>
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-lg mx-4 border border-slate-700">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Mitarbeiter bearbeiten</h2>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  value={editForm.displayName}
+                  onChange={(e) => setEditForm({ ...editForm, displayName: e.target.value })}
+                  className="input w-full"
+                  placeholder="z.B. Jack Ripper"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Badge-Nummer
+                </label>
+                <input
+                  type="text"
+                  value={editForm.badgeNumber}
+                  onChange={(e) => setEditForm({ ...editForm, badgeNumber: e.target.value })}
+                  className="input w-full"
+                  placeholder="z.B. PD-104"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Status
+                </label>
+                <select
+                  value={editForm.status}
+                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                  className="input w-full"
+                >
+                  <option value="ACTIVE">Aktiv</option>
+                  <option value="INACTIVE">Inaktiv</option>
+                  <option value="ON_LEAVE">Abwesend</option>
+                  <option value="SUSPENDED">Suspendiert</option>
+                  <option value="TERMINATED">Entlassen</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="btn-ghost"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={updateMutation.isPending}
+                className="btn-primary"
+              >
+                <Save className="h-4 w-4" />
+                {updateMutation.isPending ? 'Speichert...' : 'Speichern'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
