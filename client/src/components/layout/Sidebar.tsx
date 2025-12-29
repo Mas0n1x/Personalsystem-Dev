@@ -3,17 +3,8 @@ import { usePermissions } from '../../hooks/usePermissions';
 import {
   LayoutDashboard,
   Users,
-  UserPlus,
-  FileSearch,
-  GraduationCap,
-  ClipboardCheck,
-  Wallet,
-  Package,
-  AlertTriangle,
-  CalendarOff,
   Settings,
   Shield,
-  Megaphone,
   FileText,
   ChevronDown,
 } from 'lucide-react';
@@ -52,32 +43,11 @@ export default function Sidebar() {
       ],
     },
     {
-      name: 'Personalverwaltung',
-      permission: 'hr.view',
-      items: [
-        { name: 'Bewerbungen', href: '/hr/applications', icon: UserPlus, permission: 'hr.view' },
-        { name: 'Bewertungen', href: '/ia/evaluations', icon: FileSearch, permission: 'ia.view' },
-        { name: 'Ausbildungen', href: '/academy/trainings', icon: GraduationCap, permission: 'academy.view' },
-        { name: 'Qualitätsberichte', href: '/qa/reports', icon: ClipboardCheck, permission: 'qa.view' },
-      ],
-    },
-    {
-      name: 'Finanzen',
-      permission: 'finance.view',
-      items: [
-        { name: 'Kasse', href: '/finance/transactions', icon: Wallet, permission: 'finance.view' },
-        { name: 'Asservaten', href: '/finance/evidence', icon: Package, permission: 'finance.view' },
-        { name: 'Raubberichte', href: '/finance/robberies', icon: AlertTriangle, permission: 'finance.view' },
-        { name: 'Abmeldungen', href: '/finance/absences', icon: CalendarOff, permission: 'finance.view' },
-      ],
-    },
-    {
       name: 'Administration',
       permission: 'admin.full',
       items: [
         { name: 'Benutzer', href: '/admin/users', icon: Users, permission: 'users.view' },
         { name: 'Rollen', href: '/admin/roles', icon: Shield, permission: 'admin.full' },
-        { name: 'Ankündigungen', href: '/admin/announcements', icon: Megaphone, permission: 'announcements.view' },
         { name: 'Audit-Logs', href: '/admin/audit-logs', icon: FileText, permission: 'audit.view' },
         { name: 'Einstellungen', href: '/admin/settings', icon: Settings, permission: 'admin.full' },
       ],

@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 // ==================== BENUTZER & ROLLEN ====================
@@ -24,22 +24,8 @@ model User {
   updatedAt     DateTime @updatedAt
 
   // Relationen
-  employee         Employee?
-  applications     Application[]     @relation("ApplicationReviewer")
-  createdApplications Application[]  @relation("ApplicationCreator")
-  evaluationsGiven Evaluation[]      @relation("EvaluationGiver")
-  evaluationsReceived Evaluation[]   @relation("EvaluationReceiver")
-  trainingsAsTutor Training[]        @relation("TrainingTutor")
-  trainingsAsParticipant TrainingParticipant[]
-  qualityReports   QualityReport[]
-  transactions     Transaction[]
-  evidenceActions  EvidenceLog[]
-  robberyReports   RobberyReport[]
-  specialPayments  SpecialPayment[]
-  absences         Absence[]
-  tuningInvoices   TuningInvoice[]
-  announcements    Announcement[]
-  auditLogs        AuditLog[]
+  employee      Employee?
+  auditLogs     AuditLog[]
 
   @@map("users")
 }
@@ -50,7 +36,7 @@ model Role {
   displayName   String
   color         String   @default("#6B7280")
   discordRoleId String?
-  level         Int      @default(0) // Höher = mehr Rechte
+  level         Int      @default(0)
   permissions   Permission[]
   users         User[]
   createdAt     DateTime @default(now())
@@ -63,7 +49,7 @@ model Permission {
   id          String   @id @default(cuid())
   name        String   @unique
   description String?
-  category    String   // admin, hr, ia, academy, qa, finance, etc.
+  category    String
   roles       Role[]
   createdAt   DateTime @default(now())
 
@@ -79,312 +65,13 @@ model Employee {
   badgeNumber   String?  @unique
   rank          String   @default("Cadet")
   department    String   @default("Patrol")
-  status        EmployeeStatus @default(ACTIVE)
+  status        String   @default("ACTIVE") // ACTIVE, INACTIVE, SUSPENDED, ON_LEAVE, TERMINATED
   hireDate      DateTime @default(now())
   notes         String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   @@map("employees")
-}
-
-enum EmployeeStatus {
-  ACTIVE
-  INACTIVE
-  SUSPENDED
-  ON_LEAVE
-  TERMINATED
-}
-
-// ==================== HUMAN RESOURCES ====================
-
-model Application {
-  id            String   @id @default(cuid())
-  applicantName String
-  discordId     String?
-  discordName   String?
-  status        ApplicationStatus @default(PENDING)
-  notes         String?
-  interviewDate DateTime?
-  reviewerId    String?
-  reviewer      User?    @relation("ApplicationReviewer", fields: [reviewerId], references: [id])
-  createdById   String?
-  createdBy     User?    @relation("ApplicationCreator", fields: [createdById], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@map("applications")
-}
-
-enum ApplicationStatus {
-  PENDING
-  INTERVIEW_SCHEDULED
-  INTERVIEW_COMPLETED
-  ACCEPTED
-  REJECTED
-  WITHDRAWN
-}
-
-// ==================== INTERNAL AFFAIRS ====================
-
-model Evaluation {
-  id          String   @id @default(cuid())
-  employeeId  String
-  employee    User     @relation("EvaluationReceiver", fields: [employeeId], references: [id])
-  evaluatorId String
-  evaluator   User     @relation("EvaluationGiver", fields: [evaluatorId], references: [id])
-  type        EvaluationType @default(PERFORMANCE)
-  rating      Int      // 1-5
-  comment     String?
-  isPositive  Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@map("evaluations")
-}
-
-enum EvaluationType {
-  PERFORMANCE
-  WARNING
-  COMMENDATION
-  INVESTIGATION
-  NOTE
-}
-
-// ==================== POLICE ACADEMY ====================
-
-model Training {
-  id            String   @id @default(cuid())
-  name          String
-  description   String?
-  type          TrainingType @default(BASIC)
-  tutorId       String
-  tutor         User     @relation("TrainingTutor", fields: [tutorId], references: [id])
-  scheduledAt   DateTime?
-  completedAt   DateTime?
-  status        TrainingStatus @default(SCHEDULED)
-  maxParticipants Int?
-  participants  TrainingParticipant[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@map("trainings")
-}
-
-model TrainingParticipant {
-  id          String   @id @default(cuid())
-  trainingId  String
-  training    Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  passed      Boolean?
-  grade       String?
-  notes       String?
-  createdAt   DateTime @default(now())
-
-  @@unique([trainingId, userId])
-  @@map("training_participants")
-}
-
-enum TrainingType {
-  BASIC
-  ADVANCED
-  SPECIALIZATION
-  CERTIFICATION
-  REFRESHER
-}
-
-enum TrainingStatus {
-  SCHEDULED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-// ==================== QUALITY ASSURANCE ====================
-
-model QualityReport {
-  id          String   @id @default(cuid())
-  unit        String
-  rating      Int      // 1-5
-  report      String
-  suggestions String?
-  reviewerId  String
-  reviewer    User     @relation(fields: [reviewerId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@map("quality_reports")
-}
-
-// ==================== FINANZEN ====================
-
-model Transaction {
-  id          String   @id @default(cuid())
-  type        TransactionType
-  amount      Float
-  category    String
-  description String?
-  reference   String?
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  createdAt   DateTime @default(now())
-
-  @@map("transactions")
-}
-
-enum TransactionType {
-  INCOME
-  EXPENSE
-}
-
-model Evidence {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  value       Float?
-  status      EvidenceStatus @default(IN_STORAGE)
-  location    String?
-  caseNumber  String?
-  logs        EvidenceLog[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@map("evidence")
-}
-
-model EvidenceLog {
-  id          String   @id @default(cuid())
-  evidenceId  String
-  evidence    Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
-  action      String   // IN, OUT, DESTROYED, RELEASED
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  notes       String?
-  createdAt   DateTime @default(now())
-
-  @@map("evidence_logs")
-}
-
-enum EvidenceStatus {
-  IN_STORAGE
-  CHECKED_OUT
-  RELEASED
-  DESTROYED
-}
-
-model RobberyReport {
-  id          String   @id @default(cuid())
-  date        DateTime @default(now())
-  location    String
-  damage      Float
-  description String
-  suspects    String?
-  status      RobberyStatus @default(OPEN)
-  reporterId  String
-  reporter    User     @relation(fields: [reporterId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@map("robbery_reports")
-}
-
-enum RobberyStatus {
-  OPEN
-  INVESTIGATING
-  SOLVED
-  CLOSED
-}
-
-model SpecialPayment {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  amount      Float
-  reason      String
-  status      PaymentStatus @default(PENDING)
-  approvedBy  String?
-  approvedAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@map("special_payments")
-}
-
-enum PaymentStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  PAID
-}
-
-model Absence {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  type        AbsenceType
-  startDate   DateTime
-  endDate     DateTime
-  reason      String?
-  status      AbsenceStatus @default(PENDING)
-  approvedBy  String?
-  approvedAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@map("absences")
-}
-
-enum AbsenceType {
-  VACATION
-  SICK
-  PERSONAL
-  TRAINING
-  OTHER
-}
-
-enum AbsenceStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-model TuningInvoice {
-  id          String   @id @default(cuid())
-  vehicle     String
-  licensePlate String?
-  amount      Float
-  description String
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  createdAt   DateTime @default(now())
-
-  @@map("tuning_invoices")
-}
-
-// ==================== KOMMUNIKATION ====================
-
-model Announcement {
-  id            String   @id @default(cuid())
-  title         String
-  content       String
-  priority      AnnouncementPriority @default(NORMAL)
-  discordChannelId String?
-  discordMessageId String?
-  publishedAt   DateTime?
-  authorId      String
-  author        User     @relation(fields: [authorId], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@map("announcements")
-}
-
-enum AnnouncementPriority {
-  LOW
-  NORMAL
-  HIGH
-  URGENT
 }
 
 // ==================== SYSTEM ====================
@@ -394,7 +81,7 @@ model AuditLog {
   action    String
   entity    String
   entityId  String?
-  details   Json?
+  details   String?
   ipAddress String?
   userAgent String?
   userId    String?
@@ -412,16 +99,10 @@ model Backup {
   filename  String
   size      Int
   path      String
-  status    BackupStatus @default(COMPLETED)
+  status    String   @default("COMPLETED")
   createdAt DateTime @default(now())
 
   @@map("backups")
-}
-
-enum BackupStatus {
-  IN_PROGRESS
-  COMPLETED
-  FAILED
 }
 
 model SystemSetting {

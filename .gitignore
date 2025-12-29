@@ -44,3 +44,4 @@ coverage/
 *.tgz
 *.tar.gz
 .cache/
+nul

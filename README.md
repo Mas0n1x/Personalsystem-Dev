@@ -1,28 +1,26 @@
-# LSPD Personalmanagementsystem
+# LSPD Personalsystem
 
-Ein umfassendes Personalmanagementsystem mit Discord-Bot-Integration für das LSPD.
+Ein schlankes Personalmanagementsystem mit Discord-Integration für das LSPD.
 
 ## Features
 
-- **Personalverwaltung**: HR, Internal Affairs, Police Academy, Quality Assurance
-- **Finanzen**: Kasse, Asservaten, Raubdokumentation, Abmeldungen
-- **Discord Integration**: OAuth2 Login, Rollensynchronisation, Ankündigungen
+- **Mitarbeiterverwaltung**: Mitarbeiter anlegen, bearbeiten, Status verwalten
+- **Discord Integration**: OAuth2 Login, Rollensynchronisation
 - **Live-Sync**: Echtzeit-Updates via WebSockets
-- **Admin-Panel**: Benutzer, Rollen, Audit-Logs
+- **Admin-Panel**: Benutzer, Rollen, Berechtigungen, Audit-Logs
 
 ## Tech Stack
 
 - **Frontend**: React + Vite + TypeScript + Tailwind CSS
 - **Backend**: Express.js + TypeScript + Prisma ORM
-- **Datenbank**: PostgreSQL
+- **Datenbank**: SQLite
 - **Discord**: discord.js v14
 - **Live-Sync**: Socket.io
 
 ## Voraussetzungen
 
 - Node.js 18+
-- PostgreSQL 15+
-- Discord Application (für OAuth2 und Bot)
+- Discord Application (OAuth2 und Bot)
 
 ## Installation
 
@@ -33,24 +31,19 @@ git clone <repository-url>
 cd Personalsystem
 ```
 
-### 2. PostgreSQL starten
-
-```bash
-docker-compose up -d postgres
-```
-
-### 3. Backend einrichten
+### 2. Backend einrichten
 
 ```bash
 cd server
 npm install
 cp .env.example .env
-# .env mit deinen Werten füllen
-npm run db:push
+# .env mit deinen Werten ausfuellen
+npx prisma generate
+npx prisma db push
 npm run dev
 ```
 
-### 4. Frontend einrichten
+### 3. Frontend einrichten
 
 ```bash
 cd client
@@ -58,30 +51,27 @@ npm install
 npm run dev
 ```
 
-### 5. Discord Application erstellen
+### 4. Discord Application erstellen
 
 1. Gehe zu https://discord.com/developers/applications
 2. Erstelle eine neue Application
 3. Unter "OAuth2":
    - Kopiere Client ID und Client Secret
-   - Füge Redirect URI hinzu: `http://localhost:5173/auth/callback`
+   - Fuege Redirect URI hinzu: `http://localhost:5173/auth/callback`
 4. Unter "Bot":
    - Erstelle einen Bot
    - Kopiere den Bot Token
-   - Aktiviere "Server Members Intent" und "Message Content Intent"
-5. Lade den Bot auf deinen Server ein (OAuth2 URL Generator mit `bot` und `applications.commands` Scopes)
+   - Aktiviere "Server Members Intent"
+5. Lade den Bot auf deinen Server ein
 
-### 6. Environment Variablen
+### 5. Environment Variablen
 
-Fülle die `.env` Datei im `server` Ordner:
+Erstelle eine `.env` Datei im `server` Ordner:
 
 ```env
 # Server
 PORT=3001
 NODE_ENV=development
-
-# Database
-DATABASE_URL="postgresql://postgres:password@localhost:5432/lspd_personalsystem?schema=public"
 
 # Discord
 DISCORD_CLIENT_ID=deine_client_id
@@ -114,23 +104,20 @@ cd client
 npm run dev
 ```
 
-### Datenbank migrieren
+### Datenbank
 
 ```bash
 cd server
-npm run db:push    # Schema pushen (Entwicklung)
-npm run db:migrate # Migration erstellen (Produktion)
-npm run db:studio  # Prisma Studio öffnen
+npx prisma generate  # Prisma Client generieren
+npx prisma db push   # Schema pushen
+npx prisma studio    # Prisma Studio oeffnen
 ```
 
-## Erste Schritte nach Installation
+## Erste Schritte
 
-1. Öffne http://localhost:5173
+1. Oeffne http://localhost:5173
 2. Logge dich mit Discord ein
-3. Gehe zu Admin > Rollen
-4. Klicke auf "Berechtigungen initialisieren"
-5. Erstelle eine Admin-Rolle mit `admin.full` Berechtigung
-6. Gehe zu Admin > Benutzer und weise dir die Admin-Rolle zu
+3. Der erste Benutzer kann ueber `/api/admin/setup` zum Admin gemacht werden
 
 ## Projektstruktur
 
@@ -152,9 +139,9 @@ Personalsystem/
 │   │   ├── middleware/     # Express Middleware
 │   │   ├── services/       # Business Logic
 │   │   └── types/          # TypeScript Types
-│   └── prisma/             # Prisma Schema
+│   └── prisma/             # Prisma Schema + SQLite DB
 │
-└── docker-compose.yml      # PostgreSQL Container
+└── .gitignore
 ```
 
 ## Lizenz

@@ -21,12 +21,31 @@ export async function initializeDiscordBot(): Promise<void> {
   client.on('ready', async () => {
     console.log(`Discord Bot eingeloggt als ${client?.user?.tag}`);
 
-    if (process.env.DISCORD_GUILD_ID) {
-      guild = client?.guilds.cache.get(process.env.DISCORD_GUILD_ID) || null;
-      if (guild) {
-        console.log(`Verbunden mit Server: ${guild.name}`);
-      } else {
-        console.warn('Discord Server nicht gefunden');
+    // Debug: Zeige alle Server auf denen der Bot ist
+    console.log(`Bot ist auf ${client?.guilds.cache.size} Server(n):`);
+    client?.guilds.cache.forEach(g => {
+      console.log(`  - ${g.name} (ID: ${g.id})`);
+    });
+
+    if (process.env.DISCORD_GUILD_ID && client) {
+      try {
+        // Erst aus Cache versuchen, dann aktiv fetchen
+        guild = client.guilds.cache.get(process.env.DISCORD_GUILD_ID) || null;
+
+        if (!guild) {
+          // Aktiv vom Discord API fetchen
+          guild = await client.guilds.fetch(process.env.DISCORD_GUILD_ID);
+        }
+
+        if (guild) {
+          console.log(`Verbunden mit Server: ${guild.name}`);
+          // Members vorladen für schnellere Suche
+          await guild.members.fetch();
+        }
+      } catch (error) {
+        console.warn('Discord Server nicht gefunden oder kein Zugriff.');
+        console.warn(`Gesuchte Guild ID: ${process.env.DISCORD_GUILD_ID}`);
+        guild = null;
       }
     }
   });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -8,8 +8,13 @@ export default function AuthCallback() {
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const hasRun = useRef(false);
 
   useEffect(() => {
+    // Prevent double execution in React Strict Mode
+    if (hasRun.current) return;
+    hasRun.current = true;
+
     const code = searchParams.get('code');
 
     if (!code) {
@@ -24,7 +29,7 @@ export default function AuthCallback() {
         navigate('/', { replace: true });
       } catch (err) {
         console.error('Auth callback error:', err);
-        setError('Authentifizierung fehlgeschlagen');
+        setError('Authentifizierung fehlgeschlagen. Bitte versuche es erneut.');
       }
     };
 

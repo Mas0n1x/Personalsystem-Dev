@@ -11,11 +11,6 @@ import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import employeeRoutes from './routes/employees.js';
 import dashboardRoutes from './routes/dashboard.js';
-import hrRoutes from './routes/hr.js';
-import iaRoutes from './routes/ia.js';
-import academyRoutes from './routes/academy.js';
-import qaRoutes from './routes/qa.js';
-import financeRoutes from './routes/finance.js';
 import adminRoutes from './routes/admin.js';
 
 // Services
@@ -55,11 +50,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/hr', hrRoutes);
-app.use('/api/ia', iaRoutes);
-app.use('/api/academy', academyRoutes);
-app.use('/api/qa', qaRoutes);
-app.use('/api/finance', financeRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Error handling

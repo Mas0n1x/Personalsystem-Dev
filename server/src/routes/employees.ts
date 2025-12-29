@@ -1,7 +1,6 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
-import { EmployeeStatus } from '@prisma/client';
 
 const router = Router();
 
@@ -11,14 +10,14 @@ router.get('/', authMiddleware, requirePermission('employees.view'), async (req:
     const { search, department, status, rank, page = '1', limit = '20' } = req.query;
 
     const where: {
-      status?: EmployeeStatus;
+      status?: string;
       department?: string;
       rank?: string;
-      OR?: Array<{ user?: { username?: { contains: string; mode: 'insensitive' }; displayName?: { contains: string; mode: 'insensitive' } }; badgeNumber?: { contains: string; mode: 'insensitive' } }>;
+      OR?: Array<{ user?: { username?: { contains: string }; displayName?: { contains: string } }; badgeNumber?: { contains: string } }>;
     } = {};
 
     if (status) {
-      where.status = status as EmployeeStatus;
+      where.status = status as string;
     }
 
     if (department) {
@@ -31,9 +30,9 @@ router.get('/', authMiddleware, requirePermission('employees.view'), async (req:
 
     if (search) {
       where.OR = [
-        { user: { username: { contains: search as string, mode: 'insensitive' } } },
-        { user: { displayName: { contains: search as string, mode: 'insensitive' } } },
-        { badgeNumber: { contains: search as string, mode: 'insensitive' } },
+        { user: { username: { contains: search as string } } },
+        { user: { displayName: { contains: search as string } } },
+        { badgeNumber: { contains: search as string } },
       ];
     }
 
@@ -78,17 +77,6 @@ router.get('/:id', authMiddleware, requirePermission('employees.view'), async (r
         user: {
           include: {
             role: true,
-            evaluationsReceived: {
-              orderBy: { createdAt: 'desc' },
-              take: 10,
-              include: {
-                evaluator: true,
-              },
-            },
-            absences: {
-              orderBy: { startDate: 'desc' },
-              take: 5,
-            },
           },
         },
       },

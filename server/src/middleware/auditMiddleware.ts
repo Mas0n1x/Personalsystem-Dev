@@ -65,12 +65,12 @@ async function logAuditEntry(req: AuthRequest, responseBody: unknown): Promise<v
         action,
         entity,
         entityId,
-        details: {
+        details: JSON.stringify({
           method: req.method,
           path: req.path,
           body: sanitizedBody,
           query: req.query,
-        },
+        }),
         ipAddress: req.ip || req.socket.remoteAddress,
         userAgent: req.headers['user-agent'],
         userId,
@@ -116,7 +116,7 @@ export async function createAuditLog(
         action,
         entity,
         entityId,
-        details: details as object,
+        details: details ? JSON.stringify(details) : undefined,
         userId,
       },
     });
