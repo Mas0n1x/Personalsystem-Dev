@@ -64,28 +64,41 @@ router.get('/stats/overview', authMiddleware, requirePermission('employees.view'
   }
 });
 
+// Team zu RankLevel Range Mapping
+function getTeamRankLevelRange(team: string): { min: number; max: number } | null {
+  switch (team) {
+    case 'Green': return { min: 1, max: 5 };
+    case 'Silver': return { min: 6, max: 9 };
+    case 'Gold': return { min: 10, max: 12 };
+    case 'Red': return { min: 13, max: 15 };
+    case 'White': return { min: 16, max: 17 };
+    default: return null;
+  }
+}
+
 // Alle Mitarbeiter abrufen
 router.get('/', authMiddleware, requirePermission('employees.view'), async (req: AuthRequest, res: Response) => {
   try {
-    const { search, department, status, rank, page = '1', limit = '20' } = req.query;
+    const { search, department, rank, team, page = '1', limit = '20' } = req.query;
 
-    const where: {
-      status?: string;
-      department?: string;
-      rank?: string;
-      OR?: Array<{ user?: { username?: { contains: string }; displayName?: { contains: string } }; badgeNumber?: { contains: string } }>;
-    } = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = {};
 
-    if (status) {
-      where.status = status as string;
-    }
-
+    // Department-Filter (mit contains, da Departments als "Patrol, S.W.A.T." gespeichert sind)
     if (department) {
-      where.department = department as string;
+      where.department = { contains: department as string };
     }
 
     if (rank) {
       where.rank = rank as string;
+    }
+
+    // Team-Filter (nach rankLevel Range filtern)
+    if (team) {
+      const range = getTeamRankLevelRange(team as string);
+      if (range) {
+        where.rankLevel = { gte: range.min, lte: range.max };
+      }
     }
 
     if (search) {
@@ -95,6 +108,8 @@ router.get('/', authMiddleware, requirePermission('employees.view'), async (req:
         { badgeNumber: { contains: search as string } },
       ];
     }
+
+    console.log('Employee filter:', { search, department, rank, team, where });
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
@@ -150,7 +165,7 @@ router.post('/', authMiddleware, requirePermission('employees.edit'), async (req
         userId,
         badgeNumber,
         rank: rank || 'Cadet',
-        department: department || 'Patrol',
+        department: department || '',
         status: status || 'ACTIVE',
       },
       include: {

@@ -167,11 +167,7 @@ function extractDepartmentsFromRoles(roles: Map<string, { name: string }>): stri
     }
   }
 
-  // Wenn keine Unit gefunden, Patrol als Standard
-  if (departments.size === 0) {
-    departments.add('Patrol');
-  }
-
+  // Leeres Array wenn keine Unit gefunden
   return Array.from(departments);
 }
 

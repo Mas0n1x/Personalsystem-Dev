@@ -5,7 +5,7 @@ import { employeesApi } from '../services/api';
 import { usePermissions } from '../hooks/usePermissions';
 import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
-import { Search, Plus, Filter, ChevronUp, ChevronDown, Users, UserX, X, Check } from 'lucide-react';
+import { Search, Filter, ChevronUp, ChevronDown, Users, UserX, X, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Employee, PaginatedResponse } from '../types';
 
@@ -46,6 +46,9 @@ export default function Employees() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState('');
+  const [rank, setRank] = useState('');
+  const [team, setTeam] = useState('');
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
 
   // Modal States
   const [unitsModalOpen, setUnitsModalOpen] = useState(false);
@@ -56,13 +59,15 @@ export default function Employees() {
   const [terminateReason, setTerminateReason] = useState('');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['employees', page, search, department],
+    queryKey: ['employees', page, search, department, rank, team],
     queryFn: () =>
       employeesApi.getAll({
         page: String(page),
         limit: '20',
         ...(search && { search }),
         ...(department && { department }),
+        ...(rank && { rank }),
+        ...(team && { team }),
       }),
   });
 
@@ -245,7 +250,10 @@ export default function Employees() {
       key: 'department',
       header: 'Abteilung',
       render: (employee: Employee) => {
-        const departments = employee.department?.split(', ').filter(Boolean) || ['Patrol'];
+        const departments = employee.department?.split(', ').filter(Boolean) || [];
+        if (departments.length === 0) {
+          return <span className="text-slate-500">-</span>;
+        }
         return (
           <div className="flex flex-wrap gap-1">
             {departments.map((dept, idx) => (
@@ -313,6 +321,17 @@ export default function Employees() {
       : []),
   ];
 
+  // Filter zurücksetzen
+  const resetFilters = () => {
+    setSearch('');
+    setDepartment('');
+    setRank('');
+    setTeam('');
+    setPage(1);
+  };
+
+  const hasActiveFilters = search || department || rank || team;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -321,12 +340,6 @@ export default function Employees() {
           <h1 className="text-2xl font-bold text-white">Mitarbeiter</h1>
           <p className="text-slate-400 mt-1">Übersicht aller Mitarbeiter des LSPD</p>
         </div>
-        {canEditEmployees && (
-          <button className="btn-primary">
-            <Plus className="h-4 w-4" />
-            Neuer Mitarbeiter
-          </button>
-        )}
       </div>
 
       {/* Filter */}
@@ -351,7 +364,6 @@ export default function Employees() {
             className="input w-auto"
           >
             <option value="">Alle Abteilungen</option>
-            <option value="Patrol">Patrol</option>
             <option value="S.W.A.T.">S.W.A.T.</option>
             <option value="Detectives">Detectives</option>
             <option value="Highway Patrol">Highway Patrol</option>
@@ -365,11 +377,64 @@ export default function Employees() {
             <option value="Leadership">Leadership</option>
           </select>
 
-          <button className="btn-ghost">
+          <button
+            onClick={() => setShowMoreFilters(!showMoreFilters)}
+            className={`btn-ghost ${showMoreFilters ? 'bg-slate-700' : ''}`}
+          >
             <Filter className="h-4 w-4" />
-            Mehr Filter
+            {showMoreFilters ? 'Weniger Filter' : 'Mehr Filter'}
           </button>
+
+          {hasActiveFilters && (
+            <button onClick={resetFilters} className="btn-ghost text-red-400 hover:text-red-300">
+              <X className="h-4 w-4" />
+              Filter zurücksetzen
+            </button>
+          )}
         </div>
+
+        {/* Erweiterte Filter */}
+        {showMoreFilters && (
+          <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-slate-700">
+            <select
+              value={rank}
+              onChange={(e) => setRank(e.target.value)}
+              className="input w-auto"
+            >
+              <option value="">Alle Ränge</option>
+              <option value="Recruit">Recruit</option>
+              <option value="Junior Officer">Junior Officer</option>
+              <option value="Officer I">Officer I</option>
+              <option value="Officer II">Officer II</option>
+              <option value="Officer III">Officer III</option>
+              <option value="Senior Officer">Senior Officer</option>
+              <option value="Sergeant">Sergeant</option>
+              <option value="First Sergeant">First Sergeant</option>
+              <option value="Staff Sergeant">Staff Sergeant</option>
+              <option value="Lieutenant I">Lieutenant I</option>
+              <option value="Lieutenant II">Lieutenant II</option>
+              <option value="Senior Lieutenant">Senior Lieutenant</option>
+              <option value="Captain">Captain</option>
+              <option value="Commander">Commander</option>
+              <option value="Commissioner of Teams / Units">Commissioner of Teams / Units</option>
+              <option value="Assistant Chief">Assistant Chief</option>
+              <option value="Chief">Chief</option>
+            </select>
+
+            <select
+              value={team}
+              onChange={(e) => setTeam(e.target.value)}
+              className="input w-auto"
+            >
+              <option value="">Alle Teams</option>
+              <option value="Green">Team Green (1-5)</option>
+              <option value="Silver">Team Silver (6-9)</option>
+              <option value="Gold">Team Gold (10-12)</option>
+              <option value="Red">Team Red (13-15)</option>
+              <option value="White">Team White (16-17)</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Tabelle */}
