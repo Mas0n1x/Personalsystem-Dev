@@ -9,7 +9,9 @@ import {
   getAllUnitRoles,
   getMemberRoles,
   syncDiscordMembers,
-  getAllDiscordUnitStyleRoles
+  getAllDiscordUnitStyleRoles,
+  findFreeBadgeNumber,
+  getTeamConfigForLevel
 } from '../services/discordBot.js';
 
 const router = Router();
@@ -262,13 +264,39 @@ router.post('/:id/uprank', authMiddleware, requirePermission('employees.edit'), 
       return;
     }
 
+    // Daten für Update vorbereiten
+    const updateData: { rank: string; rankLevel: number; badgeNumber?: string } = {
+      rank: result.newRank!,
+      rankLevel: result.newLevel!,
+    };
+
+    // Bei Team-Wechsel: Neue Dienstnummer setzen
+    if (result.teamChanged && result.newBadgeNumber) {
+      updateData.badgeNumber = result.newBadgeNumber;
+    }
+
     const updatedEmployee = await prisma.employee.update({
       where: { id: req.params.id },
-      data: {
-        rank: result.newRank!,
-        rankLevel: result.newLevel!,
-      },
+      data: updateData,
       include: { user: true },
+    });
+
+    // Nickname auf Discord aktualisieren (mit neuer Badge-Nummer falls geändert)
+    const cleanName = (name: string | null) => {
+      if (!name) return null;
+      return name.replace(/^\[[A-Z]+-\d+\]\s*/, '').trim();
+    };
+    const pureName = cleanName(updatedEmployee.user.displayName) || updatedEmployee.user.username;
+    const newNickname = updatedEmployee.badgeNumber
+      ? `[${updatedEmployee.badgeNumber}] ${pureName}`
+      : pureName;
+
+    await updateDiscordNickname(updatedEmployee.user.discordId, newNickname);
+
+    // User displayName auch aktualisieren
+    await prisma.user.update({
+      where: { id: updatedEmployee.userId },
+      data: { displayName: newNickname },
     });
 
     await syncDiscordMembers();
@@ -278,6 +306,8 @@ router.post('/:id/uprank', authMiddleware, requirePermission('employees.edit'), 
       employee: updatedEmployee,
       newRank: result.newRank,
       newLevel: result.newLevel,
+      newBadgeNumber: result.newBadgeNumber,
+      teamChanged: result.teamChanged,
     });
   } catch (error) {
     console.error('Uprank error:', error);
@@ -305,13 +335,39 @@ router.post('/:id/downrank', authMiddleware, requirePermission('employees.edit')
       return;
     }
 
+    // Daten für Update vorbereiten
+    const updateData: { rank: string; rankLevel: number; badgeNumber?: string } = {
+      rank: result.newRank!,
+      rankLevel: result.newLevel!,
+    };
+
+    // Bei Team-Wechsel: Neue Dienstnummer setzen
+    if (result.teamChanged && result.newBadgeNumber) {
+      updateData.badgeNumber = result.newBadgeNumber;
+    }
+
     const updatedEmployee = await prisma.employee.update({
       where: { id: req.params.id },
-      data: {
-        rank: result.newRank!,
-        rankLevel: result.newLevel!,
-      },
+      data: updateData,
       include: { user: true },
+    });
+
+    // Nickname auf Discord aktualisieren (mit neuer Badge-Nummer falls geändert)
+    const cleanName = (name: string | null) => {
+      if (!name) return null;
+      return name.replace(/^\[[A-Z]+-\d+\]\s*/, '').trim();
+    };
+    const pureName = cleanName(updatedEmployee.user.displayName) || updatedEmployee.user.username;
+    const newNickname = updatedEmployee.badgeNumber
+      ? `[${updatedEmployee.badgeNumber}] ${pureName}`
+      : pureName;
+
+    await updateDiscordNickname(updatedEmployee.user.discordId, newNickname);
+
+    // User displayName auch aktualisieren
+    await prisma.user.update({
+      where: { id: updatedEmployee.userId },
+      data: { displayName: newNickname },
     });
 
     await syncDiscordMembers();
@@ -321,6 +377,8 @@ router.post('/:id/downrank', authMiddleware, requirePermission('employees.edit')
       employee: updatedEmployee,
       newRank: result.newRank,
       newLevel: result.newLevel,
+      newBadgeNumber: result.newBadgeNumber,
+      teamChanged: result.teamChanged,
     });
   } catch (error) {
     console.error('Downrank error:', error);
@@ -416,10 +474,42 @@ router.put('/:id', authMiddleware, requirePermission('employees.edit'), async (r
       return;
     }
 
+    // Badge-Nummer Validierung
+    let finalBadgeNumber = badgeNumber || null;
+
+    if (badgeNumber) {
+      // Prüfe ob die Badge-Nummer bereits belegt ist (außer vom aktuellen Mitarbeiter)
+      const badgeExists = await prisma.employee.findFirst({
+        where: {
+          badgeNumber: badgeNumber,
+          id: { not: req.params.id },
+        },
+      });
+
+      if (badgeExists) {
+        res.status(400).json({ error: `Dienstnummer ${badgeNumber} ist bereits vergeben` });
+        return;
+      }
+
+      // Prüfe ob die Badge-Nummer im gültigen Bereich für den Rang liegt
+      const teamConfig = getTeamConfigForLevel(existingEmployee.rankLevel);
+      const badgeMatch = badgeNumber.match(/^([A-Z]+)-(\d+)$/);
+
+      if (badgeMatch) {
+        const badgeNum = parseInt(badgeMatch[2]);
+        if (badgeNum < teamConfig.badgeMin || badgeNum > teamConfig.badgeMax) {
+          res.status(400).json({
+            error: `Dienstnummer muss für Team ${teamConfig.team} im Bereich ${teamConfig.badgePrefix}-${teamConfig.badgeMin.toString().padStart(2, '0')} bis ${teamConfig.badgePrefix}-${teamConfig.badgeMax.toString().padStart(2, '0')} liegen`,
+          });
+          return;
+        }
+      }
+    }
+
     const employee = await prisma.employee.update({
       where: { id: req.params.id },
       data: {
-        badgeNumber: badgeNumber || null,
+        badgeNumber: finalBadgeNumber,
         status,
       },
       include: {
@@ -438,8 +528,8 @@ router.put('/:id', authMiddleware, requirePermission('employees.edit'), async (r
 
     const pureName = cleanName(displayName) || cleanName(existingEmployee.user.displayName) || existingEmployee.user.username;
 
-    const newNickname = badgeNumber
-      ? `[${badgeNumber}] ${pureName}`
+    const newNickname = finalBadgeNumber
+      ? `[${finalBadgeNumber}] ${pureName}`
       : pureName;
 
     console.log(`Updating Discord nickname for ${existingEmployee.user.discordId} to "${newNickname}"`);

@@ -25,6 +25,49 @@ function extractRankFromRoleName(roleName: string): { level: number; rank: strin
   return null;
 }
 
+// Team-Konfiguration basierend auf Rang-Level
+// Dienstnummern-Bereiche und Team-Rollen
+interface TeamConfig {
+  team: string;
+  teamRole: string;
+  teamLeitungRole?: string;
+  badgePrefix: string;
+  badgeMin: number;
+  badgeMax: number;
+}
+
+function getTeamConfigForLevel(level: number): TeamConfig {
+  if (level === 17) {
+    return { team: 'White', teamRole: '» Team White', badgePrefix: 'PD', badgeMin: 1, badgeMax: 1 };
+  } else if (level === 16) {
+    return { team: 'White', teamRole: '» Team White', badgePrefix: 'PD', badgeMin: 2, badgeMax: 2 };
+  } else if (level === 15) {
+    return { team: 'Red', teamRole: '» Team Red', teamLeitungRole: '» Team Red Leitung', badgePrefix: 'PD', badgeMin: 3, badgeMax: 3 };
+  } else if (level >= 13 && level <= 14) {
+    return { team: 'Red', teamRole: '» Team Red', badgePrefix: 'PD', badgeMin: 4, badgeMax: 10 };
+  } else if (level >= 10 && level <= 12) {
+    return { team: 'Gold', teamRole: '» Team Gold', badgePrefix: 'PD', badgeMin: 100, badgeMax: 130 };
+  } else if (level >= 6 && level <= 9) {
+    return { team: 'Silver', teamRole: '» Team Silver', badgePrefix: 'PD', badgeMin: 131, badgeMax: 200 };
+  } else {
+    // 1-5: Green
+    return { team: 'Green', teamRole: '» Team Green', badgePrefix: 'PD', badgeMin: 201, badgeMax: 300 };
+  }
+}
+
+// Alle Team-Rollen Namen
+const ALL_TEAM_ROLES = [
+  '» Team White',
+  '» Team Red Leitung',
+  '» Team Red',
+  '» Team Gold Leitung',
+  '» Team Gold',
+  '» Team Silver Leitung',
+  '» Team Silver',
+  '» Team Green Leitung',
+  '» Team Green',
+];
+
 // Bekannte Unit/Abteilungs-Rollen (ohne Nummer, nur "» Name")
 // Format: { unit: 'Unit Name', isBase: true/false } - isBase = Basis-Mitgliedsrolle
 const UNIT_ROLES: Record<string, { unit: string; isBase: boolean; order: number }> = {
@@ -634,11 +677,85 @@ export function getAllUnitRoles(): { id: string; name: string; unit: string; isB
   });
 }
 
-// Rang ändern (Uprank/Downrank)
+// Freie Dienstnummer im angegebenen Bereich finden
+export async function findFreeBadgeNumber(min: number, max: number, prefix: string): Promise<string | null> {
+  // Alle belegten Badge-Nummern aus der Datenbank holen
+  const employees = await prisma.employee.findMany({
+    where: {
+      badgeNumber: {
+        startsWith: prefix,
+      },
+    },
+    select: {
+      badgeNumber: true,
+    },
+  });
+
+  // Extrahiere die Nummern aus den Badge-Nummern
+  const usedNumbers = new Set<number>();
+  for (const emp of employees) {
+    if (emp.badgeNumber) {
+      const match = emp.badgeNumber.match(new RegExp(`^${prefix}-(\\d+)$`));
+      if (match) {
+        usedNumbers.add(parseInt(match[1]));
+      }
+    }
+  }
+
+  // Finde die erste freie Nummer im Bereich
+  for (let num = min; num <= max; num++) {
+    if (!usedNumbers.has(num)) {
+      // Formatiere die Nummer mit führenden Nullen
+      const numStr = num.toString().padStart(2, '0');
+      return `${prefix}-${numStr}`;
+    }
+  }
+
+  return null; // Keine freie Nummer gefunden
+}
+
+// Team-Rollen aktualisieren
+async function updateTeamRoles(member: Awaited<ReturnType<typeof guild.members.fetch>>, newTeamConfig: TeamConfig): Promise<void> {
+  if (!guild) return;
+
+  // Alle Team-Rollen-IDs sammeln
+  const teamRoleIds: Map<string, string> = new Map();
+  for (const [, role] of guild.roles.cache) {
+    if (ALL_TEAM_ROLES.includes(role.name)) {
+      teamRoleIds.set(role.name, role.id);
+    }
+  }
+
+  // Alte Team-Rollen entfernen
+  for (const [, role] of member.roles.cache) {
+    if (ALL_TEAM_ROLES.includes(role.name)) {
+      await member.roles.remove(role.id);
+      console.log(`  ➖ Team-Rolle entfernt: ${role.name}`);
+    }
+  }
+
+  // Neue Team-Rolle hinzufügen
+  const newTeamRoleId = teamRoleIds.get(newTeamConfig.teamRole);
+  if (newTeamRoleId) {
+    await member.roles.add(newTeamRoleId);
+    console.log(`  ➕ Team-Rolle hinzugefügt: ${newTeamConfig.teamRole}`);
+  }
+
+  // Leitung-Rolle hinzufügen wenn vorhanden
+  if (newTeamConfig.teamLeitungRole) {
+    const leitungRoleId = teamRoleIds.get(newTeamConfig.teamLeitungRole);
+    if (leitungRoleId) {
+      await member.roles.add(leitungRoleId);
+      console.log(`  ➕ Leitung-Rolle hinzugefügt: ${newTeamConfig.teamLeitungRole}`);
+    }
+  }
+}
+
+// Rang ändern (Uprank/Downrank) mit automatischer Team- und Dienstnummer-Anpassung
 export async function changeRank(
   discordId: string,
   direction: 'up' | 'down'
-): Promise<{ success: boolean; newRank?: string; newLevel?: number; error?: string }> {
+): Promise<{ success: boolean; newRank?: string; newLevel?: number; newBadgeNumber?: string; teamChanged?: boolean; error?: string }> {
   if (!guild) {
     return { success: false, error: 'Guild nicht verfügbar' };
   }
@@ -679,11 +796,33 @@ export async function changeRank(
       return { success: false, error: `Rolle für Rang ${newLevel} nicht gefunden` };
     }
 
-    // Alte Rolle entfernen, neue hinzufügen
-    console.log(`Rang-Änderung für ${member.user.tag}: ${currentRankRole.rank} (${currentRankRole.level}) -> ${newRankRole.rank} (${newLevel})`);
+    // Team-Konfiguration ermitteln
+    const oldTeamConfig = getTeamConfigForLevel(currentRankRole.level);
+    const newTeamConfig = getTeamConfigForLevel(newLevel);
+    const teamChanged = oldTeamConfig.team !== newTeamConfig.team;
 
+    console.log(`Rang-Änderung für ${member.user.tag}: ${currentRankRole.rank} (${currentRankRole.level}) -> ${newRankRole.rank} (${newLevel})`);
+    console.log(`  Team: ${oldTeamConfig.team} -> ${newTeamConfig.team} (${teamChanged ? 'WECHSEL' : 'kein Wechsel'})`);
+
+    // 1. Rang-Rolle ändern
     await member.roles.remove(currentRankRole.role!.id);
     await member.roles.add(newRankRole.id);
+    console.log(`  ✅ Rang-Rolle geändert`);
+
+    // 2. Team-Rollen aktualisieren
+    await updateTeamRoles(member, newTeamConfig);
+
+    // 3. Neue Dienstnummer nur wenn Team wechselt
+    let newBadgeNumber: string | undefined;
+    if (teamChanged) {
+      const freeBadge = await findFreeBadgeNumber(newTeamConfig.badgeMin, newTeamConfig.badgeMax, newTeamConfig.badgePrefix);
+      if (freeBadge) {
+        newBadgeNumber = freeBadge;
+        console.log(`  ✅ Neue Dienstnummer: ${freeBadge}`);
+      } else {
+        console.warn(`  ⚠️ Keine freie Dienstnummer im Bereich ${newTeamConfig.badgeMin}-${newTeamConfig.badgeMax}`);
+      }
+    }
 
     console.log(`✅ Rang erfolgreich geändert!`);
 
@@ -691,6 +830,8 @@ export async function changeRank(
       success: true,
       newRank: newRankRole.rank,
       newLevel: newRankRole.level,
+      newBadgeNumber,
+      teamChanged,
     };
   } catch (error) {
     console.error(`Fehler bei Rang-Änderung für ${discordId}:`, error);
@@ -786,4 +927,5 @@ export async function getMemberRoles(discordId: string): Promise<{ id: string; n
   }
 }
 
-export { client };
+// Exportiere getTeamConfigForLevel für externe Verwendung
+export { client, getTeamConfigForLevel };
