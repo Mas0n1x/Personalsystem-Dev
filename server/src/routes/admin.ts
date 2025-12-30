@@ -122,6 +122,9 @@ router.post('/setup', async (req, res: Response) => {
       // Evidence Permissions
       { name: 'evidence.view', description: 'Asservate anzeigen', category: 'evidence' },
       { name: 'evidence.manage', description: 'Asservate verwalten', category: 'evidence' },
+      // Tuning Permissions
+      { name: 'tuning.view', description: 'Tuning-Rechnungen anzeigen', category: 'tuning' },
+      { name: 'tuning.manage', description: 'Tuning-Rechnungen verwalten', category: 'tuning' },
     ];
 
     for (const perm of defaultPermissions) {
@@ -195,6 +198,9 @@ router.post('/permissions/seed', authMiddleware, requirePermission('admin.full')
       // Evidence Permissions
       { name: 'evidence.view', description: 'Asservate anzeigen', category: 'evidence' },
       { name: 'evidence.manage', description: 'Asservate verwalten', category: 'evidence' },
+      // Tuning Permissions
+      { name: 'tuning.view', description: 'Tuning-Rechnungen anzeigen', category: 'tuning' },
+      { name: 'tuning.manage', description: 'Tuning-Rechnungen verwalten', category: 'tuning' },
     ];
 
     for (const perm of defaultPermissions) {

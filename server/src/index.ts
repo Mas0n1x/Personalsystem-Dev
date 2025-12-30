@@ -19,6 +19,7 @@ import treasuryRoutes from './routes/treasury.js';
 import noteRoutes from './routes/notes.js';
 import announcementRoutes from './routes/announcements.js';
 import evidenceRoutes from './routes/evidence.js';
+import tuningRoutes from './routes/tuning.js';
 
 // Services
 import { initializeDiscordBot } from './services/discordBot.js';
@@ -65,6 +66,7 @@ app.use('/api/treasury', treasuryRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/evidence', evidenceRoutes);
+app.use('/api/tuning', tuningRoutes);
 
 // Error handling
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

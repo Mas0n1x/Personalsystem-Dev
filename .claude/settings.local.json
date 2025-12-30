@@ -26,7 +26,8 @@
       "Bash(node check-absences.mjs:*)",
       "Bash(node fix-absences.mjs:*)",
       "Bash(tree:*)",
-      "Bash(del \"c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\client\\\\src\\\\pages\\\\leadership\\\\TasksAndNotes.tsx\")"
+      "Bash(del \"c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\client\\\\src\\\\pages\\\\leadership\\\\TasksAndNotes.tsx\")",
+      "Bash(npm install:*)"
     ]
   }
 }

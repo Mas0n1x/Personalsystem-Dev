@@ -17,6 +17,7 @@ import Settings from './pages/admin/Settings';
 // Leadership
 import Leadership from './pages/Leadership';
 import Evidence from './pages/Evidence';
+import Tuning from './pages/Tuning';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -57,6 +58,7 @@ function App() {
         <Route path="employees/:id" element={<EmployeeDetail />} />
         <Route path="absences" element={<Absences />} />
         <Route path="evidence" element={<Evidence />} />
+        <Route path="tuning" element={<Tuning />} />
 
         {/* Leadership */}
         <Route path="leadership" element={<Leadership />} />

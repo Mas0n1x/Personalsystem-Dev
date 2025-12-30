@@ -192,3 +192,15 @@ export const evidenceApi = {
   destroyBulk: (ids: string[]) => api.put('/evidence/destroy-bulk', { ids }),
   delete: (id: string) => api.delete(`/evidence/${id}`),
 };
+
+// Tuning API
+export const tuningApi = {
+  getAll: () => api.get('/tuning'),
+  getStats: () => api.get('/tuning/stats'),
+  getImageUrl: (filename: string) => `/api/tuning/image/${filename}`,
+  create: (formData: FormData) => api.post('/tuning', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  complete: (id: string) => api.put(`/tuning/${id}/complete`),
+  delete: (id: string) => api.delete(`/tuning/${id}`),
+};
