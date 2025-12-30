@@ -20,6 +20,7 @@ import noteRoutes from './routes/notes.js';
 import announcementRoutes from './routes/announcements.js';
 import evidenceRoutes from './routes/evidence.js';
 import tuningRoutes from './routes/tuning.js';
+import robberyRoutes from './routes/robbery.js';
 
 // Services
 import { initializeDiscordBot } from './services/discordBot.js';
@@ -67,6 +68,7 @@ app.use('/api/notes', noteRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/evidence', evidenceRoutes);
 app.use('/api/tuning', tuningRoutes);
+app.use('/api/robbery', robberyRoutes);
 
 // Error handling
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

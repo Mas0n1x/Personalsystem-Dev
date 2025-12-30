@@ -11,6 +11,7 @@ import {
   Briefcase,
   Package,
   Car,
+  Crosshair,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -47,6 +48,7 @@ export default function Sidebar() {
         { name: 'Abmeldungen', href: '/absences', icon: CalendarOff, permission: 'employees.view' },
         { name: 'Asservaten', href: '/evidence', icon: Package, permission: 'evidence.view' },
         { name: 'Tuning', href: '/tuning', icon: Car, permission: 'tuning.view' },
+        { name: 'Räube', href: '/robbery', icon: Crosshair, permission: 'robbery.view' },
         { name: 'Leadership', href: '/leadership', icon: Briefcase, permission: 'leadership.view' },
       ],
     },

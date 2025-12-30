@@ -125,6 +125,10 @@ router.post('/setup', async (req, res: Response) => {
       // Tuning Permissions
       { name: 'tuning.view', description: 'Tuning-Rechnungen anzeigen', category: 'tuning' },
       { name: 'tuning.manage', description: 'Tuning-Rechnungen verwalten', category: 'tuning' },
+      // Robbery Permissions
+      { name: 'robbery.view', description: 'Räube anzeigen', category: 'robbery' },
+      { name: 'robbery.create', description: 'Räube erstellen', category: 'robbery' },
+      { name: 'robbery.manage', description: 'Räube verwalten', category: 'robbery' },
     ];
 
     for (const perm of defaultPermissions) {
@@ -201,6 +205,10 @@ router.post('/permissions/seed', authMiddleware, requirePermission('admin.full')
       // Tuning Permissions
       { name: 'tuning.view', description: 'Tuning-Rechnungen anzeigen', category: 'tuning' },
       { name: 'tuning.manage', description: 'Tuning-Rechnungen verwalten', category: 'tuning' },
+      // Robbery Permissions
+      { name: 'robbery.view', description: 'Räube anzeigen', category: 'robbery' },
+      { name: 'robbery.create', description: 'Räube erstellen', category: 'robbery' },
+      { name: 'robbery.manage', description: 'Räube verwalten', category: 'robbery' },
     ];
 
     for (const perm of defaultPermissions) {

@@ -204,3 +204,15 @@ export const tuningApi = {
   complete: (id: string) => api.put(`/tuning/${id}/complete`),
   delete: (id: string) => api.delete(`/tuning/${id}`),
 };
+
+// Robbery API (Räube)
+export const robberyApi = {
+  getAll: () => api.get('/robbery'),
+  getStats: () => api.get('/robbery/stats'),
+  getEmployees: () => api.get('/robbery/employees'),
+  getImageUrl: (filename: string) => `/api/robbery/image/${filename}`,
+  create: (formData: FormData) => api.post('/robbery', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  delete: (id: string) => api.delete(`/robbery/${id}`),
+};
