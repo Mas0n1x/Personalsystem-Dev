@@ -13,6 +13,11 @@ import employeeRoutes from './routes/employees.js';
 import dashboardRoutes from './routes/dashboard.js';
 import adminRoutes from './routes/admin.js';
 import absenceRoutes from './routes/absences.js';
+import taskRoutes from './routes/tasks.js';
+import sanctionRoutes from './routes/sanctions.js';
+import treasuryRoutes from './routes/treasury.js';
+import noteRoutes from './routes/notes.js';
+import announcementRoutes from './routes/announcements.js';
 
 // Services
 import { initializeDiscordBot } from './services/discordBot.js';
@@ -53,6 +58,11 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/absences', absenceRoutes);
+app.use('/api/tasks', taskRoutes);
+app.use('/api/sanctions', sanctionRoutes);
+app.use('/api/treasury', treasuryRoutes);
+app.use('/api/notes', noteRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 // Error handling
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

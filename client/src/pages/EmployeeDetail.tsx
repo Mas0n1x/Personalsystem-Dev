@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeesApi } from '../services/api';
 import { StatusBadge } from '../components/ui/Badge';
-import { ArrowLeft, Edit, Calendar, Clock, X, Save, CalendarOff } from 'lucide-react';
+import { ArrowLeft, Edit, Clock, X, Save, CalendarOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 

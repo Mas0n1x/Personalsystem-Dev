@@ -125,3 +125,57 @@ export const absencesApi = {
     api.post('/absences', data),
   delete: (id: string) => api.delete(`/absences/${id}`),
 };
+
+// Tasks API
+export const tasksApi = {
+  getAll: (params?: Record<string, string>) => api.get('/tasks', { params }),
+  create: (data: { title: string; description?: string; assigneeId?: string; priority?: string; dueDate?: string }) =>
+    api.post('/tasks', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/tasks/${id}`, data),
+  updateStatus: (id: string, status: string) => api.put(`/tasks/${id}/status`, { status }),
+  delete: (id: string) => api.delete(`/tasks/${id}`),
+};
+
+// Sanctions API
+export const sanctionsApi = {
+  getAll: (params?: Record<string, string>) => api.get('/sanctions', { params }),
+  getByEmployee: (employeeId: string) => api.get(`/sanctions/employee/${employeeId}`),
+  create: (data: { employeeId: string; hasWarning: boolean; hasFine: boolean; hasMeasure: boolean; reason: string; amount?: number; measure?: string; expiresAt?: string }) =>
+    api.post('/sanctions', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/sanctions/${id}`, data),
+  revoke: (id: string) => api.put(`/sanctions/${id}/revoke`),
+  delete: (id: string) => api.delete(`/sanctions/${id}`),
+};
+
+// Treasury API
+export const treasuryApi = {
+  get: () => api.get('/treasury'),
+  getTransactions: (params?: Record<string, string>) => api.get('/treasury/transactions', { params }),
+  deposit: (data: { moneyType: string; amount: number; reason: string }) =>
+    api.post('/treasury/deposit', data),
+  withdraw: (data: { moneyType: string; amount: number; reason: string }) =>
+    api.post('/treasury/withdraw', data),
+};
+
+// Notes API
+export const notesApi = {
+  getAll: (params?: Record<string, string>) => api.get('/notes', { params }),
+  create: (data: { title: string; content: string; category?: string }) =>
+    api.post('/notes', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/notes/${id}`, data),
+  togglePin: (id: string) => api.put(`/notes/${id}/pin`),
+  delete: (id: string) => api.delete(`/notes/${id}`),
+};
+
+// Announcements API
+export const announcementsApi = {
+  getAll: () => api.get('/announcements'),
+  getChannels: () => api.get('/announcements/channels'),
+  create: (data: { title: string; content: string; channelId?: string }) =>
+    api.post('/announcements', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/announcements/${id}`, data),
+  send: (id: string) => api.post(`/announcements/${id}/send`),
+  sendDirect: (data: { title: string; content: string; channelId: string }) =>
+    api.post('/announcements/send-direct', data),
+  delete: (id: string) => api.delete(`/announcements/${id}`),
+};

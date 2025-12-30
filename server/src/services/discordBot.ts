@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, EmbedBuilder, TextChannel, Guild, ChannelType } from 'discord.js';
+import { Client, GatewayIntentBits, EmbedBuilder, TextChannel, Guild, ChannelType, GuildMember } from 'discord.js';
 import { prisma } from '../index.js';
 
 let client: Client | null = null;
@@ -729,7 +729,7 @@ export async function findFreeBadgeNumber(min: number, max: number, prefix: stri
 }
 
 // Team-Rollen aktualisieren
-async function updateTeamRoles(member: Awaited<ReturnType<typeof guild.members.fetch>>, newTeamConfig: TeamConfig): Promise<void> {
+async function updateTeamRoles(member: GuildMember, newTeamConfig: TeamConfig): Promise<void> {
   if (!guild) return;
 
   // Alle Team-Rollen-IDs sammeln
@@ -938,6 +938,71 @@ export async function getMemberRoles(discordId: string): Promise<{ id: string; n
   } catch (error) {
     console.error(`Fehler beim Abrufen der Rollen für ${discordId}:`, error);
     return [];
+  }
+}
+
+// Vordefinierte Ankündigungs-Kanäle aus .env abrufen
+export async function getAnnouncementChannels(): Promise<{ id: string; name: string }[]> {
+  if (!guild || !client) return [];
+
+  const channelIds = (process.env.ANNOUNCEMENT_CHANNELS || '').split(',').filter(id => id.trim());
+
+  if (channelIds.length === 0) {
+    // Fallback: Alle Text-Kanäle zurückgeben
+    return guild.channels.cache
+      .filter(c => c.type === ChannelType.GuildText)
+      .map(c => ({ id: c.id, name: c.name }));
+  }
+
+  const channels: { id: string; name: string }[] = [];
+
+  for (const channelId of channelIds) {
+    try {
+      const channel = await client.channels.fetch(channelId.trim());
+      if (channel && channel.type === ChannelType.GuildText) {
+        channels.push({ id: channel.id, name: (channel as TextChannel).name });
+      }
+    } catch (error) {
+      console.warn(`Kanal ${channelId} nicht gefunden`);
+    }
+  }
+
+  return channels;
+}
+
+// Rolle die bei jeder Ankündigung erwähnt wird
+const ANNOUNCEMENT_MENTION_ROLE_ID = '1213569073573793822';
+
+// Ankündigung an einen bestimmten Kanal senden (vereinfachte Version)
+export async function sendAnnouncementToChannel(
+  channelId: string,
+  title: string,
+  content: string
+): Promise<string | null> {
+  if (!client) return null;
+
+  try {
+    const channel = await client.channels.fetch(channelId);
+    if (!channel || channel.type !== ChannelType.GuildText) return null;
+
+    const textChannel = channel as TextChannel;
+
+    const embed = new EmbedBuilder()
+      .setTitle(title)
+      .setDescription(content)
+      .setColor(0x3498db) // Blau
+      .setTimestamp()
+      .setFooter({ text: 'LSPD Personalsystem' });
+
+    // Rolle erwähnen und Embed senden
+    const message = await textChannel.send({
+      content: `<@&${ANNOUNCEMENT_MENTION_ROLE_ID}>`,
+      embeds: [embed],
+    });
+    return message.id;
+  } catch (error) {
+    console.error('Error sending announcement to channel:', error);
+    return null;
   }
 }
 

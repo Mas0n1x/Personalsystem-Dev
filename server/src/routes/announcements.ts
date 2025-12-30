@@ -1,0 +1,219 @@
+import { Router, Response } from 'express';
+import { prisma } from '../index.js';
+import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { sendAnnouncementToChannel, getAnnouncementChannels } from '../services/discordBot.js';
+
+const router = Router();
+
+// GET alle Ankündigungen
+router.get('/', authMiddleware, requirePermission('leadership.view'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const announcements = await prisma.announcement.findMany({
+      include: {
+        createdBy: {
+          select: {
+            displayName: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(announcements);
+  } catch (error) {
+    console.error('Get announcements error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Ankündigungen' });
+  }
+});
+
+// GET verfügbare Discord-Kanäle
+router.get('/channels', authMiddleware, requirePermission('leadership.manage'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const channels = await getAnnouncementChannels();
+    res.json(channels);
+  } catch (error) {
+    console.error('Get channels error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Kanäle' });
+  }
+});
+
+// POST neue Ankündigung erstellen (Draft)
+router.post('/', authMiddleware, requirePermission('leadership.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { title, content, channelId } = req.body;
+
+    if (!title || !content) {
+      res.status(400).json({ error: 'Titel und Inhalt sind erforderlich' });
+      return;
+    }
+
+    const announcement = await prisma.announcement.create({
+      data: {
+        title,
+        content,
+        channelId,
+        createdById: req.user!.id,
+      },
+      include: {
+        createdBy: {
+          select: {
+            displayName: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    res.status(201).json(announcement);
+  } catch (error) {
+    console.error('Create announcement error:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen der Ankündigung' });
+  }
+});
+
+// POST Ankündigung an Discord senden
+router.post('/:id/send', authMiddleware, requirePermission('leadership.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const announcement = await prisma.announcement.findUnique({ where: { id } });
+
+    if (!announcement) {
+      res.status(404).json({ error: 'Ankündigung nicht gefunden' });
+      return;
+    }
+
+    if (announcement.status === 'SENT') {
+      res.status(400).json({ error: 'Ankündigung wurde bereits gesendet' });
+      return;
+    }
+
+    if (!announcement.channelId) {
+      res.status(400).json({ error: 'Kein Kanal ausgewählt' });
+      return;
+    }
+
+    // An Discord senden
+    const messageId = await sendAnnouncementToChannel(
+      announcement.channelId,
+      announcement.title,
+      announcement.content
+    );
+
+    if (!messageId) {
+      res.status(500).json({ error: 'Fehler beim Senden an Discord' });
+      return;
+    }
+
+    // Ankündigung aktualisieren
+    const updatedAnnouncement = await prisma.announcement.update({
+      where: { id },
+      data: {
+        status: 'SENT',
+        messageId,
+        sentAt: new Date(),
+      },
+      include: {
+        createdBy: {
+          select: {
+            displayName: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    res.json(updatedAnnouncement);
+  } catch (error) {
+    console.error('Send announcement error:', error);
+    res.status(500).json({ error: 'Fehler beim Senden der Ankündigung' });
+  }
+});
+
+// PUT Ankündigung bearbeiten
+router.put('/:id', authMiddleware, requirePermission('leadership.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { title, content, channelId } = req.body;
+
+    const existingAnnouncement = await prisma.announcement.findUnique({ where: { id } });
+
+    if (!existingAnnouncement) {
+      res.status(404).json({ error: 'Ankündigung nicht gefunden' });
+      return;
+    }
+
+    if (existingAnnouncement.status === 'SENT') {
+      res.status(400).json({ error: 'Gesendete Ankündigungen können nicht bearbeitet werden' });
+      return;
+    }
+
+    const announcement = await prisma.announcement.update({
+      where: { id },
+      data: {
+        title,
+        content,
+        channelId,
+      },
+      include: {
+        createdBy: {
+          select: {
+            displayName: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    res.json(announcement);
+  } catch (error) {
+    console.error('Update announcement error:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren der Ankündigung' });
+  }
+});
+
+// DELETE Ankündigung löschen
+router.delete('/:id', authMiddleware, requirePermission('leadership.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.announcement.delete({ where: { id } });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete announcement error:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen der Ankündigung' });
+  }
+});
+
+// POST Direkt an Discord senden (ohne Speicherung)
+router.post('/send-direct', authMiddleware, requirePermission('leadership.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { title, content, channelId } = req.body;
+
+    if (!title || !content || !channelId) {
+      res.status(400).json({ error: 'Titel, Inhalt und Kanal sind erforderlich' });
+      return;
+    }
+
+    // Direkt an Discord senden
+    const messageId = await sendAnnouncementToChannel(channelId, title, content);
+
+    if (!messageId) {
+      res.status(500).json({ error: 'Fehler beim Senden an Discord' });
+      return;
+    }
+
+    res.json({ success: true, messageId });
+  } catch (error) {
+    console.error('Send direct announcement error:', error);
+    res.status(500).json({ error: 'Fehler beim Senden der Ankündigung' });
+  }
+});
+
+export default router;

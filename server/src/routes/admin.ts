@@ -112,6 +112,13 @@ router.post('/setup', async (req, res: Response) => {
       { name: 'employees.delete', description: 'Mitarbeiter entlassen', category: 'employees' },
       { name: 'audit.view', description: 'Audit-Logs anzeigen', category: 'audit' },
       { name: 'backup.manage', description: 'Backups verwalten', category: 'backup' },
+      // Leadership Permissions
+      { name: 'leadership.view', description: 'Leadership-Bereich anzeigen', category: 'leadership' },
+      { name: 'leadership.manage', description: 'Leadership-Bereich verwalten', category: 'leadership' },
+      { name: 'treasury.view', description: 'Kasse anzeigen', category: 'treasury' },
+      { name: 'treasury.manage', description: 'Kasse verwalten', category: 'treasury' },
+      { name: 'sanctions.view', description: 'Sanktionen anzeigen', category: 'sanctions' },
+      { name: 'sanctions.manage', description: 'Sanktionen verwalten', category: 'sanctions' },
     ];
 
     for (const perm of defaultPermissions) {
@@ -175,6 +182,13 @@ router.post('/permissions/seed', authMiddleware, requirePermission('admin.full')
       { name: 'employees.delete', description: 'Mitarbeiter entlassen', category: 'employees' },
       { name: 'audit.view', description: 'Audit-Logs anzeigen', category: 'audit' },
       { name: 'backup.manage', description: 'Backups verwalten', category: 'backup' },
+      // Leadership Permissions
+      { name: 'leadership.view', description: 'Leadership-Bereich anzeigen', category: 'leadership' },
+      { name: 'leadership.manage', description: 'Leadership-Bereich verwalten', category: 'leadership' },
+      { name: 'treasury.view', description: 'Kasse anzeigen', category: 'treasury' },
+      { name: 'treasury.manage', description: 'Kasse verwalten', category: 'treasury' },
+      { name: 'sanctions.view', description: 'Sanktionen anzeigen', category: 'sanctions' },
+      { name: 'sanctions.manage', description: 'Sanktionen verwalten', category: 'sanctions' },
     ];
 
     for (const perm of defaultPermissions) {

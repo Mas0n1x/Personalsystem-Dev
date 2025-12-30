@@ -14,6 +14,9 @@ import Roles from './pages/admin/Roles';
 import AuditLogs from './pages/admin/AuditLogs';
 import Settings from './pages/admin/Settings';
 
+// Leadership
+import Leadership from './pages/Leadership';
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
 
@@ -52,6 +55,9 @@ function App() {
         <Route path="employees" element={<Employees />} />
         <Route path="employees/:id" element={<EmployeeDetail />} />
         <Route path="absences" element={<Absences />} />
+
+        {/* Leadership */}
+        <Route path="leadership" element={<Leadership />} />
 
         {/* Admin */}
         <Route path="admin/users" element={<Users />} />
