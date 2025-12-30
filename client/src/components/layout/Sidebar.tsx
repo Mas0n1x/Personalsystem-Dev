@@ -12,6 +12,13 @@ import {
   Package,
   Car,
   Crosshair,
+  UserX,
+  Search,
+  GraduationCap,
+  ShieldAlert,
+  ClipboardCheck,
+  TrendingUp,
+  Building2,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -50,6 +57,18 @@ export default function Sidebar() {
         { name: 'Tuning', href: '/tuning', icon: Car, permission: 'tuning.view' },
         { name: 'Räube', href: '/robbery', icon: Crosshair, permission: 'robbery.view' },
         { name: 'Leadership', href: '/leadership', icon: Briefcase, permission: 'leadership.view' },
+      ],
+    },
+    {
+      name: 'Units',
+      items: [
+        { name: 'HR', href: '/hr', icon: UserX, permission: 'blacklist.view' },
+        { name: 'Detectives', href: '/detectives', icon: Search, permission: 'detectives.view' },
+        { name: 'Academy', href: '/academy', icon: GraduationCap, permission: 'academy.view' },
+        { name: 'Internal Affairs', href: '/internal-affairs', icon: ShieldAlert, permission: 'ia.view' },
+        { name: 'Quality Assurance', href: '/quality-assurance', icon: ClipboardCheck, permission: 'qa.view' },
+        { name: 'Teamleitung', href: '/teamleitung', icon: TrendingUp, permission: 'teamlead.view' },
+        { name: 'Management', href: '/management', icon: Building2, permission: 'management.uprank' },
       ],
     },
     {
@@ -139,6 +158,9 @@ export default function Sidebar() {
       <div className="p-4 border-t border-slate-700">
         <p className="text-xs text-slate-500 text-center">
           LSPD Personalsystem v1.0
+        </p>
+        <p className="text-xs text-slate-600 text-center mt-1">
+          Made by Mas0n1x
         </p>
       </div>
     </aside>

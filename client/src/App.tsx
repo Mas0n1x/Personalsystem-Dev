@@ -19,6 +19,13 @@ import Leadership from './pages/Leadership';
 import Evidence from './pages/Evidence';
 import Tuning from './pages/Tuning';
 import Robbery from './pages/Robbery';
+import HumanResources from './pages/HumanResources';
+import Detectives from './pages/Detectives';
+import Academy from './pages/Academy';
+import InternalAffairs from './pages/InternalAffairs';
+import QualityAssurance from './pages/QualityAssurance';
+import Teamleitung from './pages/Teamleitung';
+import Management from './pages/Management';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -61,6 +68,13 @@ function App() {
         <Route path="evidence" element={<Evidence />} />
         <Route path="tuning" element={<Tuning />} />
         <Route path="robbery" element={<Robbery />} />
+        <Route path="hr" element={<HumanResources />} />
+        <Route path="detectives" element={<Detectives />} />
+        <Route path="academy" element={<Academy />} />
+        <Route path="internal-affairs" element={<InternalAffairs />} />
+        <Route path="quality-assurance" element={<QualityAssurance />} />
+        <Route path="teamleitung" element={<Teamleitung />} />
+        <Route path="management" element={<Management />} />
 
         {/* Leadership */}
         <Route path="leadership" element={<Leadership />} />

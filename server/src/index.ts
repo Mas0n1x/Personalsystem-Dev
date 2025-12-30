@@ -21,6 +21,15 @@ import announcementRoutes from './routes/announcements.js';
 import evidenceRoutes from './routes/evidence.js';
 import tuningRoutes from './routes/tuning.js';
 import robberyRoutes from './routes/robbery.js';
+import blacklistRoutes from './routes/blacklist.js';
+import uprankLockRoutes from './routes/uprankLock.js';
+import applicationRoutes from './routes/applications.js';
+import caseRoutes from './routes/cases.js';
+import trainingRoutes from './routes/trainings.js';
+import investigationRoutes from './routes/investigations.js';
+import unitReviewRoutes from './routes/unitReviews.js';
+import uprankRequestRoutes from './routes/uprankRequests.js';
+import teamChangeReportRoutes from './routes/teamChangeReports.js';
 
 // Services
 import { initializeDiscordBot } from './services/discordBot.js';
@@ -69,6 +78,15 @@ app.use('/api/announcements', announcementRoutes);
 app.use('/api/evidence', evidenceRoutes);
 app.use('/api/tuning', tuningRoutes);
 app.use('/api/robbery', robberyRoutes);
+app.use('/api/blacklist', blacklistRoutes);
+app.use('/api/uprank-locks', uprankLockRoutes);
+app.use('/api/applications', applicationRoutes);
+app.use('/api/cases', caseRoutes);
+app.use('/api/trainings', trainingRoutes);
+app.use('/api/investigations', investigationRoutes);
+app.use('/api/unit-reviews', unitReviewRoutes);
+app.use('/api/uprank-requests', uprankRequestRoutes);
+app.use('/api/team-change-reports', teamChangeReportRoutes);
 
 // Error handling
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

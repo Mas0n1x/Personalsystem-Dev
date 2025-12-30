@@ -36,6 +36,19 @@ model User {
   submittedTuning      TuningInvoice[] @relation("TuningSubmittedBy")
   completedTuning      TuningInvoice[] @relation("TuningCompletedBy")
   createdRobberies     Robbery[] @relation("RobberyCreatedBy")
+  addedBlacklist       Blacklist[] @relation("BlacklistAddedBy")
+  createdUprankLocks   UprankLock[] @relation("UprankLockCreatedBy")
+  createdApplications  Application[] @relation("ApplicationCreatedBy")
+  processedApplications Application[] @relation("ApplicationProcessedBy")
+  createdCases         Case[] @relation("CaseCreatedBy")
+  uploadedCaseImages   CaseImage[] @relation("CaseImageUploadedBy")
+  instructedTrainings  Training[] @relation("TrainingInstructor")
+  leadInvestigations   Investigation[] @relation("InvestigationLead")
+  investigationNotes   InvestigationNote[] @relation("InvestigationNoteCreatedBy")
+  unitReviews          UnitReview[] @relation("UnitReviewBy")
+  requestedUpranks     UprankRequest[] @relation("UprankRequestedBy")
+  processedUpranks     UprankRequest[] @relation("UprankProcessedBy")
+  reviewedTeamChanges  TeamChangeReport[] @relation("TeamChangeReviewedBy")
 
   @@map("users")
 }
@@ -88,6 +101,13 @@ model Employee {
   sanctions     Sanction[]
   robberyLeader      Robbery[] @relation("RobberyLeader")
   robberyNegotiator  Robbery[] @relation("RobberyNegotiator")
+  uprankLocks        UprankLock[]
+  leadingCases       Case[] @relation("CaseLeadInvestigator")
+  trainingParticipations TrainingParticipant[]
+  accusedInvestigations  Investigation[] @relation("InvestigationAccused")
+  witnessInvestigations  InvestigationWitness[] @relation("InvestigationWitness")
+  uprankRequests         UprankRequest[] @relation("UprankRequestEmployee")
+  teamChangeReports      TeamChangeReport[] @relation("TeamChangeEmployee")
 
   @@map("employees")
 }
@@ -322,4 +342,304 @@ model Robbery {
   @@index([negotiatorId])
   @@index([createdAt])
   @@map("robberies")
+}
+
+// ==================== BLACKLIST ====================
+
+model Blacklist {
+  id          String    @id @default(cuid())
+  discordId   String    @unique              // Discord ID des gesperrten Users
+  username    String                          // Discord Username (zur Anzeige)
+  reason      String                          // Grund für Blacklist
+  addedById   String
+  addedBy     User      @relation("BlacklistAddedBy", fields: [addedById], references: [id])
+  expiresAt   DateTime?                       // Optional: Ablaufdatum (null = permanent)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([discordId])
+  @@map("blacklist")
+}
+
+// ==================== UPRANK-SPERREN ====================
+
+model UprankLock {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  reason      String                          // Grund (z.B. "Teamwechsel zu Team Green")
+  team        String                          // Team das die Sperre ausgelöst hat
+  lockedUntil DateTime                        // Bis wann gesperrt
+  isActive    Boolean   @default(true)
+  createdById String
+  createdBy   User      @relation("UprankLockCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([employeeId])
+  @@index([lockedUntil])
+  @@map("uprank_locks")
+}
+
+// ==================== BEWERBUNGEN ====================
+
+model Application {
+  id              String    @id @default(cuid())
+  discordId       String                          // Discord ID des Bewerbers
+  discordUsername String                          // Discord Username
+  status          String    @default("PENDING")   // PENDING, INTERVIEW, ACCEPTED, REJECTED
+  notes           String?                         // Notizen zum Bewerber
+  interviewDate   DateTime?                       // Geplantes Gespräch
+  interviewNotes  String?                         // Notizen vom Gespräch
+  rejectionReason String?                         // Ablehnungsgrund
+  createdById     String
+  createdBy       User      @relation("ApplicationCreatedBy", fields: [createdById], references: [id])
+  processedById   String?
+  processedBy     User?     @relation("ApplicationProcessedBy", fields: [processedById], references: [id])
+  processedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([discordId])
+  @@index([status])
+  @@map("applications")
+}
+
+// ==================== DETECTIVES - ERMITTLUNGSAKTEN ====================
+
+model Case {
+  id              String    @id @default(cuid())
+  caseNumber      String    @unique               // Aktenzeichen z.B. "DET-2024-001"
+  title           String                          // Titel der Ermittlung
+  description     String?                         // Beschreibung
+  status          String    @default("OPEN")      // OPEN, IN_PROGRESS, CLOSED, ARCHIVED
+  priority        String    @default("NORMAL")    // LOW, NORMAL, HIGH, CRITICAL
+  suspects        String?                         // Verdächtige (Text)
+  notes           String?                         // Interne Notizen
+  leadInvestigatorId String?
+  leadInvestigator Employee? @relation("CaseLeadInvestigator", fields: [leadInvestigatorId], references: [id])
+  createdById     String
+  createdBy       User      @relation("CaseCreatedBy", fields: [createdById], references: [id])
+  closedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relationen
+  images          CaseImage[]
+
+  @@index([status])
+  @@index([caseNumber])
+  @@map("cases")
+}
+
+model CaseImage {
+  id          String   @id @default(cuid())
+  caseId      String
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  imagePath   String                             // Pfad zum Bild
+  description String?                            // Bildbeschreibung
+  uploadedById String
+  uploadedBy  User     @relation("CaseImageUploadedBy", fields: [uploadedById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([caseId])
+  @@map("case_images")
+}
+
+// ==================== POLICE ACADEMY ====================
+
+// Schulungstypen (z.B. "Schießtraining", "Verhandlungstaktik", etc.)
+model TrainingType {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  description String?
+  duration    Int        @default(60)           // Dauer in Minuten
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relationen
+  trainings   Training[]
+
+  @@map("training_types")
+}
+
+// Geplante Schulungen
+model Training {
+  id            String    @id @default(cuid())
+  typeId        String
+  type          TrainingType @relation(fields: [typeId], references: [id])
+  title         String                          // Spezifischer Titel
+  description   String?                         // Zusätzliche Details
+  scheduledAt   DateTime                        // Wann findet die Schulung statt
+  location      String?                         // Ort (z.B. "Schießstand", "Besprechungsraum")
+  maxParticipants Int?                          // Max. Teilnehmer (null = unbegrenzt)
+  status        String    @default("SCHEDULED") // SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
+  instructorId  String
+  instructor    User      @relation("TrainingInstructor", fields: [instructorId], references: [id])
+  notes         String?                         // Interne Notizen
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relationen
+  participants  TrainingParticipant[]
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([instructorId])
+  @@map("trainings")
+}
+
+// Teilnehmer an Schulungen
+model TrainingParticipant {
+  id          String    @id @default(cuid())
+  trainingId  String
+  training    Training  @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  status      String    @default("REGISTERED")  // REGISTERED, ATTENDED, NO_SHOW, EXCUSED
+  grade       String?                           // Bewertung (optional): EXCELLENT, GOOD, SATISFACTORY, FAILED
+  feedback    String?                           // Feedback vom Ausbilder
+  registeredAt DateTime @default(now())
+  attendedAt  DateTime?
+
+  @@unique([trainingId, employeeId])
+  @@index([trainingId])
+  @@index([employeeId])
+  @@map("training_participants")
+}
+
+// ==================== INTERNAL AFFAIRS ====================
+
+// Interne Ermittlungen
+model Investigation {
+  id              String    @id @default(cuid())
+  caseNumber      String    @unique               // IA-2024-001
+  title           String
+  description     String?
+  status          String    @default("OPEN")      // OPEN, IN_PROGRESS, CLOSED, ARCHIVED
+  priority        String    @default("NORMAL")    // LOW, NORMAL, HIGH, CRITICAL
+  category        String    @default("BESCHWERDE") // BESCHWERDE, DISZIPLINAR, KORRUPTION, SONSTIGES
+  accusedId       String?                          // Beschuldigter Mitarbeiter
+  accused         Employee?  @relation("InvestigationAccused", fields: [accusedId], references: [id], onDelete: SetNull)
+  complainant     String?                          // Name des Beschwerdeführers (extern)
+  findings        String?                          // Ermittlungsergebnisse
+  recommendation  String?                          // Empfehlung (z.B. "Keine Maßnahme", "Verwarnung", etc.)
+  leadInvestigatorId String
+  leadInvestigator User      @relation("InvestigationLead", fields: [leadInvestigatorId], references: [id])
+  closedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relationen
+  notes           InvestigationNote[]
+  witnesses       InvestigationWitness[]
+
+  @@index([status])
+  @@index([caseNumber])
+  @@index([accusedId])
+  @@map("investigations")
+}
+
+// Notizen zu einer Ermittlung
+model InvestigationNote {
+  id              String    @id @default(cuid())
+  investigationId String
+  investigation   Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  content         String
+  isConfidential  Boolean   @default(false)       // Nur für IA sichtbar
+  createdById     String
+  createdBy       User      @relation("InvestigationNoteCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime  @default(now())
+
+  @@index([investigationId])
+  @@map("investigation_notes")
+}
+
+// Zeugen einer Ermittlung
+model InvestigationWitness {
+  id              String    @id @default(cuid())
+  investigationId String
+  investigation   Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  employeeId      String?                          // Mitarbeiter als Zeuge
+  employee        Employee?  @relation("InvestigationWitness", fields: [employeeId], references: [id], onDelete: SetNull)
+  externalName    String?                          // Externer Zeuge (Name)
+  statement       String?                          // Aussage
+  interviewedAt   DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([investigationId])
+  @@map("investigation_witnesses")
+}
+
+// ==================== QUALITY ASSURANCE ====================
+
+// Unit-Überprüfungen
+model UnitReview {
+  id              String    @id @default(cuid())
+  unit            String                            // Team Name (z.B. "Team Green", "HR", etc.)
+  reviewDate      DateTime                          // Datum der Überprüfung
+  rating          Int       @default(3)             // 1-5 Sterne
+  findings        String?                           // Feststellungen
+  recommendations String?                           // Empfehlungen
+  status          String    @default("DRAFT")       // DRAFT, SUBMITTED, REVIEWED
+  reviewerId      String
+  reviewer        User      @relation("UnitReviewBy", fields: [reviewerId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([unit])
+  @@index([status])
+  @@map("unit_reviews")
+}
+
+// ==================== INTERNAL AFFAIRS - TEAMWECHSEL BERICHTE ====================
+
+// Automatische Berichte bei Teamwechseln für IA
+model TeamChangeReport {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation("TeamChangeEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  previousTeam    String                            // Vorheriges Team
+  newTeam         String                            // Neues Team
+  changeDate      DateTime  @default(now())         // Datum des Wechsels
+  uprankLockId    String?                           // Referenz zur Uprank-Sperre (falls vorhanden)
+  notes           String?                           // Notizen zum Wechsel
+  status          String    @default("PENDING")     // PENDING, REVIEWED, ARCHIVED
+  reviewedById    String?
+  reviewedBy      User?     @relation("TeamChangeReviewedBy", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  reviewNotes     String?                           // IA-Bewertung
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([changeDate])
+  @@map("team_change_reports")
+}
+
+// ==================== TEAMLEITUNG - UPRANK ANTRÄGE ====================
+
+// Uprank-Anträge von Teamleitern an das Management
+model UprankRequest {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation("UprankRequestEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  currentRank     String                            // Aktueller Rang
+  targetRank      String                            // Gewünschter Rang
+  reason          String                            // Begründung
+  achievements    String?                           // Leistungen/Erfolge
+  status          String    @default("PENDING")     // PENDING, APPROVED, REJECTED
+  rejectionReason String?                           // Ablehnungsgrund
+  requestedById   String
+  requestedBy     User      @relation("UprankRequestedBy", fields: [requestedById], references: [id])
+  processedById   String?
+  processedBy     User?     @relation("UprankProcessedBy", fields: [processedById], references: [id])
+  processedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+  @@map("uprank_requests")
 }

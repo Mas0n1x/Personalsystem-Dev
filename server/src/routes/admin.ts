@@ -129,6 +129,33 @@ router.post('/setup', async (req, res: Response) => {
       { name: 'robbery.view', description: 'Räube anzeigen', category: 'robbery' },
       { name: 'robbery.create', description: 'Räube erstellen', category: 'robbery' },
       { name: 'robbery.manage', description: 'Räube verwalten', category: 'robbery' },
+      // Blacklist Permissions
+      { name: 'blacklist.view', description: 'Blacklist anzeigen', category: 'blacklist' },
+      { name: 'blacklist.manage', description: 'Blacklist verwalten', category: 'blacklist' },
+      // Uprank-Sperren Permissions
+      { name: 'uprank.view', description: 'Uprank-Sperren anzeigen', category: 'uprank' },
+      { name: 'uprank.manage', description: 'Uprank-Sperren verwalten', category: 'uprank' },
+      // HR/Bewerbungen Permissions
+      { name: 'hr.view', description: 'Bewerbungen anzeigen', category: 'hr' },
+      { name: 'hr.manage', description: 'Bewerbungen verwalten', category: 'hr' },
+      // Detectives Permissions
+      { name: 'detectives.view', description: 'Ermittlungsakten anzeigen', category: 'detectives' },
+      { name: 'detectives.manage', description: 'Ermittlungsakten verwalten', category: 'detectives' },
+      // Academy Permissions
+      { name: 'academy.view', description: 'Schulungen anzeigen', category: 'academy' },
+      { name: 'academy.manage', description: 'Schulungen verwalten', category: 'academy' },
+      // Internal Affairs Permissions
+      { name: 'ia.view', description: 'Interne Ermittlungen anzeigen', category: 'ia' },
+      { name: 'ia.manage', description: 'Interne Ermittlungen verwalten', category: 'ia' },
+      // Quality Assurance Permissions
+      { name: 'qa.view', description: 'Unit-Reviews anzeigen', category: 'qa' },
+      { name: 'qa.manage', description: 'Unit-Reviews verwalten', category: 'qa' },
+      // Teamleitung Permissions
+      { name: 'teamlead.view', description: 'Uprank-Anträge anzeigen', category: 'teamlead' },
+      { name: 'teamlead.manage', description: 'Uprank-Anträge erstellen', category: 'teamlead' },
+      // Management Permissions
+      { name: 'management.view', description: 'Management-Bereich anzeigen', category: 'management' },
+      { name: 'management.uprank', description: 'Uprank-Anträge bearbeiten', category: 'management' },
     ];
 
     for (const perm of defaultPermissions) {
@@ -209,6 +236,33 @@ router.post('/permissions/seed', authMiddleware, requirePermission('admin.full')
       { name: 'robbery.view', description: 'Räube anzeigen', category: 'robbery' },
       { name: 'robbery.create', description: 'Räube erstellen', category: 'robbery' },
       { name: 'robbery.manage', description: 'Räube verwalten', category: 'robbery' },
+      // Blacklist Permissions
+      { name: 'blacklist.view', description: 'Blacklist anzeigen', category: 'blacklist' },
+      { name: 'blacklist.manage', description: 'Blacklist verwalten', category: 'blacklist' },
+      // Uprank-Sperren Permissions
+      { name: 'uprank.view', description: 'Uprank-Sperren anzeigen', category: 'uprank' },
+      { name: 'uprank.manage', description: 'Uprank-Sperren verwalten', category: 'uprank' },
+      // HR/Bewerbungen Permissions
+      { name: 'hr.view', description: 'Bewerbungen anzeigen', category: 'hr' },
+      { name: 'hr.manage', description: 'Bewerbungen verwalten', category: 'hr' },
+      // Detectives Permissions
+      { name: 'detectives.view', description: 'Ermittlungsakten anzeigen', category: 'detectives' },
+      { name: 'detectives.manage', description: 'Ermittlungsakten verwalten', category: 'detectives' },
+      // Academy Permissions
+      { name: 'academy.view', description: 'Schulungen anzeigen', category: 'academy' },
+      { name: 'academy.manage', description: 'Schulungen verwalten', category: 'academy' },
+      // Internal Affairs Permissions
+      { name: 'ia.view', description: 'Interne Ermittlungen anzeigen', category: 'ia' },
+      { name: 'ia.manage', description: 'Interne Ermittlungen verwalten', category: 'ia' },
+      // Quality Assurance Permissions
+      { name: 'qa.view', description: 'Unit-Reviews anzeigen', category: 'qa' },
+      { name: 'qa.manage', description: 'Unit-Reviews verwalten', category: 'qa' },
+      // Teamleitung Permissions
+      { name: 'teamlead.view', description: 'Uprank-Anträge anzeigen', category: 'teamlead' },
+      { name: 'teamlead.manage', description: 'Uprank-Anträge erstellen', category: 'teamlead' },
+      // Management Permissions
+      { name: 'management.view', description: 'Management-Bereich anzeigen', category: 'management' },
+      { name: 'management.uprank', description: 'Uprank-Anträge bearbeiten', category: 'management' },
     ];
 
     for (const perm of defaultPermissions) {
