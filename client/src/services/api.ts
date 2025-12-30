@@ -114,3 +114,14 @@ export const adminApi = {
   // Stats
   getStats: () => api.get('/admin/stats'),
 };
+
+// Absences API
+export const absencesApi = {
+  getAll: (params?: Record<string, string>) => api.get('/absences', { params }),
+  getActive: () => api.get('/absences/active'),
+  getByEmployee: (employeeId: string, limit?: number) =>
+    api.get(`/absences/employee/${employeeId}`, { params: { limit } }),
+  create: (data: { type: string; reason?: string; startDate: string; endDate: string }) =>
+    api.post('/absences', data),
+  delete: (id: string) => api.delete(`/absences/${id}`),
+};

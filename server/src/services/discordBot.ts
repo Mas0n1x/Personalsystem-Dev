@@ -533,6 +533,22 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
       const department = departments.join(', ');
 
       try {
+        // System-Rolle basierend auf Discord-Rollen finden
+        // Hole alle System-Rollen die eine Discord-Rolle zugewiesen haben
+        const systemRoles = await prisma.role.findMany({
+          where: { discordRoleId: { not: null } },
+          orderBy: { level: 'desc' },
+        });
+
+        // Finde die höchste System-Rolle, deren Discord-Rolle der Benutzer hat
+        let assignedRoleId: string | null = null;
+        for (const sysRole of systemRoles) {
+          if (sysRole.discordRoleId && member.roles.cache.has(sysRole.discordRoleId)) {
+            assignedRoleId = sysRole.id;
+            break; // Höchste Rolle gefunden (sortiert nach level desc)
+          }
+        }
+
         // User erstellen/aktualisieren
         const user = await prisma.user.upsert({
           where: { discordId: member.id },
@@ -542,12 +558,14 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
             displayName: member.displayName || member.user.globalName || null,
             avatar: member.user.avatarURL() || null,
             isActive: true,
+            roleId: assignedRoleId,
           },
           update: {
             username: member.user.username,
             displayName: member.displayName || member.user.globalName || null,
             avatar: member.user.avatarURL() || null,
             isActive: true,
+            roleId: assignedRoleId,
           },
         });
 

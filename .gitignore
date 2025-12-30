@@ -45,3 +45,7 @@ coverage/
 *.tar.gz
 .cache/
 nul
+
+# Temp scripts
+check-absences.mjs
+fix-absences.mjs

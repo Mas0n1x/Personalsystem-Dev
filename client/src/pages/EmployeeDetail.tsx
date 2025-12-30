@@ -3,10 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeesApi } from '../services/api';
 import { StatusBadge } from '../components/ui/Badge';
-import { ArrowLeft, Edit, Star, Calendar, Clock, X, Save } from 'lucide-react';
+import { ArrowLeft, Edit, Calendar, Clock, X, Save, CalendarOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import type { Evaluation, Absence } from '../types';
+
+interface AbsenceData {
+  id: string;
+  type: 'ABSENCE' | 'DAY_OFF';
+  reason: string | null;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+}
 
 interface EmployeeDetailData {
   id: string;
@@ -18,14 +26,13 @@ interface EmployeeDetailData {
   status: string;
   hireDate: string;
   notes: string | null;
+  absences: AbsenceData[];
   user: {
     id: string;
     username: string;
     displayName: string | null;
     avatar: string | null;
     role: { id: string; name: string; displayName: string; color: string } | null;
-    evaluationsReceived: Evaluation[];
-    absences: Absence[];
   };
 }
 
@@ -167,90 +174,65 @@ export default function EmployeeDetail() {
         )}
       </div>
 
-      {/* Tabs */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Bewertungen */}
-        <div className="card">
-          <div className="card-header flex items-center gap-2">
-            <Star className="h-5 w-5 text-yellow-400" />
-            <h3 className="font-semibold text-white">Letzte Bewertungen</h3>
-          </div>
-          <div className="card-body">
-            {!employee.user?.evaluationsReceived?.length ? (
-              <p className="text-slate-400 text-center py-4">Keine Bewertungen vorhanden</p>
-            ) : (
-              <div className="space-y-4">
-                {employee.user.evaluationsReceived.map((evaluation) => (
+      {/* Abmeldungen */}
+      <div className="card">
+        <div className="card-header flex items-center gap-2">
+          <CalendarOff className="h-5 w-5 text-blue-400" />
+          <h3 className="font-semibold text-white">Letzte Abmeldungen</h3>
+        </div>
+        <div className="card-body">
+          {!employee.absences?.length ? (
+            <p className="text-slate-400 text-center py-4">Keine Abmeldungen vorhanden</p>
+          ) : (
+            <div className="space-y-4">
+              {employee.absences.map((absence) => {
+                const isActive = () => {
+                  const now = new Date();
+                  const start = new Date(absence.startDate);
+                  const end = new Date(absence.endDate);
+                  return now >= start && now <= end;
+                };
+
+                return (
                   <div
-                    key={evaluation.id}
-                    className="p-4 bg-slate-700/50 rounded-lg border border-slate-600"
+                    key={absence.id}
+                    className={`p-4 bg-slate-700/50 rounded-lg border border-slate-600 ${
+                      isActive() ? 'border-l-4 border-l-green-500' : ''
+                    }`}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <StatusBadge status={evaluation.type} />
-                        <div className="flex items-center gap-0.5">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`h-4 w-4 ${
-                                star <= evaluation.rating
-                                  ? 'text-yellow-400 fill-yellow-400'
-                                  : 'text-slate-600'
-                              }`}
-                            />
-                          ))}
-                        </div>
+                        <span
+                          className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            absence.type === 'DAY_OFF'
+                              ? 'bg-blue-600/20 text-blue-400'
+                              : 'bg-orange-600/20 text-orange-400'
+                          }`}
+                        >
+                          {absence.type === 'DAY_OFF' ? 'Dienstfrei' : 'Abmeldung'}
+                        </span>
+                        {isActive() && (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-600/20 text-green-400">
+                            Aktiv
+                          </span>
+                        )}
                       </div>
-                      <span className="text-xs text-slate-400">
-                        {format(new Date(evaluation.createdAt), 'dd.MM.yyyy', { locale: de })}
-                      </span>
-                    </div>
-                    {evaluation.comment && (
-                      <p className="text-sm text-slate-300">{evaluation.comment}</p>
-                    )}
-                    <p className="text-xs text-slate-400 mt-2">
-                      von {evaluation.evaluator?.displayName || evaluation.evaluator?.username}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Abwesenheiten */}
-        <div className="card">
-          <div className="card-header flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-blue-400" />
-            <h3 className="font-semibold text-white">Letzte Abwesenheiten</h3>
-          </div>
-          <div className="card-body">
-            {!employee.user?.absences?.length ? (
-              <p className="text-slate-400 text-center py-4">Keine Abwesenheiten vorhanden</p>
-            ) : (
-              <div className="space-y-4">
-                {employee.user.absences.map((absence) => (
-                  <div
-                    key={absence.id}
-                    className="p-4 bg-slate-700/50 rounded-lg border border-slate-600"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <StatusBadge status={absence.type} />
-                      <StatusBadge status={absence.status} />
                     </div>
                     <div className="flex items-center gap-2 text-sm text-slate-300">
                       <Clock className="h-4 w-4" />
-                      {format(new Date(absence.startDate), 'dd.MM.yyyy', { locale: de })} -{' '}
-                      {format(new Date(absence.endDate), 'dd.MM.yyyy', { locale: de })}
+                      {format(new Date(absence.startDate), 'dd.MM.yyyy', { locale: de })}
+                      {absence.startDate !== absence.endDate && (
+                        <> - {format(new Date(absence.endDate), 'dd.MM.yyyy', { locale: de })}</>
+                      )}
                     </div>
                     {absence.reason && (
                       <p className="text-sm text-slate-400 mt-2">{absence.reason}</p>
                     )}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

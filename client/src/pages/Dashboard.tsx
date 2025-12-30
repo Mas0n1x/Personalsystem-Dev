@@ -1,12 +1,31 @@
 import { useQuery } from '@tanstack/react-query';
-import { dashboardApi } from '../services/api';
+import { dashboardApi, absencesApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import {
   Users,
   UserCheck,
   UserMinus,
+  CalendarOff,
 } from 'lucide-react';
+
+interface ActiveAbsence {
+  id: string;
+  type: 'ABSENCE' | 'DAY_OFF';
+  reason: string | null;
+  startDate: string;
+  endDate: string;
+  employee: {
+    id: string;
+    badgeNumber: string | null;
+    rank: string;
+    user: {
+      displayName: string | null;
+      username: string;
+      avatar: string | null;
+    };
+  };
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -18,7 +37,14 @@ export default function Dashboard() {
     refetchInterval: 30000, // Alle 30 Sekunden aktualisieren
   });
 
+  const { data: activeAbsencesData } = useQuery({
+    queryKey: ['active-absences'],
+    queryFn: () => absencesApi.getActive(),
+    refetchInterval: 60000, // Jede Minute aktualisieren
+  });
+
   const stats = statsData?.data?.stats;
+  const activeAbsences = activeAbsencesData?.data as ActiveAbsence[] | undefined;
 
   if (isLoading) {
     return (
@@ -83,8 +109,8 @@ export default function Dashboard() {
 
       </div>
 
-      {/* Online Benutzer */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Online Benutzer & Aktive Abmeldungen */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Online Benutzer */}
         <div className="card">
           <div className="card-header flex items-center justify-between">
@@ -114,6 +140,56 @@ export default function Dashboard() {
                         {u.displayName || u.username}
                       </p>
                       <p className="text-xs text-slate-400">@{u.username}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Aktive Abmeldungen & Dienstfrei */}
+        <div className="card">
+          <div className="card-header flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CalendarOff className="h-5 w-5 text-orange-400" />
+              <h2 className="text-lg font-semibold text-white">Abmeldungen & Dienstfrei</h2>
+            </div>
+            <span className="badge-warning">{activeAbsences?.length || 0} Aktiv</span>
+          </div>
+          <div className="card-body">
+            {!activeAbsences?.length ? (
+              <p className="text-slate-400 text-center py-4">Keine aktiven Abmeldungen</p>
+            ) : (
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {activeAbsences.map((absence) => (
+                  <div key={absence.id} className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
+                    <img
+                      src={
+                        absence.employee.user.avatar ||
+                        `https://ui-avatars.com/api/?name=${absence.employee.user.username}&background=random`
+                      }
+                      alt={absence.employee.user.username}
+                      className="h-10 w-10 rounded-full"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">
+                        {absence.employee.user.displayName || absence.employee.user.username}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                            absence.type === 'DAY_OFF'
+                              ? 'bg-blue-600/20 text-blue-400'
+                              : 'bg-orange-600/20 text-orange-400'
+                          }`}
+                        >
+                          {absence.type === 'DAY_OFF' ? 'Dienstfrei' : 'Abmeldung'}
+                        </span>
+                        {absence.reason && (
+                          <span className="text-xs text-slate-400 truncate">{absence.reason}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

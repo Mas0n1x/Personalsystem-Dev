@@ -21,7 +21,10 @@
       "Bash(npx tsx:*)",
       "Bash(timeout /t 8 /nobreak)",
       "Bash(powershell:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(sqlite3:*)",
+      "Bash(node check-absences.mjs:*)",
+      "Bash(node fix-absences.mjs:*)"
     ]
   }
 }

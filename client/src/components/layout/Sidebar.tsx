@@ -7,6 +7,7 @@ import {
   Shield,
   FileText,
   ChevronDown,
+  CalendarOff,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -40,13 +41,13 @@ export default function Sidebar() {
       items: [
         { name: 'Dashboard', href: '/', icon: LayoutDashboard },
         { name: 'Mitarbeiter', href: '/employees', icon: Users, permission: 'employees.view' },
+        { name: 'Abmeldungen', href: '/absences', icon: CalendarOff, permission: 'employees.view' },
       ],
     },
     {
       name: 'Administration',
       permission: 'admin.full',
       items: [
-        { name: 'Benutzer', href: '/admin/users', icon: Users, permission: 'users.view' },
         { name: 'Rollen', href: '/admin/roles', icon: Shield, permission: 'admin.full' },
         { name: 'Audit-Logs', href: '/admin/audit-logs', icon: FileText, permission: 'audit.view' },
         { name: 'Einstellungen', href: '/admin/settings', icon: Settings, permission: 'admin.full' },

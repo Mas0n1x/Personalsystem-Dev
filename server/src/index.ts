@@ -12,6 +12,7 @@ import userRoutes from './routes/users.js';
 import employeeRoutes from './routes/employees.js';
 import dashboardRoutes from './routes/dashboard.js';
 import adminRoutes from './routes/admin.js';
+import absenceRoutes from './routes/absences.js';
 
 // Services
 import { initializeDiscordBot } from './services/discordBot.js';
@@ -51,6 +52,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/absences', absenceRoutes);
 
 // Error handling
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

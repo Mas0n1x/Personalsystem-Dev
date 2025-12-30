@@ -10,6 +10,12 @@ interface RoleWithCount extends Role {
   _count: { users: number };
 }
 
+interface DiscordRole {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export default function Roles() {
   const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -26,8 +32,14 @@ export default function Roles() {
     queryFn: adminApi.getPermissions,
   });
 
+  const { data: discordInfoData } = useQuery({
+    queryKey: ['discord-info'],
+    queryFn: adminApi.getDiscordInfo,
+  });
+
   const roles = rolesData?.data as RoleWithCount[] | undefined;
   const permissions = permissionsData?.data as Permission[] | undefined;
+  const discordRoles = discordInfoData?.data?.roles as DiscordRole[] | undefined;
 
   const createMutation = useMutation({
     mutationFn: adminApi.createRole,
@@ -140,55 +152,65 @@ export default function Roles() {
 
       {/* Rollen-Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {roles?.map((role) => (
-          <div key={role.id} className="card p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <Shield className="h-8 w-8" style={{ color: role.color }} />
-                <div>
-                  <h3 className="font-semibold text-white">{role.displayName}</h3>
-                  <p className="text-sm text-slate-400">Level {role.level}</p>
+        {roles?.map((role) => {
+          const discordRole = discordRoles?.find(dr => dr.id === role.discordRoleId);
+          return (
+            <div key={role.id} className="card p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <Shield className="h-8 w-8" style={{ color: role.color }} />
+                  <div>
+                    <h3 className="font-semibold text-white">{role.displayName}</h3>
+                    <p className="text-sm text-slate-400">Level {role.level}</p>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => openEditModal(role)}
+                    className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm('Rolle wirklich löschen?')) {
+                        deleteMutation.mutate(role.id);
+                      }
+                    }}
+                    className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => openEditModal(role)}
-                  className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg"
-                >
-                  <Edit className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm('Rolle wirklich löschen?')) {
-                      deleteMutation.mutate(role.id);
-                    }
-                  }}
-                  className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+
+              {discordRole && (
+                <div className="mb-3 px-2 py-1 rounded bg-slate-700/50 inline-block">
+                  <span className="text-xs text-slate-400">Discord: </span>
+                  <span className="text-xs text-white">{discordRole.name}</span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 text-sm text-slate-400 mb-4">
+                <Users className="h-4 w-4" />
+                <span>{role._count.users} Benutzer</span>
+              </div>
+
+              <div className="flex flex-wrap gap-1">
+                {role.permissions.slice(0, 5).map((perm) => (
+                  <span key={perm.id} className="badge-gray text-xs">
+                    {perm.name}
+                  </span>
+                ))}
+                {role.permissions.length > 5 && (
+                  <span className="badge-gray text-xs">
+                    +{role.permissions.length - 5} weitere
+                  </span>
+                )}
               </div>
             </div>
-
-            <div className="flex items-center gap-2 text-sm text-slate-400 mb-4">
-              <Users className="h-4 w-4" />
-              <span>{role._count.users} Benutzer</span>
-            </div>
-
-            <div className="flex flex-wrap gap-1">
-              {role.permissions.slice(0, 5).map((perm) => (
-                <span key={perm.id} className="badge-gray text-xs">
-                  {perm.name}
-                </span>
-              ))}
-              {role.permissions.length > 5 && (
-                <span className="badge-gray text-xs">
-                  +{role.permissions.length - 5} weitere
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Create Modal */}
@@ -228,7 +250,18 @@ export default function Roles() {
               <input name="displayName" className="input" required placeholder="z.B. Administrator" />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="label">Discord Rolle *</label>
+            <select name="discordRoleId" className="input" required>
+              <option value="">Discord Rolle auswählen...</option>
+              {discordRoles?.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {role.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">Farbe</label>
               <input name="color" type="color" className="input h-10" defaultValue="#6B7280" />
@@ -236,10 +269,6 @@ export default function Roles() {
             <div>
               <label className="label">Level</label>
               <input name="level" type="number" min="0" className="input" defaultValue="0" />
-            </div>
-            <div>
-              <label className="label">Discord Role ID</label>
-              <input name="discordRoleId" className="input" />
             </div>
           </div>
           <div>
@@ -334,7 +363,18 @@ export default function Roles() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="label">Discord Rolle *</label>
+              <select name="discordRoleId" className="input" required defaultValue={selectedRole.discordRoleId || ''}>
+                <option value="">Discord Rolle auswählen...</option>
+                {discordRoles?.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="label">Farbe</label>
                 <input
@@ -352,14 +392,6 @@ export default function Roles() {
                   min="0"
                   className="input"
                   defaultValue={selectedRole.level}
-                />
-              </div>
-              <div>
-                <label className="label">Discord Role ID</label>
-                <input
-                  name="discordRoleId"
-                  className="input"
-                  defaultValue={selectedRole.discordRoleId || ''}
                 />
               </div>
             </div>

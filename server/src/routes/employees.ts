@@ -459,6 +459,10 @@ router.get('/:id', authMiddleware, requirePermission('employees.view'), async (r
             role: true,
           },
         },
+        absences: {
+          orderBy: { startDate: 'desc' },
+          take: 10,
+        },
       },
     });
 

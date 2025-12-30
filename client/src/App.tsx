@@ -6,6 +6,7 @@ import AuthCallback from './pages/AuthCallback';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import EmployeeDetail from './pages/EmployeeDetail';
+import Absences from './pages/Absences';
 
 // Admin
 import Users from './pages/admin/Users';
@@ -50,6 +51,7 @@ function App() {
         <Route index element={<Dashboard />} />
         <Route path="employees" element={<Employees />} />
         <Route path="employees/:id" element={<EmployeeDetail />} />
+        <Route path="absences" element={<Absences />} />
 
         {/* Admin */}
         <Route path="admin/users" element={<Users />} />
