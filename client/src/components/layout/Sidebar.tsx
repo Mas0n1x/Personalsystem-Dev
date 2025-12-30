@@ -9,6 +9,7 @@ import {
   ChevronDown,
   CalendarOff,
   Briefcase,
+  Package,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -43,6 +44,7 @@ export default function Sidebar() {
         { name: 'Dashboard', href: '/', icon: LayoutDashboard },
         { name: 'Mitarbeiter', href: '/employees', icon: Users, permission: 'employees.view' },
         { name: 'Abmeldungen', href: '/absences', icon: CalendarOff, permission: 'employees.view' },
+        { name: 'Asservaten', href: '/evidence', icon: Package, permission: 'evidence.view' },
         { name: 'Leadership', href: '/leadership', icon: Briefcase, permission: 'leadership.view' },
       ],
     },

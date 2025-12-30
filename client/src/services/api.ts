@@ -179,3 +179,16 @@ export const announcementsApi = {
     api.post('/announcements/send-direct', data),
   delete: (id: string) => api.delete(`/announcements/${id}`),
 };
+
+// Evidence API (Asservate)
+export const evidenceApi = {
+  getAll: (params?: Record<string, string>) => api.get('/evidence', { params }),
+  getStats: () => api.get('/evidence/stats'),
+  create: (data: { name: string; description?: string; category?: string; quantity?: number; location?: string; caseNumber?: string }) =>
+    api.post('/evidence', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/evidence/${id}`, data),
+  release: (id: string, data: { status: string; releaseReason?: string }) => api.put(`/evidence/${id}/release`, data),
+  restore: (id: string) => api.put(`/evidence/${id}/restore`),
+  destroyBulk: (ids: string[]) => api.put('/evidence/destroy-bulk', { ids }),
+  delete: (id: string) => api.delete(`/evidence/${id}`),
+};

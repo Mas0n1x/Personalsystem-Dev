@@ -119,6 +119,9 @@ router.post('/setup', async (req, res: Response) => {
       { name: 'treasury.manage', description: 'Kasse verwalten', category: 'treasury' },
       { name: 'sanctions.view', description: 'Sanktionen anzeigen', category: 'sanctions' },
       { name: 'sanctions.manage', description: 'Sanktionen verwalten', category: 'sanctions' },
+      // Evidence Permissions
+      { name: 'evidence.view', description: 'Asservate anzeigen', category: 'evidence' },
+      { name: 'evidence.manage', description: 'Asservate verwalten', category: 'evidence' },
     ];
 
     for (const perm of defaultPermissions) {
@@ -189,6 +192,9 @@ router.post('/permissions/seed', authMiddleware, requirePermission('admin.full')
       { name: 'treasury.manage', description: 'Kasse verwalten', category: 'treasury' },
       { name: 'sanctions.view', description: 'Sanktionen anzeigen', category: 'sanctions' },
       { name: 'sanctions.manage', description: 'Sanktionen verwalten', category: 'sanctions' },
+      // Evidence Permissions
+      { name: 'evidence.view', description: 'Asservate anzeigen', category: 'evidence' },
+      { name: 'evidence.manage', description: 'Asservate verwalten', category: 'evidence' },
     ];
 
     for (const perm of defaultPermissions) {

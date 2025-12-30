@@ -31,6 +31,8 @@ model User {
   treasuryTransactions TreasuryTransaction[]
   notes                Note[]
   announcements        Announcement[]
+  storedEvidence       Evidence[] @relation("EvidenceStoredBy")
+  releasedEvidence     Evidence[] @relation("EvidenceReleasedBy")
 
   @@map("users")
 }
@@ -250,4 +252,30 @@ model Announcement {
   @@index([createdById])
   @@index([status])
   @@map("announcements")
+}
+
+// ==================== ASSERVATE ====================
+
+model Evidence {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  category    String    @default("SONSTIGES") // WAFFEN, DROGEN, GELD, FAHRZEUGE, DOKUMENTE, SONSTIGES
+  quantity    Int       @default(1)
+  location    String?   // Lagerort
+  caseNumber  String?   // Aktenzeichen
+  status      String    @default("EINGELAGERT") // EINGELAGERT, AUSGELAGERT, VERNICHTET, FREIGEGEBEN
+  storedById  String
+  storedBy    User      @relation("EvidenceStoredBy", fields: [storedById], references: [id])
+  releasedById String?
+  releasedBy  User?     @relation("EvidenceReleasedBy", fields: [releasedById], references: [id])
+  releasedAt  DateTime?
+  releaseReason String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([category])
+  @@index([caseNumber])
+  @@map("evidence")
 }

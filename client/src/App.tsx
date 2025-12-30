@@ -16,6 +16,7 @@ import Settings from './pages/admin/Settings';
 
 // Leadership
 import Leadership from './pages/Leadership';
+import Evidence from './pages/Evidence';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -55,6 +56,7 @@ function App() {
         <Route path="employees" element={<Employees />} />
         <Route path="employees/:id" element={<EmployeeDetail />} />
         <Route path="absences" element={<Absences />} />
+        <Route path="evidence" element={<Evidence />} />
 
         {/* Leadership */}
         <Route path="leadership" element={<Leadership />} />
