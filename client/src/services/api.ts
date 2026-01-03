@@ -113,6 +113,11 @@ export const adminApi = {
 
   // Backups
   getBackups: (params?: Record<string, string>) => api.get('/admin/backups', { params }),
+  getBackupStats: () => api.get('/admin/backups/stats'),
+  createBackup: (description?: string) => api.post('/admin/backups', { description }),
+  downloadBackup: (id: string) => `/api/admin/backups/${id}/download`,
+  restoreBackup: (id: string) => api.post(`/admin/backups/${id}/restore`),
+  deleteBackup: (id: string) => api.delete(`/admin/backups/${id}`),
 
   // Stats
   getStats: () => api.get('/admin/stats'),
@@ -391,4 +396,65 @@ export const teamChangeReportsApi = {
   update: (id: string, data: { notes?: string }) =>
     api.put(`/team-change-reports/${id}`, data),
   delete: (id: string) => api.delete(`/team-change-reports/${id}`),
+};
+
+// Academy API (Ausbildung)
+export const academyApi = {
+  // Modules (Admin)
+  getModules: () => api.get('/academy/modules'),
+  createModule: (data: { name: string; description?: string; category: 'JUNIOR_OFFICER' | 'OFFICER'; sortOrder?: number }) =>
+    api.post('/academy/modules', data),
+  updateModule: (id: string, data: { name?: string; description?: string; category?: string; sortOrder?: number; isActive?: boolean }) =>
+    api.put(`/academy/modules/${id}`, data),
+  deleteModule: (id: string) => api.delete(`/academy/modules/${id}`),
+  reorderModules: (modules: { id: string; sortOrder: number }[]) =>
+    api.put('/academy/modules/reorder', { modules }),
+
+  // Trainees
+  getTrainees: () => api.get('/academy/trainees'),
+
+  // Progress
+  toggleProgress: (data: { employeeId: string; moduleId: string }) =>
+    api.post('/academy/progress/toggle', data),
+
+  // Notes
+  getNotes: (employeeId: string) => api.get(`/academy/notes/${employeeId}`),
+  createNote: (data: { employeeId: string; content: string }) =>
+    api.post('/academy/notes', data),
+  deleteNote: (id: string) => api.delete(`/academy/notes/${id}`),
+
+  // Uprank Request
+  requestUprank: (data: { employeeId: string; targetRank: string }) =>
+    api.post('/academy/request-uprank', data),
+
+  // Stats
+  getStats: () => api.get('/academy/stats'),
+
+  // Exams (Prüfungsprotokolle)
+  getExams: (params?: Record<string, string>) => api.get('/academy/exams', { params }),
+  getExam: (id: string) => api.get(`/academy/exams/${id}`),
+  createExam: (data: {
+    employeeId: string;
+    examType?: string;
+    theoryScore?: number;
+    theoryMax?: number;
+    funcCodesScore?: number;
+    funcCodesMax?: number;
+    lawScore?: number;
+    lawMax?: number;
+    reportScore?: number;
+    reportMax?: number;
+    situationsPassed?: boolean;
+    examinerNotes?: string;
+  }) => api.post('/academy/exams', data),
+  updateExam: (id: string, data: Record<string, unknown>) => api.put(`/academy/exams/${id}`, data),
+  deleteExam: (id: string) => api.delete(`/academy/exams/${id}`),
+
+  // Retrainings (Nachschulungen)
+  getRetrainings: (params?: Record<string, string>) => api.get('/academy/retrainings', { params }),
+  createRetraining: (data: { employeeId: string; type: string; reason: string; notes?: string }) =>
+    api.post('/academy/retrainings', data),
+  updateRetraining: (id: string, data: { status?: string; notes?: string }) =>
+    api.put(`/academy/retrainings/${id}`, data),
+  deleteRetraining: (id: string) => api.delete(`/academy/retrainings/${id}`),
 };

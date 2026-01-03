@@ -30,7 +30,8 @@
       "Bash(npm install:*)",
       "Bash(del \"C:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server\\\\node_modules\\\\.prisma\\\\client\\\\query_engine-windows.dll.node\")",
       "Bash(node fix-permissions.mjs:*)",
-      "Bash(node check-user.mjs:*)"
+      "Bash(node check-user.mjs:*)",
+      "Bash(npm run db:push:*)"
     ]
   }
 }

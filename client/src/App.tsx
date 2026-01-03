@@ -13,6 +13,8 @@ import Users from './pages/admin/Users';
 import Roles from './pages/admin/Roles';
 import AuditLogs from './pages/admin/AuditLogs';
 import Settings from './pages/admin/Settings';
+import AcademyModules from './pages/admin/AcademyModules';
+import Backups from './pages/admin/Backups';
 
 // Leadership
 import Leadership from './pages/Leadership';
@@ -84,6 +86,8 @@ function App() {
         <Route path="admin/roles" element={<Roles />} />
         <Route path="admin/audit-logs" element={<AuditLogs />} />
         <Route path="admin/settings" element={<Settings />} />
+        <Route path="admin/academy-modules" element={<AcademyModules />} />
+        <Route path="admin/backups" element={<Backups />} />
       </Route>
 
       {/* Fallback */}

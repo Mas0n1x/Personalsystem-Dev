@@ -30,6 +30,7 @@ import investigationRoutes from './routes/investigations.js';
 import unitReviewRoutes from './routes/unitReviews.js';
 import uprankRequestRoutes from './routes/uprankRequests.js';
 import teamChangeReportRoutes from './routes/teamChangeReports.js';
+import academyRoutes from './routes/academy.js';
 
 // Services
 import { initializeDiscordBot } from './services/discordBot.js';
@@ -87,6 +88,7 @@ app.use('/api/investigations', investigationRoutes);
 app.use('/api/unit-reviews', unitReviewRoutes);
 app.use('/api/uprank-requests', uprankRequestRoutes);
 app.use('/api/team-change-reports', teamChangeReportRoutes);
+app.use('/api/academy', academyRoutes);
 
 // Error handling
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

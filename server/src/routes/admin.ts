@@ -2,6 +2,12 @@ import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { getGuildInfo, syncAllRoles, syncDiscordMembers } from '../services/discordBot.js';
+import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = Router();
 
@@ -515,6 +521,16 @@ router.put('/settings', authMiddleware, requirePermission('admin.full'), async (
 
 // ==================== BACKUPS ====================
 
+// Backup-Ordner Pfad
+const BACKUP_DIR = path.join(__dirname, '../../backups');
+const DB_PATH = path.join(__dirname, '../../prisma/dev.db');
+
+// Stelle sicher, dass der Backup-Ordner existiert
+if (!fs.existsSync(BACKUP_DIR)) {
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+}
+
+// Liste aller Backups
 router.get('/backups', authMiddleware, requirePermission('backup.manage'), async (req: AuthRequest, res: Response) => {
   try {
     const { page = '1', limit = '20' } = req.query;
@@ -541,6 +557,212 @@ router.get('/backups', authMiddleware, requirePermission('backup.manage'), async
     res.status(500).json({ error: 'Fehler beim Abrufen der Backups' });
   }
 });
+
+// Neues Backup erstellen
+router.post('/backups', authMiddleware, requirePermission('backup.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { description } = req.body;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `backup_${timestamp}.db`;
+    const backupPath = path.join(BACKUP_DIR, filename);
+
+    // Prüfe ob Datenbank existiert
+    if (!fs.existsSync(DB_PATH)) {
+      res.status(400).json({ error: 'Datenbank nicht gefunden' });
+      return;
+    }
+
+    // Kopiere Datenbank
+    fs.copyFileSync(DB_PATH, backupPath);
+
+    // Dateigröße ermitteln
+    const stats = fs.statSync(backupPath);
+    const size = stats.size;
+
+    // Backup in Datenbank speichern
+    const backup = await prisma.backup.create({
+      data: {
+        filename,
+        size,
+        path: backupPath,
+        status: 'COMPLETED',
+      },
+    });
+
+    // Audit-Log
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.id,
+        action: 'BACKUP_CREATED',
+        entity: 'Backup',
+        entityId: backup.id,
+        details: JSON.stringify({ filename, size, description }),
+      },
+    });
+
+    res.status(201).json(backup);
+  } catch (error) {
+    console.error('Create backup error:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen des Backups' });
+  }
+});
+
+// Backup-Stats (MUSS vor /:id Routen stehen!)
+router.get('/backups/stats', authMiddleware, requirePermission('backup.manage'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const backups = await prisma.backup.findMany();
+    const totalSize = backups.reduce((sum, b) => sum + b.size, 0);
+    const latestBackup = await prisma.backup.findFirst({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      totalBackups: backups.length,
+      totalSize,
+      totalSizeFormatted: formatBytes(totalSize),
+      latestBackup: latestBackup?.createdAt || null,
+    });
+  } catch (error) {
+    console.error('Get backup stats error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Backup-Statistiken' });
+  }
+});
+
+// Backup herunterladen
+router.get('/backups/:id/download', authMiddleware, requirePermission('backup.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const backup = await prisma.backup.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!backup) {
+      res.status(404).json({ error: 'Backup nicht gefunden' });
+      return;
+    }
+
+    // Prüfe ob Datei existiert
+    if (!fs.existsSync(backup.path)) {
+      res.status(404).json({ error: 'Backup-Datei nicht gefunden' });
+      return;
+    }
+
+    res.download(backup.path, backup.filename);
+  } catch (error) {
+    console.error('Download backup error:', error);
+    res.status(500).json({ error: 'Fehler beim Herunterladen des Backups' });
+  }
+});
+
+// Backup wiederherstellen
+router.post('/backups/:id/restore', authMiddleware, requirePermission('backup.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const backup = await prisma.backup.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!backup) {
+      res.status(404).json({ error: 'Backup nicht gefunden' });
+      return;
+    }
+
+    // Prüfe ob Backup-Datei existiert
+    if (!fs.existsSync(backup.path)) {
+      res.status(404).json({ error: 'Backup-Datei nicht gefunden' });
+      return;
+    }
+
+    // Erstelle erst ein Backup der aktuellen Datenbank
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const preRestoreFilename = `pre_restore_${timestamp}.db`;
+    const preRestorePath = path.join(BACKUP_DIR, preRestoreFilename);
+
+    if (fs.existsSync(DB_PATH)) {
+      fs.copyFileSync(DB_PATH, preRestorePath);
+      const preRestoreStats = fs.statSync(preRestorePath);
+
+      await prisma.backup.create({
+        data: {
+          filename: preRestoreFilename,
+          size: preRestoreStats.size,
+          path: preRestorePath,
+          status: 'PRE_RESTORE',
+        },
+      });
+    }
+
+    // Kopiere Backup zur Datenbank (überschreibe)
+    fs.copyFileSync(backup.path, DB_PATH);
+
+    // Audit-Log (muss vor dem Disconnect geschrieben werden)
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.id,
+        action: 'BACKUP_RESTORED',
+        entity: 'Backup',
+        entityId: backup.id,
+        details: JSON.stringify({ filename: backup.filename, restoredAt: new Date() }),
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Backup wurde wiederhergestellt. Der Server muss möglicherweise neu gestartet werden.',
+      preRestoreBackup: preRestoreFilename,
+    });
+  } catch (error) {
+    console.error('Restore backup error:', error);
+    res.status(500).json({ error: 'Fehler beim Wiederherstellen des Backups' });
+  }
+});
+
+// Backup löschen
+router.delete('/backups/:id', authMiddleware, requirePermission('backup.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const backup = await prisma.backup.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!backup) {
+      res.status(404).json({ error: 'Backup nicht gefunden' });
+      return;
+    }
+
+    // Lösche Datei wenn vorhanden
+    if (fs.existsSync(backup.path)) {
+      fs.unlinkSync(backup.path);
+    }
+
+    // Lösche aus Datenbank
+    await prisma.backup.delete({
+      where: { id: req.params.id },
+    });
+
+    // Audit-Log
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.id,
+        action: 'BACKUP_DELETED',
+        entity: 'Backup',
+        entityId: backup.id,
+        details: JSON.stringify({ filename: backup.filename }),
+      },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete backup error:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen des Backups' });
+  }
+});
+
+// Hilfsfunktion für Dateigröße
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
 
 // ==================== SYSTEM STATS ====================
 

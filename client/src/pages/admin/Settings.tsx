@@ -194,37 +194,9 @@ export default function Settings() {
                 onChange={(e) => setSettings({ ...settings, siteTitle: e.target.value })}
                 placeholder="LSPD Personalsystem"
               />
-            </div>
-
-            <div>
-              <label className="label">Standard-Abteilung für neue Mitarbeiter</label>
-              <input
-                className="input"
-                value={settings.defaultDepartment || ''}
-                onChange={(e) => setSettings({ ...settings, defaultDepartment: e.target.value })}
-                placeholder="Patrol"
-              />
-            </div>
-
-            <div>
-              <label className="label">Standard-Rang für neue Mitarbeiter</label>
-              <input
-                className="input"
-                value={settings.defaultRank || ''}
-                onChange={(e) => setSettings({ ...settings, defaultRank: e.target.value })}
-                placeholder="Cadet"
-              />
-            </div>
-
-            <div>
-              <label className="label">Backup-Aufbewahrung (Tage)</label>
-              <input
-                type="number"
-                className="input"
-                value={settings.backupRetention || ''}
-                onChange={(e) => setSettings({ ...settings, backupRetention: e.target.value })}
-                placeholder="30"
-              />
+              <p className="text-xs text-slate-500 mt-1">
+                Wird im Browser-Tab und Header angezeigt
+              </p>
             </div>
 
             <button

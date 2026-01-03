@@ -50,6 +50,11 @@ model User {
   requestedUpranks     UprankRequest[] @relation("UprankRequestedBy")
   processedUpranks     UprankRequest[] @relation("UprankProcessedBy")
   reviewedTeamChanges  TeamChangeReport[] @relation("TeamChangeReviewedBy")
+  completedAcademyProgress AcademyProgress[] @relation("AcademyProgressCompletedBy")
+  createdAcademyNotes  AcademyNote[] @relation("AcademyNoteCreatedBy")
+  conductedExams       AcademyExam[] @relation("AcademyExamExaminer")
+  createdRetrainings   AcademyRetraining[] @relation("AcademyRetrainingCreatedBy")
+  completedRetrainings AcademyRetraining[] @relation("AcademyRetrainingCompletedBy")
 
   @@map("users")
 }
@@ -109,6 +114,10 @@ model Employee {
   witnessInvestigations  InvestigationWitness[] @relation("InvestigationWitness")
   uprankRequests         UprankRequest[] @relation("UprankRequestEmployee")
   teamChangeReports      TeamChangeReport[] @relation("TeamChangeEmployee")
+  academyProgress        AcademyProgress[] @relation("AcademyProgressEmployee")
+  academyNotes           AcademyNote[] @relation("AcademyNoteEmployee")
+  academyExams           AcademyExam[] @relation("AcademyExamEmployee")
+  academyRetrainings     AcademyRetraining[] @relation("AcademyRetrainingEmployee")
 
   @@map("employees")
 }
@@ -658,10 +667,120 @@ model UprankRequest {
   processedById   String?
   processedBy     User?     @relation("UprankProcessedBy", fields: [processedById], references: [id])
   processedAt     DateTime?
+  isAcademyRequest Boolean  @default(false)         // Ob aus Academy-System
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
   @@index([employeeId])
   @@index([status])
   @@map("uprank_requests")
+}
+
+// ==================== ACADEMY - AUSBILDUNGSMODULE ====================
+
+// Ausbildungsmodule (definierbar im Admin-Bereich)
+model AcademyModule {
+  id          String    @id @default(cuid())
+  name        String                              // Name des Moduls (z.B. "Aktenschulung")
+  description String?                             // Beschreibung
+  category    String                              // "JUNIOR_OFFICER" oder "OFFICER"
+  sortOrder   Int       @default(0)               // Reihenfolge in der Anzeige
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relationen
+  progress    AcademyProgress[]
+
+  @@index([category])
+  @@index([isActive])
+  @@map("academy_modules")
+}
+
+// Fortschritt eines Azubis bei einem Modul
+model AcademyProgress {
+  id          String    @id @default(cuid())
+  moduleId    String
+  module      AcademyModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  employeeId  String
+  employee    Employee  @relation("AcademyProgressEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  completedById String?                           // Wer hat abgehakt
+  completedBy User?     @relation("AcademyProgressCompletedBy", fields: [completedById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([moduleId, employeeId])
+  @@index([employeeId])
+  @@index([moduleId])
+  @@map("academy_progress")
+}
+
+// Interne Notizen zu einem Azubi (mit Permission-System)
+model AcademyNote {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation("AcademyNoteEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  content     String
+  createdById String
+  createdBy   User      @relation("AcademyNoteCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@map("academy_notes")
+}
+
+// Prüfungsprotokolle (Wiedereinstellungstest, etc.)
+model AcademyExam {
+  id                  String    @id @default(cuid())
+  employeeId          String
+  employee            Employee  @relation("AcademyExamEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  examType            String    @default("WIEDEREINSTELLUNG") // WIEDEREINSTELLUNG, BEFOERDERUNG, etc.
+  theoryScore         Int       @default(0)                   // Theoriefragen (max. 13)
+  theoryMax           Int       @default(13)
+  funcCodesScore      Int       @default(0)                   // Funkcodes (max. 10)
+  funcCodesMax        Int       @default(10)
+  lawScore            Int       @default(0)                   // Gesetzesfragen (max. 10)
+  lawMax              Int       @default(10)
+  reportScore         Int       @default(0)                   // Einsatzbericht (max. 25)
+  reportMax           Int       @default(25)
+  situationsPassed    Boolean   @default(false)               // Situationsfragen bestanden
+  totalScore          Int       @default(0)                   // Gesamtpunktzahl
+  maxScore            Int       @default(58)                  // Maximalpunktzahl
+  grade               Int?                                    // Note 1-6
+  passed              Boolean   @default(false)               // Bestanden?
+  examinerNotes       String?                                 // Anmerkungen des Prüfers
+  examinerId          String
+  examiner            User      @relation("AcademyExamExaminer", fields: [examinerId], references: [id])
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@index([examType])
+  @@index([passed])
+  @@map("academy_exams")
+}
+
+// Nachschulungen
+model AcademyRetraining {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation("AcademyRetrainingEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  type            String                                      // Art der Nachschulung (z.B. "Funkschulung", "Gesetze", etc.)
+  reason          String                                      // Grund für die Nachschulung
+  status          String    @default("PENDING")               // PENDING, COMPLETED, CANCELLED
+  completedAt     DateTime?
+  completedById   String?
+  completedBy     User?     @relation("AcademyRetrainingCompletedBy", fields: [completedById], references: [id])
+  createdById     String
+  createdBy       User      @relation("AcademyRetrainingCreatedBy", fields: [createdById], references: [id])
+  notes           String?                                     // Zusätzliche Notizen
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+  @@map("academy_retrainings")
 }
