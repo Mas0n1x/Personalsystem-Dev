@@ -27,7 +27,10 @@
       "Bash(node fix-absences.mjs:*)",
       "Bash(tree:*)",
       "Bash(del \"c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\client\\\\src\\\\pages\\\\leadership\\\\TasksAndNotes.tsx\")",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(del \"C:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server\\\\node_modules\\\\.prisma\\\\client\\\\query_engine-windows.dll.node\")",
+      "Bash(node fix-permissions.mjs:*)",
+      "Bash(node check-user.mjs:*)"
     ]
   }
 }

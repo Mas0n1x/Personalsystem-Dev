@@ -178,9 +178,13 @@ export default function InternalAffairs() {
     queryFn: () => teamChangeReportsApi.getAll(teamChangeFilter !== 'all' ? { status: teamChangeFilter } : {}).then(res => res.data),
   });
 
-  const { data: allEmployees = [] } = useQuery({
+  const { data: allEmployees = [], isLoading: isLoadingAllEmployees } = useQuery({
     queryKey: ['all-employees-for-teamchange'],
-    queryFn: () => employeesApi.getAll().then(res => res.data),
+    queryFn: async () => {
+      const res = await employeesApi.getAll();
+      // API gibt { data: employees[], total, page, ... } zurück
+      return res.data?.data || res.data || [];
+    },
     enabled: showCreateTeamChangeModal,
   });
 
@@ -660,14 +664,20 @@ export default function InternalAffairs() {
             >
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1">Mitarbeiter *</label>
-                <select name="employeeId" required className="input w-full">
-                  <option value="">Auswählen...</option>
-                  {allEmployees.map((emp: Employee) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.user.displayName || emp.user.username} ({emp.rank})
-                    </option>
-                  ))}
-                </select>
+                {isLoadingAllEmployees ? (
+                  <div className="input w-full flex items-center justify-center">
+                    <div className="animate-spin h-5 w-5 border-2 border-red-500 border-t-transparent rounded-full"></div>
+                  </div>
+                ) : (
+                  <select name="employeeId" required className="input w-full">
+                    <option value="">Auswählen...</option>
+                    {Array.isArray(allEmployees) && allEmployees.map((emp: Employee) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.user?.displayName || emp.user?.username || 'Unbekannt'} ({emp.rank || 'N/A'})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

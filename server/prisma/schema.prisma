@@ -41,6 +41,7 @@ model User {
   createdApplications  Application[] @relation("ApplicationCreatedBy")
   processedApplications Application[] @relation("ApplicationProcessedBy")
   createdCases         Case[] @relation("CaseCreatedBy")
+  createdDetectiveFolders DetectiveFolder[] @relation("DetectiveFolderCreatedBy")
   uploadedCaseImages   CaseImage[] @relation("CaseImageUploadedBy")
   instructedTrainings  Training[] @relation("TrainingInstructor")
   leadInvestigations   Investigation[] @relation("InvestigationLead")
@@ -102,7 +103,7 @@ model Employee {
   robberyLeader      Robbery[] @relation("RobberyLeader")
   robberyNegotiator  Robbery[] @relation("RobberyNegotiator")
   uprankLocks        UprankLock[]
-  leadingCases       Case[] @relation("CaseLeadInvestigator")
+  detectiveFolders   DetectiveFolder[] @relation("DetectiveFolders")
   trainingParticipations TrainingParticipant[]
   accusedInvestigations  Investigation[] @relation("InvestigationAccused")
   witnessInvestigations  InvestigationWitness[] @relation("InvestigationWitness")
@@ -406,6 +407,26 @@ model Application {
 
 // ==================== DETECTIVES - ERMITTLUNGSAKTEN ====================
 
+// Ordner pro Detektiv
+model DetectiveFolder {
+  id              String    @id @default(cuid())
+  name            String                          // Name des Ordners (z.B. Detektivname)
+  description     String?                         // Beschreibung
+  detectiveId     String                          // Mitarbeiter (Detektiv)
+  detective       Employee  @relation("DetectiveFolders", fields: [detectiveId], references: [id], onDelete: Cascade)
+  createdById     String
+  createdBy       User      @relation("DetectiveFolderCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relationen
+  cases           Case[]
+
+  @@unique([detectiveId])                         // Ein Ordner pro Detektiv
+  @@index([detectiveId])
+  @@map("detective_folders")
+}
+
 model Case {
   id              String    @id @default(cuid())
   caseNumber      String    @unique               // Aktenzeichen z.B. "DET-2024-001"
@@ -415,8 +436,8 @@ model Case {
   priority        String    @default("NORMAL")    // LOW, NORMAL, HIGH, CRITICAL
   suspects        String?                         // Verdächtige (Text)
   notes           String?                         // Interne Notizen
-  leadInvestigatorId String?
-  leadInvestigator Employee? @relation("CaseLeadInvestigator", fields: [leadInvestigatorId], references: [id])
+  folderId        String                          // Gehört zu einem Detektiv-Ordner
+  folder          DetectiveFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
   createdById     String
   createdBy       User      @relation("CaseCreatedBy", fields: [createdById], references: [id])
   closedAt        DateTime?
@@ -428,6 +449,7 @@ model Case {
 
   @@index([status])
   @@index([caseNumber])
+  @@index([folderId])
   @@map("cases")
 }
 

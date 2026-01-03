@@ -1,19 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { blacklistApi, uprankLockApi, employeesApi, applicationApi } from '../services/api';
+import { blacklistApi, applicationApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   Plus,
   X,
   Ban,
-  Lock,
-  Unlock,
   RefreshCw,
   Trash2,
   Clock,
   AlertTriangle,
-  Users,
-  Search,
   Calendar,
   Edit2,
   UserPlus,
@@ -38,38 +34,6 @@ interface BlacklistEntry {
   };
 }
 
-interface UprankLock {
-  id: string;
-  reason: string;
-  team: string;
-  lockedUntil: string;
-  isActive: boolean;
-  createdAt: string;
-  employee: {
-    id: string;
-    rank: string;
-    user: {
-      displayName: string | null;
-      username: string;
-      avatar: string | null;
-    };
-  };
-  createdBy: {
-    displayName: string | null;
-    username: string;
-  };
-}
-
-interface Employee {
-  id: string;
-  rank: string;
-  user: {
-    displayName: string | null;
-    username: string;
-    avatar: string | null;
-  };
-}
-
 interface Application {
   id: string;
   discordId: string;
@@ -91,7 +55,7 @@ interface Application {
   } | null;
 }
 
-type Tab = 'applications' | 'blacklist' | 'uprank';
+type Tab = 'applications' | 'blacklist';
 
 export default function HumanResources() {
   const { user } = useAuth();
@@ -105,13 +69,6 @@ export default function HumanResources() {
   const [username, setUsername] = useState('');
   const [reason, setReason] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
-
-  // Uprank Lock State
-  const [showUprankModal, setShowUprankModal] = useState(false);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
-  const [uprankReason, setUprankReason] = useState('');
-  const [lockedUntil, setLockedUntil] = useState('');
-  const [selectedTeam, setSelectedTeam] = useState('');
 
   // Application State
   const [showApplicationModal, setShowApplicationModal] = useState(false);
@@ -142,21 +99,6 @@ export default function HumanResources() {
     queryFn: () => blacklistApi.getStats(),
   });
 
-  const { data: uprankLocksData, isLoading: uprankLoading } = useQuery({
-    queryKey: ['uprank-locks'],
-    queryFn: () => uprankLockApi.getAll(),
-  });
-
-  const { data: uprankStatsData } = useQuery({
-    queryKey: ['uprank-stats'],
-    queryFn: () => uprankLockApi.getStats(),
-  });
-
-  const { data: employeesData } = useQuery({
-    queryKey: ['employees-list'],
-    queryFn: () => employeesApi.getAll().then(res => res.data),
-  });
-
   const { data: applicationsData, isLoading: applicationsLoading } = useQuery({
     queryKey: ['applications', applicationStatus],
     queryFn: () => applicationApi.getAll(applicationStatus !== 'ALL' ? { status: applicationStatus } : undefined),
@@ -169,9 +111,6 @@ export default function HumanResources() {
 
   const blacklist = (blacklistData?.data || []) as BlacklistEntry[];
   const blacklistStats = blacklistStatsData?.data as { total: number; permanent: number; temporary: number } | undefined;
-  const uprankLocks = (uprankLocksData?.data || []) as UprankLock[];
-  const uprankStats = uprankStatsData?.data as { total: number; active: number; expired: number } | undefined;
-  const employees = (employeesData?.data || []) as Employee[];
   const applications = (applicationsData?.data || []) as Application[];
   const applicationStats = applicationStatsData?.data as { pending: number; interview: number; accepted: number; rejected: number; total: number } | undefined;
 
@@ -202,49 +141,6 @@ export default function HumanResources() {
       queryClient.invalidateQueries({ queryKey: ['blacklist'] });
       queryClient.invalidateQueries({ queryKey: ['blacklist-stats'] });
       toast.success('Blacklist-Eintrag entfernt');
-    },
-  });
-
-  // Uprank Lock Mutations
-  const createUprankLockMutation = useMutation({
-    mutationFn: uprankLockApi.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['uprank-locks'] });
-      queryClient.invalidateQueries({ queryKey: ['uprank-stats'] });
-      closeUprankModal();
-      toast.success('Uprank-Sperre erstellt');
-    },
-  });
-
-  const createAutoUprankLockMutation = useMutation({
-    mutationFn: uprankLockApi.createAuto,
-    onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['uprank-locks'] });
-      queryClient.invalidateQueries({ queryKey: ['uprank-stats'] });
-      closeUprankModal();
-      if (response.data.created) {
-        toast.success(response.data.message);
-      } else {
-        toast.error(response.data.message);
-      }
-    },
-  });
-
-  const revokeUprankLockMutation = useMutation({
-    mutationFn: uprankLockApi.revoke,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['uprank-locks'] });
-      queryClient.invalidateQueries({ queryKey: ['uprank-stats'] });
-      toast.success('Uprank-Sperre aufgehoben');
-    },
-  });
-
-  const deleteUprankLockMutation = useMutation({
-    mutationFn: uprankLockApi.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['uprank-locks'] });
-      queryClient.invalidateQueries({ queryKey: ['uprank-stats'] });
-      toast.success('Uprank-Sperre gelöscht');
     },
   });
 
@@ -356,41 +252,6 @@ export default function HumanResources() {
         username,
         reason,
         expiresAt: expiresAt || undefined,
-      });
-    }
-  };
-
-  // Uprank Modal
-  const openUprankModal = () => {
-    setSelectedEmployeeId('');
-    setUprankReason('');
-    setLockedUntil('');
-    setSelectedTeam('');
-    setShowUprankModal(true);
-  };
-
-  const closeUprankModal = () => {
-    setShowUprankModal(false);
-    setSelectedEmployeeId('');
-    setUprankReason('');
-    setLockedUntil('');
-    setSelectedTeam('');
-  };
-
-  const handleUprankSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (selectedTeam) {
-      // Auto-Sperre basierend auf Team
-      createAutoUprankLockMutation.mutate({
-        employeeId: selectedEmployeeId,
-        team: selectedTeam,
-      });
-    } else {
-      // Manuelle Sperre
-      createUprankLockMutation.mutate({
-        employeeId: selectedEmployeeId,
-        reason: uprankReason,
-        lockedUntil,
       });
     }
   };
@@ -540,15 +401,9 @@ export default function HumanResources() {
     return new Date(dateStr) < new Date();
   };
 
-  const getEmployeeName = (emp: Employee) => emp.user.displayName || emp.user.username;
-
   // Permission checks
   const canManageBlacklist = user?.role?.permissions?.some(
     (p: { name: string }) => p.name === 'blacklist.manage' || p.name === 'admin.full'
-  );
-
-  const canManageUprank = user?.role?.permissions?.some(
-    (p: { name: string }) => p.name === 'uprank.manage' || p.name === 'admin.full'
   );
 
   const canManageHR = user?.role?.permissions?.some(
@@ -561,7 +416,7 @@ export default function HumanResources() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Human Resources</h1>
-          <p className="text-slate-400 mt-1">Blacklist & Uprank-Sperren verwalten</p>
+          <p className="text-slate-400 mt-1">Blacklist & Bewerbungen verwalten</p>
         </div>
       </div>
 
@@ -607,27 +462,6 @@ export default function HumanResources() {
           </div>
           {activeTab === 'blacklist' && (
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-400" />
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('uprank')}
-          className={`px-4 py-2 font-medium transition-colors relative ${
-            activeTab === 'uprank'
-              ? 'text-amber-400'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Lock className="h-4 w-4" />
-            Uprank-Sperren
-            {uprankStats && (
-              <span className="px-2 py-0.5 text-xs bg-amber-600/20 text-amber-400 rounded-full">
-                {uprankStats.active}
-              </span>
-            )}
-          </div>
-          {activeTab === 'uprank' && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400" />
           )}
         </button>
       </div>
@@ -924,158 +758,6 @@ export default function HumanResources() {
         </div>
       )}
 
-      {/* Uprank Tab */}
-      {activeTab === 'uprank' && (
-        <div className="space-y-6">
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="card p-5 bg-gradient-to-br from-amber-900/20 to-slate-800/50 border-amber-700/30">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-amber-600/20 rounded-xl">
-                  <Lock className="h-6 w-6 text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-amber-400">{uprankStats?.active || 0}</p>
-                  <p className="text-sm text-slate-400">Aktive Sperren</p>
-                </div>
-              </div>
-            </div>
-            <div className="card p-5 bg-gradient-to-br from-slate-800/50 to-slate-800/50 border-slate-700/30">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-slate-600/20 rounded-xl">
-                  <Clock className="h-6 w-6 text-slate-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-white">{uprankStats?.expired || 0}</p>
-                  <p className="text-sm text-slate-400">Abgelaufen</p>
-                </div>
-              </div>
-            </div>
-            <div className="card p-5 bg-gradient-to-br from-blue-900/20 to-slate-800/50 border-blue-700/30">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-600/20 rounded-xl">
-                  <Users className="h-6 w-6 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-blue-400">{uprankStats?.total || 0}</p>
-                  <p className="text-sm text-slate-400">Gesamt</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Info Box */}
-          <div className="card p-4 bg-amber-900/10 border-amber-700/30">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-400 mt-0.5" />
-              <div className="text-sm">
-                <p className="text-amber-400 font-medium mb-1">Automatische Uprank-Sperren</p>
-                <ul className="text-slate-400 space-y-1">
-                  <li>Team Green: 1 Woche Sperre</li>
-                  <li>Team Silver: 2 Wochen Sperre</li>
-                  <li>Team Gold: 4 Wochen Sperre</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* Uprank Locks Card */}
-          <div className="card">
-            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-              <h2 className="font-semibold text-white">Aktive Uprank-Sperren</h2>
-              {canManageUprank && (
-                <button onClick={openUprankModal} className="btn-primary flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  Sperre erstellen
-                </button>
-              )}
-            </div>
-            <div className="divide-y divide-slate-700">
-              {uprankLoading ? (
-                <div className="p-12 text-center">
-                  <RefreshCw className="h-8 w-8 text-slate-400 animate-spin mx-auto" />
-                </div>
-              ) : uprankLocks.length === 0 ? (
-                <div className="p-12 text-center">
-                  <Lock className="h-16 w-16 text-slate-600 mx-auto mb-4" />
-                  <p className="text-slate-400">Keine aktiven Uprank-Sperren</p>
-                </div>
-              ) : (
-                uprankLocks.map((lock) => {
-                  const expired = new Date(lock.lockedUntil) < new Date();
-                  return (
-                    <div key={lock.id} className="p-4 hover:bg-slate-750 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <img
-                          src={
-                            lock.employee.user.avatar ||
-                            `https://ui-avatars.com/api/?name=${getEmployeeName(lock.employee as Employee)}&size=40&background=334155&color=fff`
-                          }
-                          className="h-10 w-10 rounded-full"
-                          alt=""
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-white">
-                              {getEmployeeName(lock.employee as Employee)}
-                            </span>
-                            <span className="text-xs text-slate-500">({lock.employee.rank})</span>
-                            <span className={`px-2 py-0.5 text-xs rounded-full ${
-                              lock.team === 'Team Green' ? 'bg-green-600/20 text-green-400' :
-                              lock.team === 'Team Silver' ? 'bg-slate-600/20 text-slate-300' :
-                              lock.team === 'Team Gold' ? 'bg-amber-600/20 text-amber-400' :
-                              'bg-blue-600/20 text-blue-400'
-                            }`}>
-                              {lock.team}
-                            </span>
-                            {expired && (
-                              <span className="px-2 py-0.5 text-xs bg-green-600/20 text-green-400 rounded-full">
-                                Abgelaufen
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-slate-400">{lock.reason}</p>
-                          <p className="text-xs text-slate-500 mt-1">
-                            Gesperrt bis {formatDate(lock.lockedUntil)} | Erstellt von {lock.createdBy.displayName || lock.createdBy.username}
-                          </p>
-                        </div>
-                        {canManageUprank && (
-                          <div className="flex items-center gap-2">
-                            {!expired && lock.isActive && (
-                              <button
-                                onClick={() => {
-                                  if (confirm('Sperre wirklich aufheben?')) {
-                                    revokeUprankLockMutation.mutate(lock.id);
-                                  }
-                                }}
-                                className="p-2 text-green-400 hover:bg-green-600/20 rounded-lg transition-colors"
-                                title="Sperre aufheben"
-                              >
-                                <Unlock className="h-4 w-4" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => {
-                                if (confirm('Sperre wirklich löschen?')) {
-                                  deleteUprankLockMutation.mutate(lock.id);
-                                }
-                              }}
-                              className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Blacklist Modal */}
       {showBlacklistModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
@@ -1147,89 +829,6 @@ export default function HumanResources() {
                 </button>
                 <button type="submit" className="btn-primary px-5">
                   {editingBlacklist ? 'Speichern' : 'Hinzufügen'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Uprank Lock Modal */}
-      {showUprankModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl">
-            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">Uprank-Sperre erstellen</h2>
-              <button onClick={closeUprankModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
-                <X className="h-5 w-5 text-slate-400" />
-              </button>
-            </div>
-
-            <form onSubmit={handleUprankSubmit} className="p-6 space-y-5">
-              <div>
-                <label className="label">Mitarbeiter *</label>
-                <select
-                  value={selectedEmployeeId}
-                  onChange={(e) => setSelectedEmployeeId(e.target.value)}
-                  className="input"
-                  required
-                >
-                  <option value="">Mitarbeiter auswählen...</option>
-                  {employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.rank} - {getEmployeeName(emp)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="label">Team (für automatische Sperre)</label>
-                <select
-                  value={selectedTeam}
-                  onChange={(e) => setSelectedTeam(e.target.value)}
-                  className="input"
-                >
-                  <option value="">Manuell festlegen...</option>
-                  <option value="Team Green">Team Green (1 Woche)</option>
-                  <option value="Team Silver">Team Silver (2 Wochen)</option>
-                  <option value="Team Gold">Team Gold (4 Wochen)</option>
-                </select>
-              </div>
-
-              {!selectedTeam && (
-                <>
-                  <div>
-                    <label className="label">Grund *</label>
-                    <textarea
-                      value={uprankReason}
-                      onChange={(e) => setUprankReason(e.target.value)}
-                      className="input min-h-[80px]"
-                      placeholder="Grund für die Sperre"
-                      required={!selectedTeam}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="label">Gesperrt bis *</label>
-                    <input
-                      type="date"
-                      value={lockedUntil}
-                      onChange={(e) => setLockedUntil(e.target.value)}
-                      className="input"
-                      min={new Date().toISOString().split('T')[0]}
-                      required={!selectedTeam}
-                    />
-                  </div>
-                </>
-              )}
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={closeUprankModal} className="btn-ghost px-5">
-                  Abbrechen
-                </button>
-                <button type="submit" className="btn-primary px-5">
-                  Sperre erstellen
                 </button>
               </div>
             </form>

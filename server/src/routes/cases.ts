@@ -61,12 +61,305 @@ async function generateCaseNumber(): Promise<string> {
   return `${prefix}${nextNumber.toString().padStart(3, '0')}`;
 }
 
-// GET alle Fälle
+// ==================== DETECTIVE FOLDERS ====================
+
+// GET alle Ordner
+router.get('/folders', authMiddleware, requirePermission('detectives.view'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const folders = await prisma.detectiveFolder.findMany({
+      include: {
+        detective: {
+          include: {
+            user: {
+              select: {
+                displayName: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        createdBy: {
+          select: {
+            displayName: true,
+            username: true,
+          },
+        },
+        _count: {
+          select: { cases: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(folders);
+  } catch (error) {
+    console.error('Get folders error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Ordner' });
+  }
+});
+
+// GET einzelner Ordner mit Akten
+router.get('/folders/:id', authMiddleware, requirePermission('detectives.view'), async (req: AuthRequest, res: Response) => {
+  try {
+    const folder = await prisma.detectiveFolder.findUnique({
+      where: { id: req.params.id },
+      include: {
+        detective: {
+          include: {
+            user: {
+              select: {
+                displayName: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        createdBy: {
+          select: {
+            displayName: true,
+            username: true,
+          },
+        },
+        cases: {
+          include: {
+            createdBy: {
+              select: {
+                displayName: true,
+                username: true,
+              },
+            },
+            _count: {
+              select: { images: true },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!folder) {
+      res.status(404).json({ error: 'Ordner nicht gefunden' });
+      return;
+    }
+
+    res.json(folder);
+  } catch (error) {
+    console.error('Get folder error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen des Ordners' });
+  }
+});
+
+// POST neuen Ordner erstellen
+router.post('/folders', authMiddleware, requirePermission('detectives.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { detectiveId, description } = req.body;
+
+    if (!detectiveId) {
+      res.status(400).json({ error: 'Detektiv ist erforderlich' });
+      return;
+    }
+
+    // Prüfen ob Ordner für diesen Detektiv bereits existiert
+    const existingFolder = await prisma.detectiveFolder.findUnique({
+      where: { detectiveId },
+    });
+
+    if (existingFolder) {
+      res.status(400).json({ error: 'Für diesen Detektiv existiert bereits ein Ordner' });
+      return;
+    }
+
+    // Detektiv-Namen für Ordnername holen
+    const detective = await prisma.employee.findUnique({
+      where: { id: detectiveId },
+      include: {
+        user: {
+          select: {
+            displayName: true,
+            username: true,
+          },
+        },
+      },
+    });
+
+    if (!detective) {
+      res.status(404).json({ error: 'Detektiv nicht gefunden' });
+      return;
+    }
+
+    const name = detective.user.displayName || detective.user.username;
+
+    const folder = await prisma.detectiveFolder.create({
+      data: {
+        name,
+        description,
+        detectiveId,
+        createdById: req.user!.id,
+      },
+      include: {
+        detective: {
+          include: {
+            user: {
+              select: {
+                displayName: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        createdBy: {
+          select: {
+            displayName: true,
+            username: true,
+          },
+        },
+        _count: {
+          select: { cases: true },
+        },
+      },
+    });
+
+    res.status(201).json(folder);
+  } catch (error) {
+    console.error('Create folder error:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen des Ordners' });
+  }
+});
+
+// PUT Ordner aktualisieren
+router.put('/folders/:id', authMiddleware, requirePermission('detectives.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { description } = req.body;
+
+    const folder = await prisma.detectiveFolder.update({
+      where: { id: req.params.id },
+      data: { description },
+      include: {
+        detective: {
+          include: {
+            user: {
+              select: {
+                displayName: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        createdBy: {
+          select: {
+            displayName: true,
+            username: true,
+          },
+        },
+        _count: {
+          select: { cases: true },
+        },
+      },
+    });
+
+    res.json(folder);
+  } catch (error) {
+    console.error('Update folder error:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren des Ordners' });
+  }
+});
+
+// DELETE Ordner löschen (löscht auch alle Akten im Ordner)
+router.delete('/folders/:id', authMiddleware, requirePermission('detectives.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    // Zuerst alle Bilder der Akten im Ordner löschen
+    const cases = await prisma.case.findMany({
+      where: { folderId: req.params.id },
+      include: { images: true },
+    });
+
+    for (const caseItem of cases) {
+      for (const image of caseItem.images) {
+        const filePath = path.join(uploadDir, image.imagePath);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+    }
+
+    await prisma.detectiveFolder.delete({ where: { id: req.params.id } });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete folder error:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen des Ordners' });
+  }
+});
+
+// GET Mitarbeiter ohne Ordner (für Ordner-Erstellung)
+router.get('/employees-without-folder', authMiddleware, requirePermission('detectives.view'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const employees = await prisma.employee.findMany({
+      where: {
+        status: 'ACTIVE',
+        detectiveFolders: {
+          none: {},
+        },
+      },
+      include: {
+        user: {
+          select: {
+            displayName: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+      orderBy: { rankLevel: 'desc' },
+    });
+
+    res.json(employees);
+  } catch (error) {
+    console.error('Get employees without folder error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Mitarbeiter' });
+  }
+});
+
+// GET Statistiken
+router.get('/stats', authMiddleware, requirePermission('detectives.view'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const [folders, open, inProgress, closed, archived] = await Promise.all([
+      prisma.detectiveFolder.count(),
+      prisma.case.count({ where: { status: 'OPEN' } }),
+      prisma.case.count({ where: { status: 'IN_PROGRESS' } }),
+      prisma.case.count({ where: { status: 'CLOSED' } }),
+      prisma.case.count({ where: { status: 'ARCHIVED' } }),
+    ]);
+
+    res.json({
+      folders,
+      open,
+      inProgress,
+      closed,
+      archived,
+      totalCases: open + inProgress + closed + archived,
+    });
+  } catch (error) {
+    console.error('Get case stats error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Statistiken' });
+  }
+});
+
+// ==================== CASES ====================
+
+// GET alle Fälle (optional mit Ordner-Filter)
 router.get('/', authMiddleware, requirePermission('detectives.view'), async (req: AuthRequest, res: Response) => {
   try {
-    const { status, priority, search } = req.query;
+    const { status, priority, search, folderId } = req.query;
 
     const where: Record<string, unknown> = {};
+    if (folderId) {
+      where.folderId = folderId;
+    }
     if (status && status !== 'ALL') {
       where.status = status;
     }
@@ -90,13 +383,17 @@ router.get('/', authMiddleware, requirePermission('detectives.view'), async (req
             username: true,
           },
         },
-        leadInvestigator: {
+        folder: {
           include: {
-            user: {
-              select: {
-                displayName: true,
-                username: true,
-                avatar: true,
+            detective: {
+              include: {
+                user: {
+                  select: {
+                    displayName: true,
+                    username: true,
+                    avatar: true,
+                  },
+                },
               },
             },
           },
@@ -115,53 +412,6 @@ router.get('/', authMiddleware, requirePermission('detectives.view'), async (req
   }
 });
 
-// GET Statistiken
-router.get('/stats', authMiddleware, requirePermission('detectives.view'), async (_req: AuthRequest, res: Response) => {
-  try {
-    const [open, inProgress, closed, archived] = await Promise.all([
-      prisma.case.count({ where: { status: 'OPEN' } }),
-      prisma.case.count({ where: { status: 'IN_PROGRESS' } }),
-      prisma.case.count({ where: { status: 'CLOSED' } }),
-      prisma.case.count({ where: { status: 'ARCHIVED' } }),
-    ]);
-
-    res.json({
-      open,
-      inProgress,
-      closed,
-      archived,
-      total: open + inProgress + closed + archived,
-    });
-  } catch (error) {
-    console.error('Get case stats error:', error);
-    res.status(500).json({ error: 'Fehler beim Abrufen der Statistiken' });
-  }
-});
-
-// GET Mitarbeiter für Lead Investigator
-router.get('/employees', authMiddleware, requirePermission('detectives.view'), async (_req: AuthRequest, res: Response) => {
-  try {
-    const employees = await prisma.employee.findMany({
-      where: { status: 'ACTIVE' },
-      include: {
-        user: {
-          select: {
-            displayName: true,
-            username: true,
-            avatar: true,
-          },
-        },
-      },
-      orderBy: { rankLevel: 'desc' },
-    });
-
-    res.json(employees);
-  } catch (error) {
-    console.error('Get employees error:', error);
-    res.status(500).json({ error: 'Fehler beim Abrufen der Mitarbeiter' });
-  }
-});
-
 // GET einzelner Fall mit allen Details
 router.get('/:id', authMiddleware, requirePermission('detectives.view'), async (req: AuthRequest, res: Response) => {
   try {
@@ -174,13 +424,17 @@ router.get('/:id', authMiddleware, requirePermission('detectives.view'), async (
             username: true,
           },
         },
-        leadInvestigator: {
+        folder: {
           include: {
-            user: {
-              select: {
-                displayName: true,
-                username: true,
-                avatar: true,
+            detective: {
+              include: {
+                user: {
+                  select: {
+                    displayName: true,
+                    username: true,
+                    avatar: true,
+                  },
+                },
               },
             },
           },
@@ -229,10 +483,15 @@ router.get('/image/:filename', authMiddleware, async (req: AuthRequest, res: Res
 // POST neuen Fall erstellen
 router.post('/', authMiddleware, requirePermission('detectives.manage'), async (req: AuthRequest, res: Response) => {
   try {
-    const { title, description, priority, suspects, notes, leadInvestigatorId } = req.body;
+    const { title, description, priority, suspects, notes, folderId } = req.body;
 
     if (!title) {
       res.status(400).json({ error: 'Titel ist erforderlich' });
+      return;
+    }
+
+    if (!folderId) {
+      res.status(400).json({ error: 'Ordner ist erforderlich' });
       return;
     }
 
@@ -246,7 +505,7 @@ router.post('/', authMiddleware, requirePermission('detectives.manage'), async (
         priority: priority || 'NORMAL',
         suspects,
         notes,
-        leadInvestigatorId: leadInvestigatorId || null,
+        folderId,
         createdById: req.user!.id,
       },
       include: {
@@ -256,13 +515,17 @@ router.post('/', authMiddleware, requirePermission('detectives.manage'), async (
             username: true,
           },
         },
-        leadInvestigator: {
+        folder: {
           include: {
-            user: {
-              select: {
-                displayName: true,
-                username: true,
-                avatar: true,
+            detective: {
+              include: {
+                user: {
+                  select: {
+                    displayName: true,
+                    username: true,
+                    avatar: true,
+                  },
+                },
               },
             },
           },
@@ -314,7 +577,7 @@ router.post('/:id/images', authMiddleware, requirePermission('detectives.manage'
 // PUT Fall aktualisieren
 router.put('/:id', authMiddleware, requirePermission('detectives.manage'), async (req: AuthRequest, res: Response) => {
   try {
-    const { title, description, status, priority, suspects, notes, leadInvestigatorId } = req.body;
+    const { title, description, status, priority, suspects, notes } = req.body;
 
     const updateData: Record<string, unknown> = {};
     if (title !== undefined) updateData.title = title;
@@ -328,7 +591,6 @@ router.put('/:id', authMiddleware, requirePermission('detectives.manage'), async
     if (priority !== undefined) updateData.priority = priority;
     if (suspects !== undefined) updateData.suspects = suspects;
     if (notes !== undefined) updateData.notes = notes;
-    if (leadInvestigatorId !== undefined) updateData.leadInvestigatorId = leadInvestigatorId || null;
 
     const updatedCase = await prisma.case.update({
       where: { id: req.params.id },
@@ -340,13 +602,17 @@ router.put('/:id', authMiddleware, requirePermission('detectives.manage'), async
             username: true,
           },
         },
-        leadInvestigator: {
+        folder: {
           include: {
-            user: {
-              select: {
-                displayName: true,
-                username: true,
-                avatar: true,
+            detective: {
+              include: {
+                user: {
+                  select: {
+                    displayName: true,
+                    username: true,
+                    avatar: true,
+                  },
+                },
               },
             },
           },

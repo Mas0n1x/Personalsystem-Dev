@@ -550,6 +550,17 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
         }
 
         // User erstellen/aktualisieren
+        // WICHTIG: Bestehende roleId nicht überschreiben wenn bereits gesetzt (z.B. manuell als Admin)
+        const existingUser = await prisma.user.findUnique({
+          where: { discordId: member.id },
+          select: { roleId: true },
+        });
+
+        // Nur roleId setzen wenn:
+        // 1. Es einen neuen assignedRoleId gibt (basierend auf Discord-Rollen), ODER
+        // 2. Der User noch keine roleId hat
+        const newRoleId = assignedRoleId || existingUser?.roleId || null;
+
         const user = await prisma.user.upsert({
           where: { discordId: member.id },
           create: {
@@ -565,7 +576,9 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
             displayName: member.displayName || member.user.globalName || null,
             avatar: member.user.avatarURL() || null,
             isActive: true,
-            roleId: assignedRoleId,
+            // Nur roleId aktualisieren wenn es eine neue Discord-basierte Rolle gibt
+            // ODER wenn der User noch keine Rolle hat
+            ...(assignedRoleId ? { roleId: assignedRoleId } : {}),
           },
         });
 

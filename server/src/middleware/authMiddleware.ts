@@ -62,14 +62,19 @@ export async function authMiddleware(
 export function requirePermission(...requiredPermissions: string[]) {
   return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     if (!req.user) {
+      console.log('[AUTH] No user in request');
       res.status(401).json({ error: 'Nicht autorisiert' });
       return;
     }
 
     const userPermissions = req.user.role?.permissions.map(p => p.name) || [];
 
+    console.log(`[AUTH] User: ${req.user.username}, Role: ${req.user.role?.name}, Permissions: ${userPermissions.join(', ')}`);
+    console.log(`[AUTH] Required: ${requiredPermissions.join(', ')}`);
+
     // Admin hat immer alle Rechte
     if (userPermissions.includes('admin.full')) {
+      console.log('[AUTH] Admin access granted');
       next();
       return;
     }
@@ -77,6 +82,7 @@ export function requirePermission(...requiredPermissions: string[]) {
     const hasPermission = requiredPermissions.some(perm => userPermissions.includes(perm));
 
     if (!hasPermission) {
+      console.log(`[AUTH] DENIED - User ${req.user.username} lacks permissions`);
       res.status(403).json({ error: 'Keine Berechtigung für diese Aktion' });
       return;
     }

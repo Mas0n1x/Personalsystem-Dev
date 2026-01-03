@@ -86,6 +86,9 @@ export const dashboardApi = {
 
 // Admin API
 export const adminApi = {
+  // Fix Permissions (für eingeloggten User ohne vorherige Berechtigung)
+  fixPermissions: () => api.post('/admin/fix-permissions'),
+
   // Roles
   getRoles: () => api.get('/admin/roles'),
   createRole: (data: Record<string, unknown>) => api.post('/admin/roles', data),
@@ -262,12 +265,22 @@ export const applicationApi = {
 
 // Ermittlungsakten API (Detectives)
 export const casesApi = {
+  // Folders (Detektiv-Ordner)
+  getFolders: () => api.get('/cases/folders'),
+  getFolderById: (id: string) => api.get(`/cases/folders/${id}`),
+  createFolder: (data: { detectiveId: string; description?: string }) =>
+    api.post('/cases/folders', data),
+  updateFolder: (id: string, data: { description?: string }) =>
+    api.put(`/cases/folders/${id}`, data),
+  deleteFolder: (id: string) => api.delete(`/cases/folders/${id}`),
+  getEmployeesWithoutFolder: () => api.get('/cases/employees-without-folder'),
+
+  // Cases (Akten)
   getAll: (params?: Record<string, string>) => api.get('/cases', { params }),
   getStats: () => api.get('/cases/stats'),
   getById: (id: string) => api.get(`/cases/${id}`),
-  getEmployees: () => api.get('/cases/employees'),
   getImageUrl: (filename: string) => `/api/cases/image/${filename}`,
-  create: (data: { title: string; description?: string; priority?: string; suspects?: string; notes?: string; leadInvestigatorId?: string }) =>
+  create: (data: { title: string; description?: string; priority?: string; suspects?: string; notes?: string; folderId: string }) =>
     api.post('/cases', data),
   update: (id: string, data: Record<string, unknown>) =>
     api.put(`/cases/${id}`, data),

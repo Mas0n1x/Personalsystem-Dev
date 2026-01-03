@@ -81,6 +81,117 @@ router.delete('/roles/:id', authMiddleware, requirePermission('admin.full'), asy
   }
 });
 
+// ==================== FIX PERMISSIONS (für eingeloggten User - ohne vorherige Berechtigungsprüfung) ====================
+
+router.post('/fix-permissions', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const username = req.user!.username;
+
+    // Liste aller Standard-Berechtigungen
+    const defaultPermissions = [
+      { name: 'admin.full', description: 'Vollzugriff auf alle Funktionen', category: 'admin' },
+      { name: 'users.view', description: 'Benutzer anzeigen', category: 'users' },
+      { name: 'users.edit', description: 'Benutzer bearbeiten', category: 'users' },
+      { name: 'users.delete', description: 'Benutzer löschen', category: 'users' },
+      { name: 'employees.view', description: 'Mitarbeiter anzeigen', category: 'employees' },
+      { name: 'employees.edit', description: 'Mitarbeiter bearbeiten', category: 'employees' },
+      { name: 'employees.delete', description: 'Mitarbeiter entlassen', category: 'employees' },
+      { name: 'audit.view', description: 'Audit-Logs anzeigen', category: 'audit' },
+      { name: 'backup.manage', description: 'Backups verwalten', category: 'backup' },
+      { name: 'leadership.view', description: 'Leadership-Bereich anzeigen', category: 'leadership' },
+      { name: 'leadership.manage', description: 'Leadership-Bereich verwalten', category: 'leadership' },
+      { name: 'treasury.view', description: 'Kasse anzeigen', category: 'treasury' },
+      { name: 'treasury.manage', description: 'Kasse verwalten', category: 'treasury' },
+      { name: 'sanctions.view', description: 'Sanktionen anzeigen', category: 'sanctions' },
+      { name: 'sanctions.manage', description: 'Sanktionen verwalten', category: 'sanctions' },
+      { name: 'evidence.view', description: 'Asservate anzeigen', category: 'evidence' },
+      { name: 'evidence.manage', description: 'Asservate verwalten', category: 'evidence' },
+      { name: 'tuning.view', description: 'Tuning-Rechnungen anzeigen', category: 'tuning' },
+      { name: 'tuning.manage', description: 'Tuning-Rechnungen verwalten', category: 'tuning' },
+      { name: 'robbery.view', description: 'Räube anzeigen', category: 'robbery' },
+      { name: 'robbery.create', description: 'Räube erstellen', category: 'robbery' },
+      { name: 'robbery.manage', description: 'Räube verwalten', category: 'robbery' },
+      { name: 'blacklist.view', description: 'Blacklist anzeigen', category: 'blacklist' },
+      { name: 'blacklist.manage', description: 'Blacklist verwalten', category: 'blacklist' },
+      { name: 'uprank.view', description: 'Uprank-Sperren anzeigen', category: 'uprank' },
+      { name: 'uprank.manage', description: 'Uprank-Sperren verwalten', category: 'uprank' },
+      { name: 'hr.view', description: 'Bewerbungen anzeigen', category: 'hr' },
+      { name: 'hr.manage', description: 'Bewerbungen verwalten', category: 'hr' },
+      { name: 'detectives.view', description: 'Ermittlungsakten anzeigen', category: 'detectives' },
+      { name: 'detectives.manage', description: 'Ermittlungsakten verwalten', category: 'detectives' },
+      { name: 'academy.view', description: 'Schulungen anzeigen', category: 'academy' },
+      { name: 'academy.manage', description: 'Schulungen verwalten', category: 'academy' },
+      { name: 'ia.view', description: 'Interne Ermittlungen anzeigen', category: 'ia' },
+      { name: 'ia.manage', description: 'Interne Ermittlungen verwalten', category: 'ia' },
+      { name: 'qa.view', description: 'Unit-Reviews anzeigen', category: 'qa' },
+      { name: 'qa.manage', description: 'Unit-Reviews verwalten', category: 'qa' },
+      { name: 'teamlead.view', description: 'Uprank-Anträge anzeigen', category: 'teamlead' },
+      { name: 'teamlead.manage', description: 'Uprank-Anträge erstellen', category: 'teamlead' },
+      { name: 'management.view', description: 'Management-Bereich anzeigen', category: 'management' },
+      { name: 'management.uprank', description: 'Uprank-Anträge bearbeiten', category: 'management' },
+    ];
+
+    // Alle Berechtigungen erstellen/aktualisieren
+    for (const perm of defaultPermissions) {
+      await prisma.permission.upsert({
+        where: { name: perm.name },
+        update: perm,
+        create: perm,
+      });
+    }
+
+    // Admin-Berechtigung holen
+    const adminPerm = await prisma.permission.findUnique({ where: { name: 'admin.full' } });
+
+    // Admin-Rolle erstellen/aktualisieren mit admin.full Berechtigung
+    const adminRole = await prisma.role.upsert({
+      where: { name: 'admin' },
+      update: {
+        permissions: { connect: { id: adminPerm!.id } },
+      },
+      create: {
+        name: 'admin',
+        displayName: 'Administrator',
+        color: '#ef4444',
+        level: 100,
+        permissions: { connect: { id: adminPerm!.id } },
+      },
+    });
+
+    // Benutzer der Admin-Rolle zuweisen
+    await prisma.user.update({
+      where: { id: userId },
+      data: { roleId: adminRole.id },
+    });
+
+    // Aktualisierte User-Daten laden
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        role: {
+          include: { permissions: true },
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: `Berechtigungen für ${username} repariert. Du bist jetzt Administrator mit allen Rechten.`,
+      user: {
+        id: updatedUser?.id,
+        username: updatedUser?.username,
+        role: updatedUser?.role?.name,
+        permissions: updatedUser?.role?.permissions.map(p => p.name),
+      },
+      permissionsCreated: defaultPermissions.length,
+    });
+  } catch (error) {
+    console.error('Fix permissions error:', error);
+    res.status(500).json({ error: 'Fehler beim Reparieren der Berechtigungen' });
+  }
+});
+
 // ==================== INITIAL SETUP (nur wenn keine Admins existieren) ====================
 
 router.post('/setup', async (req, res: Response) => {
