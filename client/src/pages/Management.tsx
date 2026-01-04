@@ -110,12 +110,15 @@ interface BonusPayment {
 }
 
 interface BonusSummary {
-  totalPending: number;
-  totalPaid: number;
-  countPending: number;
-  countPaid: number;
   weekStart: string;
   weekEnd: string;
+  totals: {
+    totalAmount: number;
+    pendingAmount: number;
+    paidAmount: number;
+    paymentCount: number;
+    employeeCount: number;
+  };
 }
 
 const formatDate = (date: string) => {
@@ -371,9 +374,9 @@ export default function Management() {
             <div className="flex items-center gap-2">
               <Wallet className="h-4 w-4" />
               Sonderzahlungen
-              {bonusSummary && bonusSummary.countPending > 0 && (
+              {bonusSummary && bonusSummary.totals.paymentCount > 0 && (
                 <span className="px-1.5 py-0.5 text-xs bg-yellow-500/20 text-yellow-400 rounded-full">
-                  {bonusSummary.countPending}
+                  {bonusSummary.totals.paymentCount}
                 </span>
               )}
             </div>
@@ -672,8 +675,8 @@ export default function Management() {
                       <Clock className="h-5 w-5 text-yellow-400" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-yellow-400">${bonusSummary.totalPending.toLocaleString()}</p>
-                      <p className="text-sm text-slate-400">{bonusSummary.countPending} offene Zahlungen</p>
+                      <p className="text-2xl font-bold text-yellow-400">${bonusSummary.totals.pendingAmount.toLocaleString()}</p>
+                      <p className="text-sm text-slate-400">{bonusSummary.totals.paymentCount} offene Zahlungen</p>
                     </div>
                   </div>
                 </div>
@@ -683,16 +686,16 @@ export default function Management() {
                       <CheckCircle className="h-5 w-5 text-green-400" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-green-400">${bonusSummary.totalPaid.toLocaleString()}</p>
-                      <p className="text-sm text-slate-400">{bonusSummary.countPaid} bezahlt</p>
+                      <p className="text-2xl font-bold text-green-400">${bonusSummary.totals.paidAmount.toLocaleString()}</p>
+                      <p className="text-sm text-slate-400">{bonusSummary.totals.employeeCount} Mitarbeiter</p>
                     </div>
                   </div>
                 </div>
                 <div className="card p-4 flex items-center justify-center">
-                  {bonusSummary.countPending > 0 && (
+                  {bonusSummary.totals.pendingAmount > 0 && (
                     <button
                       onClick={() => {
-                        if (confirm(`Alle ${bonusSummary.countPending} offenen Boni (${formatCurrency(bonusSummary.totalPending)}) bezahlen?`)) {
+                        if (confirm(`Alle offenen Boni (${formatCurrency(bonusSummary.totals.pendingAmount)}) bezahlen?`)) {
                           payAllBonuses.mutate();
                         }
                       }}
