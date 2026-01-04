@@ -55,6 +55,7 @@ model User {
   conductedExams       AcademyExam[] @relation("AcademyExamExaminer")
   createdRetrainings   AcademyRetraining[] @relation("AcademyRetrainingCreatedBy")
   completedRetrainings AcademyRetraining[] @relation("AcademyRetrainingCompletedBy")
+  paidBonuses          BonusPayment[] @relation("BonusPaymentPaidBy")
 
   @@map("users")
 }
@@ -118,6 +119,7 @@ model Employee {
   academyNotes           AcademyNote[] @relation("AcademyNoteEmployee")
   academyExams           AcademyExam[] @relation("AcademyExamEmployee")
   academyRetrainings     AcademyRetraining[] @relation("AcademyRetrainingEmployee")
+  bonusPayments          BonusPayment[] @relation("BonusPaymentEmployee")
 
   @@map("employees")
 }
@@ -394,13 +396,48 @@ model UprankLock {
 
 model Application {
   id              String    @id @default(cuid())
-  discordId       String                          // Discord ID des Bewerbers
-  discordUsername String                          // Discord Username
-  status          String    @default("PENDING")   // PENDING, INTERVIEW, ACCEPTED, REJECTED
+
+  // Basisdaten
+  applicantName   String                          // Name des Bewerbers (Vor- und Nachname)
+  applicationDate DateTime  @default(now())       // Bewerbungsdatum
+  idCardImage     String?                         // Pfad zum Personalausweis-Bild
+
+  // Discord (optional für späteren Schritt)
+  discordId       String?                         // Discord ID des Bewerbers
+  discordUsername String?                         // Discord Username
+
+  // Einstellungskriterien (Checkboxen)
+  criteriaStabilization    Boolean @default(false)  // Stabilisationsschein geprüft
+  criteriaVisa             Boolean @default(false)  // Visumsstufe geprüft
+  criteriaNoOffenses       Boolean @default(false)  // Keine Straftaten (7 Tage)
+  criteriaAppearance       Boolean @default(false)  // Angemessenes Aussehen
+  criteriaNoFactionLock    Boolean @default(false)  // Keine Fraktionssperre
+  criteriaNoOpenBills      Boolean @default(false)  // Keine offenen Rechnungen
+  criteriaSearched         Boolean @default(false)  // Durchsuchen
+  criteriaBlacklistChecked Boolean @default(false)  // Blacklist gecheckt
+  criteriaHandbookGiven    Boolean @default(false)  // Diensthandbuch ausgegeben
+  criteriaEmploymentTest   Boolean @default(false)  // Einstellungstest
+  criteriaRpSituation      Boolean @default(false)  // RP Situation dargestellt (AVK) & Smalltalk
+
+  // Fragenkatalog (JSON Array mit Frage-IDs die als bestanden markiert sind)
+  questionsCompleted String?                       // JSON Array: ["q1", "q2", ...]
+
+  // Onboarding Checkliste (JSON Array mit abgehakten Items)
+  onboardingCompleted String?                      // JSON Array: ["clothes", "discord", ...]
+
+  // Discord Einladung
+  discordInviteLink String?                        // Generierter Einladungslink
+  discordRolesAssigned Boolean @default(false)     // Rollen wurden vergeben
+
+  // Status und Workflow
+  status          String    @default("CRITERIA")  // CRITERIA, QUESTIONS, ONBOARDING, COMPLETED, REJECTED
+  currentStep     Int       @default(1)           // 1=Kriterien, 2=Fragen, 3=Onboarding, 4=Abgeschlossen
   notes           String?                         // Notizen zum Bewerber
   interviewDate   DateTime?                       // Geplantes Gespräch
   interviewNotes  String?                         // Notizen vom Gespräch
   rejectionReason String?                         // Ablehnungsgrund
+
+  // Bearbeiter
   createdById     String
   createdBy       User      @relation("ApplicationCreatedBy", fields: [createdById], references: [id])
   processedById   String?
@@ -783,4 +820,72 @@ model AcademyRetraining {
   @@index([employeeId])
   @@index([status])
   @@map("academy_retrainings")
+}
+
+// ==================== SONDERZAHLUNGEN / BONUS SYSTEM ====================
+
+// Konfiguration der Bonus-Arten (im Admin-Bereich einstellbar)
+model BonusConfig {
+  id              String    @id @default(cuid())
+  activityType    String    @unique                           // Eindeutige Kennung (z.B. "APPLICATION_COMPLETED", "TRAINING_CONDUCTED")
+  displayName     String                                      // Anzeigename (z.B. "Bewerbung abgeschlossen")
+  description     String?                                     // Beschreibung der Tätigkeit
+  amount          Int       @default(0)                       // Betrag in Dollar
+  isActive        Boolean   @default(true)                    // Ob diese Bonusart aktiv ist
+  category        String    @default("GENERAL")               // Kategorie (HR, ACADEMY, IA, DETECTIVE, GENERAL)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relationen
+  payments        BonusPayment[]
+
+  @@index([activityType])
+  @@index([isActive])
+  @@map("bonus_configs")
+}
+
+// Einzelne Bonus-Zahlungen (werden automatisch erstellt bei Tätigkeiten)
+model BonusPayment {
+  id              String    @id @default(cuid())
+  configId        String
+  config          BonusConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  employeeId      String
+  employee        Employee  @relation("BonusPaymentEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  amount          Int                                         // Betrag zum Zeitpunkt der Erstellung
+  reason          String?                                     // Details zur Tätigkeit (z.B. Name des Azubis)
+  referenceId     String?                                     // ID der verknüpften Entität (z.B. Application ID)
+  referenceType   String?                                     // Typ der Referenz (z.B. "Application", "Training")
+  weekStart       DateTime                                    // Start der Woche (Montag 00:00)
+  weekEnd         DateTime                                    // Ende der Woche (Sonntag 23:59)
+  status          String    @default("PENDING")               // PENDING, PAID, CANCELLED
+  paidAt          DateTime?
+  paidById        String?
+  paidBy          User?     @relation("BonusPaymentPaidBy", fields: [paidById], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@index([configId])
+  @@index([weekStart, weekEnd])
+  @@index([status])
+  @@map("bonus_payments")
+}
+
+// Wöchentliche Abrechnungsperioden
+model BonusWeek {
+  id              String    @id @default(cuid())
+  weekStart       DateTime                                    // Start der Woche (Montag 00:00)
+  weekEnd         DateTime                                    // Ende der Woche (Sonntag 23:59)
+  status          String    @default("OPEN")                  // OPEN, CLOSED, PAID
+  totalAmount     Int       @default(0)                       // Gesamtbetrag
+  closedAt        DateTime?                                   // Wann wurde die Woche geschlossen
+  submittedToManagement Boolean @default(false)               // An Management weitergeleitet
+  submittedAt     DateTime?
+  notes           String?                                     // Notizen vom Management
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([weekStart, weekEnd])
+  @@index([status])
+  @@map("bonus_weeks")
 }

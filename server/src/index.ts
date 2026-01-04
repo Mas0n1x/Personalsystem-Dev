@@ -31,11 +31,13 @@ import unitReviewRoutes from './routes/unitReviews.js';
 import uprankRequestRoutes from './routes/uprankRequests.js';
 import teamChangeReportRoutes from './routes/teamChangeReports.js';
 import academyRoutes from './routes/academy.js';
+import bonusRoutes from './routes/bonus.js';
 
 // Services
 import { initializeDiscordBot } from './services/discordBot.js';
 import { initializeSocket } from './services/socketService.js';
 import { auditMiddleware } from './middleware/auditMiddleware.js';
+import { initializeBonusCronJob } from './services/bonusService.js';
 
 dotenv.config();
 
@@ -89,6 +91,7 @@ app.use('/api/unit-reviews', unitReviewRoutes);
 app.use('/api/uprank-requests', uprankRequestRoutes);
 app.use('/api/team-change-reports', teamChangeReportRoutes);
 app.use('/api/academy', academyRoutes);
+app.use('/api/bonus', bonusRoutes);
 
 // Error handling
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -120,6 +123,10 @@ async function startServer() {
     } else {
       console.log('ℹ️ Discord Bot not configured (DISCORD_BOT_TOKEN missing)');
     }
+
+    // Initialize Bonus Cron Job (weekly reset on Sunday 23:59)
+    initializeBonusCronJob();
+    console.log('✅ Bonus Cron Job initialized');
 
     httpServer.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);

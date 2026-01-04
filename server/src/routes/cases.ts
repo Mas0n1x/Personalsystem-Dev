@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { triggerCaseOpened, triggerCaseClosed, getEmployeeIdFromUserId } from '../services/bonusService.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -533,6 +534,11 @@ router.post('/', authMiddleware, requirePermission('detectives.manage'), async (
       },
     });
 
+    // Bonus-Trigger für eröffnete Ermittlungsakte
+    if (newCase.folder.detective) {
+      await triggerCaseOpened(newCase.folder.detectiveId, caseNumber, newCase.id);
+    }
+
     res.status(201).json(newCase);
   } catch (error) {
     console.error('Create case error:', error);
@@ -579,6 +585,12 @@ router.put('/:id', authMiddleware, requirePermission('detectives.manage'), async
   try {
     const { title, description, status, priority, suspects, notes } = req.body;
 
+    // Hole vorherigen Status für Bonus-Trigger
+    const previousCase = await prisma.case.findUnique({
+      where: { id: req.params.id },
+      select: { status: true, caseNumber: true, folder: { select: { detectiveId: true } } }
+    });
+
     const updateData: Record<string, unknown> = {};
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
@@ -619,6 +631,13 @@ router.put('/:id', authMiddleware, requirePermission('detectives.manage'), async
         },
       },
     });
+
+    // Bonus-Trigger wenn Fall abgeschlossen wird
+    if ((status === 'CLOSED' || status === 'ARCHIVED') && previousCase?.status !== 'CLOSED' && previousCase?.status !== 'ARCHIVED') {
+      if (previousCase?.folder.detectiveId) {
+        await triggerCaseClosed(previousCase.folder.detectiveId, previousCase.caseNumber, req.params.id);
+      }
+    }
 
     res.json(updatedCase);
   } catch (error) {

@@ -15,6 +15,7 @@ import AuditLogs from './pages/admin/AuditLogs';
 import Settings from './pages/admin/Settings';
 import AcademyModules from './pages/admin/AcademyModules';
 import Backups from './pages/admin/Backups';
+import BonusSettings from './pages/admin/BonusSettings';
 
 // Leadership
 import Leadership from './pages/Leadership';
@@ -88,6 +89,7 @@ function App() {
         <Route path="admin/settings" element={<Settings />} />
         <Route path="admin/academy-modules" element={<AcademyModules />} />
         <Route path="admin/backups" element={<Backups />} />
+        <Route path="admin/bonus" element={<BonusSettings />} />
       </Route>
 
       {/* Fallback */}

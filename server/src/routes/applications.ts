@@ -1,8 +1,70 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { createInviteLink } from '../services/discordBot.js';
+import { triggerApplicationCompleted, triggerApplicationOnboarding, getEmployeeIdFromUserId } from '../services/bonusService.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Upload-Verzeichnis für Personalausweise
+const uploadDir = path.join(__dirname, '../../uploads/id-cards');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Multer-Konfiguration für Bild-Upload
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, 'idcard-' + uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Nur JPEG, PNG und WebP erlaubt'));
+    }
+  },
+});
 
 const router = Router();
+
+// Fragenkatalog - statisch definiert
+const QUESTION_CATALOG = [
+  { id: 'q1', text: 'Was macht man vor Dienstbeginn?' },
+  { id: 'q2', text: 'Wie lautet die Telefonseelsorge?' },
+  { id: 'q3', text: 'Wer ist der Polizeichef?' },
+  { id: 'q5', text: 'Wie schnell darf man in der Stadt und außerhalb fahren?' },
+  { id: 'q6', text: 'Wie ist der Tacklebefehl?' },
+  { id: 'q7', text: 'Wer muss einem Befehl folge leisten und warum? (Befehlskette)' },
+  { id: 'q8', text: 'Bei wem müssen Abmeldungen und Dienstfrei beantragt werden?' },
+  { id: 'q9', text: 'Was für Streifenfahrzeuge gibt es, nenne 3?' },
+  { id: 'q10', text: 'Welche Fraktionsfunkfrequenz nutzen wir?' },
+  { id: 'q11', text: 'Wie verhält man sich an einer Unfallstelle?' },
+  { id: 'q12', text: 'Was ist der Unterschied zwischen Ermahnung/Verwarnung und wie lange bleiben diese im System?' },
+];
+
+// Onboarding-Checkliste - statisch definiert
+const ONBOARDING_CHECKLIST = [
+  { id: 'clothes', text: 'Klamotten besorgen (Dienstkleidung)' },
+  { id: 'discord', text: 'Discord Rollen vergeben' },
+  { id: 'inventory', text: 'Standardinventar erklärt' },
+  { id: 'garage', text: 'Fahrzeuggarage erklärt' },
+];
 
 // GET alle Bewerbungen
 router.get('/', authMiddleware, requirePermission('hr.view'), async (req: AuthRequest, res: Response) => {
@@ -43,19 +105,22 @@ router.get('/', authMiddleware, requirePermission('hr.view'), async (req: AuthRe
 // GET Statistiken
 router.get('/stats', authMiddleware, requirePermission('hr.view'), async (_req: AuthRequest, res: Response) => {
   try {
-    const [pending, interview, accepted, rejected] = await Promise.all([
-      prisma.application.count({ where: { status: 'PENDING' } }),
-      prisma.application.count({ where: { status: 'INTERVIEW' } }),
-      prisma.application.count({ where: { status: 'ACCEPTED' } }),
+    const [criteria, questions, onboarding, completed, rejected] = await Promise.all([
+      prisma.application.count({ where: { status: 'CRITERIA' } }),
+      prisma.application.count({ where: { status: 'QUESTIONS' } }),
+      prisma.application.count({ where: { status: 'ONBOARDING' } }),
+      prisma.application.count({ where: { status: 'COMPLETED' } }),
       prisma.application.count({ where: { status: 'REJECTED' } }),
     ]);
 
     res.json({
-      pending,
-      interview,
-      accepted,
+      criteria,
+      questions,
+      onboarding,
+      completed,
       rejected,
-      total: pending + interview + accepted + rejected,
+      pending: criteria + questions + onboarding, // In Bearbeitung
+      total: criteria + questions + onboarding + completed + rejected,
     });
   } catch (error) {
     console.error('Get application stats error:', error);
@@ -63,12 +128,101 @@ router.get('/stats', authMiddleware, requirePermission('hr.view'), async (_req: 
   }
 });
 
-// GET Blacklist-Check für Bewerbung
+// GET Fragenkatalog
+router.get('/questions', authMiddleware, requirePermission('hr.view'), async (_req: AuthRequest, res: Response) => {
+  res.json(QUESTION_CATALOG);
+});
+
+// GET Onboarding-Checkliste
+router.get('/onboarding-checklist', authMiddleware, requirePermission('hr.view'), async (_req: AuthRequest, res: Response) => {
+  res.json(ONBOARDING_CHECKLIST);
+});
+
+// POST Discord Einladungslink generieren
+router.post('/generate-invite', authMiddleware, requirePermission('hr.manage'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const result = await createInviteLink(86400, 1); // 24h, 1 Verwendung
+
+    if (!result.success) {
+      res.status(500).json({ error: result.error || 'Fehler beim Erstellen der Einladung' });
+      return;
+    }
+
+    res.json({ inviteUrl: result.inviteUrl });
+  } catch (error) {
+    console.error('Generate invite error:', error);
+    res.status(500).json({ error: 'Fehler beim Generieren des Einladungslinks' });
+  }
+});
+
+// GET einzelne Bewerbung
+router.get('/:id', authMiddleware, requirePermission('hr.view'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const application = await prisma.application.findUnique({
+      where: { id },
+      include: {
+        createdBy: {
+          select: {
+            displayName: true,
+            username: true,
+          },
+        },
+        processedBy: {
+          select: {
+            displayName: true,
+            username: true,
+          },
+        },
+      },
+    });
+
+    if (!application) {
+      res.status(404).json({ error: 'Bewerbung nicht gefunden' });
+      return;
+    }
+
+    res.json(application);
+  } catch (error) {
+    console.error('Get application error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Bewerbung' });
+  }
+});
+
+// GET Personalausweis-Bild (on-demand laden)
+router.get('/:id/id-card', authMiddleware, requirePermission('hr.view'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const application = await prisma.application.findUnique({
+      where: { id },
+      select: { idCardImage: true },
+    });
+
+    if (!application || !application.idCardImage) {
+      res.status(404).json({ error: 'Bild nicht gefunden' });
+      return;
+    }
+
+    const imagePath = path.join(uploadDir, application.idCardImage);
+    if (!fs.existsSync(imagePath)) {
+      res.status(404).json({ error: 'Bilddatei nicht gefunden' });
+      return;
+    }
+
+    res.sendFile(imagePath);
+  } catch (error) {
+    console.error('Get ID card error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen des Bildes' });
+  }
+});
+
+// GET Blacklist-Check
 router.get('/check-blacklist/:discordId', authMiddleware, requirePermission('hr.view'), async (req: AuthRequest, res: Response) => {
   try {
     const { discordId } = req.params;
 
-    // Prüfe Blacklist
     const blacklistEntry = await prisma.blacklist.findUnique({
       where: { discordId },
     });
@@ -78,7 +232,6 @@ router.get('/check-blacklist/:discordId', authMiddleware, requirePermission('hr.
       return;
     }
 
-    // Prüfe ob abgelaufen
     if (blacklistEntry.expiresAt && new Date(blacklistEntry.expiresAt) < new Date()) {
       res.json({ blacklisted: false, expired: true });
       return;
@@ -96,52 +249,51 @@ router.get('/check-blacklist/:discordId', authMiddleware, requirePermission('hr.
   }
 });
 
-// POST neue Bewerbung erstellen
-router.post('/', authMiddleware, requirePermission('hr.manage'), async (req: AuthRequest, res: Response) => {
+// POST neue Bewerbung erstellen (Schritt 1: Basisdaten)
+router.post('/', authMiddleware, requirePermission('hr.manage'), upload.single('idCardImage'), async (req: AuthRequest, res: Response) => {
   try {
-    const { discordId, discordUsername, notes } = req.body;
+    const { applicantName, applicationDate, discordId, discordUsername } = req.body;
+    const idCardImage = req.file?.filename;
 
-    if (!discordId || !discordUsername) {
-      res.status(400).json({ error: 'Discord ID und Username sind erforderlich' });
+    if (!applicantName) {
+      res.status(400).json({ error: 'Name des Bewerbers ist erforderlich' });
       return;
     }
 
-    // Prüfe Blacklist automatisch
-    const blacklistEntry = await prisma.blacklist.findUnique({
-      where: { discordId },
-    });
+    // Blacklist-Check falls Discord-Daten angegeben wurden
+    if (discordId || discordUsername) {
+      // Für SQLite: Hole alle Blacklist-Einträge und prüfe manuell (case-insensitive)
+      const blacklistEntries = await prisma.blacklist.findMany();
 
-    if (blacklistEntry) {
-      // Prüfe ob abgelaufen
-      if (!blacklistEntry.expiresAt || new Date(blacklistEntry.expiresAt) > new Date()) {
-        res.status(400).json({
-          error: 'BLACKLISTED',
-          message: `Bewerber ist auf der Blacklist: ${blacklistEntry.reason}`,
-          blacklistEntry,
-        });
-        return;
+      const blacklistMatch = blacklistEntries.find(entry => {
+        if (discordId && entry.discordId === discordId) return true;
+        if (discordUsername && entry.username.toLowerCase() === discordUsername.toLowerCase()) return true;
+        return false;
+      });
+
+      if (blacklistMatch) {
+        // Prüfe ob abgelaufen
+        if (!blacklistMatch.expiresAt || new Date(blacklistMatch.expiresAt) > new Date()) {
+          res.status(400).json({
+            error: 'BLACKLISTED',
+            message: `Bewerber ist auf der Blacklist: ${blacklistMatch.reason}`,
+            blacklistEntry: blacklistMatch,
+          });
+          return;
+        }
       }
-    }
-
-    // Prüfe ob bereits eine offene Bewerbung existiert
-    const existingApplication = await prisma.application.findFirst({
-      where: {
-        discordId,
-        status: { in: ['PENDING', 'INTERVIEW'] },
-      },
-    });
-
-    if (existingApplication) {
-      res.status(400).json({ error: 'Es existiert bereits eine offene Bewerbung für diese Discord ID' });
-      return;
     }
 
     const application = await prisma.application.create({
       data: {
-        discordId,
-        discordUsername,
-        notes,
+        applicantName,
+        applicationDate: applicationDate ? new Date(applicationDate) : new Date(),
+        idCardImage,
+        discordId: discordId || null,
+        discordUsername: discordUsername || null,
         createdById: req.user!.id,
+        status: 'CRITERIA',
+        currentStep: 1,
       },
       include: {
         createdBy: {
@@ -160,27 +312,58 @@ router.post('/', authMiddleware, requirePermission('hr.manage'), async (req: Aut
   }
 });
 
-// PUT Bewerbung aktualisieren (Notizen, Gesprächstermin)
-router.put('/:id', authMiddleware, requirePermission('hr.manage'), async (req: AuthRequest, res: Response) => {
+// PUT Einstellungskriterien aktualisieren (Schritt 1)
+router.put('/:id/criteria', authMiddleware, requirePermission('hr.manage'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { notes, interviewDate, interviewNotes } = req.body;
+    const {
+      criteriaStabilization,
+      criteriaVisa,
+      criteriaNoOffenses,
+      criteriaAppearance,
+      criteriaNoFactionLock,
+      criteriaNoOpenBills,
+      criteriaSearched,
+      criteriaBlacklistChecked,
+      criteriaHandbookGiven,
+      criteriaEmploymentTest,
+      criteriaRpSituation,
+    } = req.body;
+
+    // Prüfe ob alle Kriterien erfüllt sind
+    const allCriteriaMet =
+      criteriaStabilization &&
+      criteriaVisa &&
+      criteriaNoOffenses &&
+      criteriaAppearance &&
+      criteriaNoFactionLock &&
+      criteriaNoOpenBills &&
+      criteriaSearched &&
+      criteriaBlacklistChecked &&
+      criteriaHandbookGiven &&
+      criteriaEmploymentTest &&
+      criteriaRpSituation;
 
     const application = await prisma.application.update({
       where: { id },
       data: {
-        notes,
-        interviewDate: interviewDate ? new Date(interviewDate) : undefined,
-        interviewNotes,
+        criteriaStabilization: criteriaStabilization || false,
+        criteriaVisa: criteriaVisa || false,
+        criteriaNoOffenses: criteriaNoOffenses || false,
+        criteriaAppearance: criteriaAppearance || false,
+        criteriaNoFactionLock: criteriaNoFactionLock || false,
+        criteriaNoOpenBills: criteriaNoOpenBills || false,
+        criteriaSearched: criteriaSearched || false,
+        criteriaBlacklistChecked: criteriaBlacklistChecked || false,
+        criteriaHandbookGiven: criteriaHandbookGiven || false,
+        criteriaEmploymentTest: criteriaEmploymentTest || false,
+        criteriaRpSituation: criteriaRpSituation || false,
+        // Wenn alle Kriterien erfüllt, zum nächsten Schritt
+        status: allCriteriaMet ? 'QUESTIONS' : 'CRITERIA',
+        currentStep: allCriteriaMet ? 2 : 1,
       },
       include: {
         createdBy: {
-          select: {
-            displayName: true,
-            username: true,
-          },
-        },
-        processedBy: {
           select: {
             displayName: true,
             username: true,
@@ -191,27 +374,30 @@ router.put('/:id', authMiddleware, requirePermission('hr.manage'), async (req: A
 
     res.json(application);
   } catch (error) {
-    console.error('Update application error:', error);
-    res.status(500).json({ error: 'Fehler beim Aktualisieren der Bewerbung' });
+    console.error('Update criteria error:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren der Kriterien' });
   }
 });
 
-// PUT Status auf "Gespräch geplant" setzen
-router.put('/:id/schedule-interview', authMiddleware, requirePermission('hr.manage'), async (req: AuthRequest, res: Response) => {
+// PUT Fragenkatalog aktualisieren (Schritt 2)
+router.put('/:id/questions', authMiddleware, requirePermission('hr.manage'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { interviewDate } = req.body;
+    const { questionsCompleted } = req.body;
 
-    if (!interviewDate) {
-      res.status(400).json({ error: 'Gesprächstermin ist erforderlich' });
-      return;
-    }
+    // Prüfe ob alle Fragen beantwortet wurden
+    const allQuestionsCompleted =
+      questionsCompleted &&
+      Array.isArray(questionsCompleted) &&
+      questionsCompleted.length === QUESTION_CATALOG.length;
 
     const application = await prisma.application.update({
       where: { id },
       data: {
-        status: 'INTERVIEW',
-        interviewDate: new Date(interviewDate),
+        questionsCompleted: JSON.stringify(questionsCompleted || []),
+        // Wenn alle Fragen beantwortet, zum nächsten Schritt
+        status: allQuestionsCompleted ? 'ONBOARDING' : 'QUESTIONS',
+        currentStep: allQuestionsCompleted ? 3 : 2,
       },
       include: {
         createdBy: {
@@ -225,16 +411,53 @@ router.put('/:id/schedule-interview', authMiddleware, requirePermission('hr.mana
 
     res.json(application);
   } catch (error) {
-    console.error('Schedule interview error:', error);
-    res.status(500).json({ error: 'Fehler beim Planen des Gesprächs' });
+    console.error('Update questions error:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren der Fragen' });
   }
 });
 
-// PUT Bewerbung annehmen (erstellt automatisch Mitarbeiter)
-router.put('/:id/accept', authMiddleware, requirePermission('hr.manage'), async (req: AuthRequest, res: Response) => {
+// PUT Onboarding aktualisieren (Schritt 3)
+router.put('/:id/onboarding', authMiddleware, requirePermission('hr.manage'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { interviewNotes } = req.body;
+    const { onboardingCompleted, discordId, discordUsername, discordInviteLink, discordRolesAssigned } = req.body;
+
+    // Prüfe ob Onboarding vollständig
+    const allOnboardingCompleted =
+      onboardingCompleted &&
+      Array.isArray(onboardingCompleted) &&
+      onboardingCompleted.length === ONBOARDING_CHECKLIST.length;
+
+    const application = await prisma.application.update({
+      where: { id },
+      data: {
+        onboardingCompleted: JSON.stringify(onboardingCompleted || []),
+        discordId: discordId || undefined,
+        discordUsername: discordUsername || undefined,
+        discordInviteLink: discordInviteLink || undefined,
+        discordRolesAssigned: discordRolesAssigned || false,
+      },
+      include: {
+        createdBy: {
+          select: {
+            displayName: true,
+            username: true,
+          },
+        },
+      },
+    });
+
+    res.json({ application, allComplete: allOnboardingCompleted });
+  } catch (error) {
+    console.error('Update onboarding error:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren des Onboardings' });
+  }
+});
+
+// PUT Bewerbung abschließen (erstellt Mitarbeiter)
+router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
 
     const application = await prisma.application.findUnique({
       where: { id },
@@ -245,7 +468,12 @@ router.put('/:id/accept', authMiddleware, requirePermission('hr.manage'), async 
       return;
     }
 
-    // Nochmals Blacklist prüfen
+    if (!application.discordId || !application.discordUsername) {
+      res.status(400).json({ error: 'Discord-Daten sind erforderlich' });
+      return;
+    }
+
+    // Prüfe Blacklist
     const blacklistEntry = await prisma.blacklist.findUnique({
       where: { discordId: application.discordId },
     });
@@ -258,18 +486,17 @@ router.put('/:id/accept', authMiddleware, requirePermission('hr.manage'), async 
       return;
     }
 
-    // Prüfe ob User bereits existiert
+    // User erstellen/finden
     let user = await prisma.user.findUnique({
       where: { discordId: application.discordId },
     });
 
-    // Erstelle User falls nicht existiert
     if (!user) {
       user = await prisma.user.create({
         data: {
           discordId: application.discordId,
           username: application.discordUsername,
-          displayName: application.discordUsername,
+          displayName: application.applicantName,
         },
       });
     }
@@ -284,7 +511,7 @@ router.put('/:id/accept', authMiddleware, requirePermission('hr.manage'), async 
       return;
     }
 
-    // Erstelle Mitarbeiter
+    // Mitarbeiter erstellen
     const employee = await prisma.employee.create({
       data: {
         userId: user.id,
@@ -295,12 +522,12 @@ router.put('/:id/accept', authMiddleware, requirePermission('hr.manage'), async 
       },
     });
 
-    // Aktualisiere Bewerbung
+    // Bewerbung abschließen
     const updatedApplication = await prisma.application.update({
       where: { id },
       data: {
-        status: 'ACCEPTED',
-        interviewNotes,
+        status: 'COMPLETED',
+        currentStep: 4,
         processedById: req.user!.id,
         processedAt: new Date(),
       },
@@ -320,14 +547,21 @@ router.put('/:id/accept', authMiddleware, requirePermission('hr.manage'), async 
       },
     });
 
+    // Bonus-Trigger für abgeschlossene Bewerbung
+    const processorEmployeeId = await getEmployeeIdFromUserId(req.user!.id);
+    if (processorEmployeeId) {
+      await triggerApplicationCompleted(processorEmployeeId, application.applicantName, id);
+      await triggerApplicationOnboarding(processorEmployeeId, application.applicantName, id);
+    }
+
     res.json({
       application: updatedApplication,
       employee,
-      message: `${application.discordUsername} wurde als Cadet eingestellt`,
+      message: `${application.applicantName} wurde als Cadet eingestellt`,
     });
   } catch (error) {
-    console.error('Accept application error:', error);
-    res.status(500).json({ error: 'Fehler beim Annehmen der Bewerbung' });
+    console.error('Complete application error:', error);
+    res.status(500).json({ error: 'Fehler beim Abschließen der Bewerbung' });
   }
 });
 
@@ -352,7 +586,7 @@ router.put('/:id/reject', authMiddleware, requirePermission('hr.manage'), async 
     }
 
     // Optional: Zur Blacklist hinzufügen
-    if (addToBlacklist) {
+    if (addToBlacklist && application.discordId) {
       const existingBlacklist = await prisma.blacklist.findUnique({
         where: { discordId: application.discordId },
       });
@@ -361,7 +595,7 @@ router.put('/:id/reject', authMiddleware, requirePermission('hr.manage'), async 
         await prisma.blacklist.create({
           data: {
             discordId: application.discordId,
-            username: application.discordUsername,
+            username: application.discordUsername || application.applicantName,
             reason: blacklistReason || rejectionReason,
             expiresAt: blacklistExpires ? new Date(blacklistExpires) : null,
             addedById: req.user!.id,
@@ -405,6 +639,19 @@ router.put('/:id/reject', authMiddleware, requirePermission('hr.manage'), async 
 router.delete('/:id', authMiddleware, requirePermission('hr.manage'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+
+    // Lösche zugehöriges Bild
+    const application = await prisma.application.findUnique({
+      where: { id },
+      select: { idCardImage: true },
+    });
+
+    if (application?.idCardImage) {
+      const imagePath = path.join(uploadDir, application.idCardImage);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
 
     await prisma.application.delete({ where: { id } });
 

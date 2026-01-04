@@ -1019,5 +1019,46 @@ export async function sendAnnouncementToChannel(
   }
 }
 
+// Discord Einladungslink generieren
+export async function createInviteLink(maxAge: number = 86400, maxUses: number = 1): Promise<{ success: boolean; inviteUrl?: string; error?: string }> {
+  if (!guild || !client) {
+    return { success: false, error: 'Discord nicht verbunden' };
+  }
+
+  try {
+    // Finde einen geeigneten Kanal für die Einladung
+    // Bevorzuge den System-Kanal oder den ersten Text-Kanal
+    let inviteChannel = guild.systemChannel;
+
+    if (!inviteChannel) {
+      // Fallback: Ersten Text-Kanal finden
+      const textChannels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText);
+      if (textChannels.size > 0) {
+        inviteChannel = textChannels.first() as TextChannel;
+      }
+    }
+
+    if (!inviteChannel) {
+      return { success: false, error: 'Kein geeigneter Kanal für Einladung gefunden' };
+    }
+
+    // Einladung erstellen
+    const invite = await inviteChannel.createInvite({
+      maxAge: maxAge, // Standard: 24 Stunden
+      maxUses: maxUses, // Standard: 1 Verwendung
+      unique: true,
+      reason: 'HR Onboarding - Neuer Cadet',
+    });
+
+    return {
+      success: true,
+      inviteUrl: `https://discord.gg/${invite.code}`,
+    };
+  } catch (error) {
+    console.error('Fehler beim Erstellen der Einladung:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
 // Exportiere getTeamConfigForLevel für externe Verwendung
 export { client, getTeamConfigForLevel };

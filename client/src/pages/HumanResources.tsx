@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { blacklistApi, applicationApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -10,14 +10,17 @@ import {
   Trash2,
   Clock,
   AlertTriangle,
-  Calendar,
   Edit2,
   UserPlus,
   CheckCircle,
   XCircle,
-  MessageSquare,
-  FileText,
   Eye,
+  Upload,
+  FileCheck,
+  MessageSquare,
+  ClipboardList,
+  Image as ImageIcon,
+  Link,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -36,26 +39,62 @@ interface BlacklistEntry {
 
 interface Application {
   id: string;
-  discordId: string;
-  discordUsername: string;
-  status: 'PENDING' | 'INTERVIEW' | 'ACCEPTED' | 'REJECTED';
+  applicantName: string;
+  applicationDate: string;
+  idCardImage: string | null;
+  discordId: string | null;
+  discordUsername: string | null;
+  status: 'CRITERIA' | 'QUESTIONS' | 'ONBOARDING' | 'COMPLETED' | 'REJECTED';
+  currentStep: number;
+  criteriaStabilization: boolean;
+  criteriaVisa: boolean;
+  criteriaNoOffenses: boolean;
+  criteriaAppearance: boolean;
+  criteriaNoFactionLock: boolean;
+  criteriaNoOpenBills: boolean;
+  criteriaSearched: boolean;
+  criteriaBlacklistChecked: boolean;
+  criteriaHandbookGiven: boolean;
+  criteriaEmploymentTest: boolean;
+  criteriaRpSituation: boolean;
+  questionsCompleted: string | null;
+  onboardingCompleted: string | null;
+  discordInviteLink: string | null;
+  discordRolesAssigned: boolean;
   notes: string | null;
-  interviewDate: string | null;
-  interviewNotes: string | null;
   rejectionReason: string | null;
   createdAt: string;
   processedAt: string | null;
-  createdBy: {
-    displayName: string | null;
-    username: string;
-  };
-  processedBy: {
-    displayName: string | null;
-    username: string;
-  } | null;
+  createdBy: { displayName: string | null; username: string };
+  processedBy: { displayName: string | null; username: string } | null;
+}
+
+interface Question {
+  id: string;
+  text: string;
+}
+
+interface OnboardingItem {
+  id: string;
+  text: string;
 }
 
 type Tab = 'applications' | 'blacklist';
+
+// Einstellungskriterien
+const CRITERIA_ITEMS = [
+  { key: 'criteriaStabilization', label: 'Stabilisationsschein geprüft' },
+  { key: 'criteriaVisa', label: 'Visumsstufe geprüft' },
+  { key: 'criteriaNoOffenses', label: 'Keine Straftaten (7 Tage)' },
+  { key: 'criteriaAppearance', label: 'Angemessenes Aussehen' },
+  { key: 'criteriaNoFactionLock', label: 'Keine Fraktionssperre' },
+  { key: 'criteriaNoOpenBills', label: 'Keine offenen Rechnungen' },
+  { key: 'criteriaSearched', label: 'Durchsuchen' },
+  { key: 'criteriaBlacklistChecked', label: 'Blacklist gecheckt' },
+  { key: 'criteriaHandbookGiven', label: 'Diensthandbuch ausgegeben' },
+  { key: 'criteriaEmploymentTest', label: 'Einstellungstest' },
+  { key: 'criteriaRpSituation', label: 'RP Situation dargestellt (AVK) & Smalltalk' },
+];
 
 export default function HumanResources() {
   const { user } = useAuth();
@@ -71,18 +110,30 @@ export default function HumanResources() {
   const [expiresAt, setExpiresAt] = useState('');
 
   // Application State
-  const [showApplicationModal, setShowApplicationModal] = useState(false);
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [showInterviewModal, setShowInterviewModal] = useState(false);
-  const [showAcceptModal, setShowAcceptModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [applicationStatus, setApplicationStatus] = useState<string>('ALL');
-  const [appDiscordId, setAppDiscordId] = useState('');
-  const [appUsername, setAppUsername] = useState('');
-  const [appNotes, setAppNotes] = useState('');
-  const [interviewDate, setInterviewDate] = useState('');
-  const [interviewNotes, setInterviewNotes] = useState('');
+
+  // Create Form State
+  const [applicantName, setApplicantName] = useState('');
+  const [applicationDate, setApplicationDate] = useState(new Date().toISOString().split('T')[0]);
+  const [idCardFile, setIdCardFile] = useState<File | null>(null);
+  const [checkDiscordId, setCheckDiscordId] = useState('');
+  const [checkUsername, setCheckUsername] = useState('');
+
+  // Detail Form State
+  const [criteria, setCriteria] = useState<Record<string, boolean>>({});
+  const [questionsCompleted, setQuestionsCompleted] = useState<string[]>([]);
+  const [onboardingCompleted, setOnboardingCompleted] = useState<string[]>([]);
+  const [detailDiscordId, setDetailDiscordId] = useState('');
+  const [detailDiscordUsername, setDetailDiscordUsername] = useState('');
+  const [discordInviteLink, setDiscordInviteLink] = useState('');
+  const [discordRolesAssigned, setDiscordRolesAssigned] = useState(false);
+
+  // Reject State
   const [rejectionReason, setRejectionReason] = useState('');
   const [addToBlacklist, setAddToBlacklist] = useState(false);
   const [blacklistReason, setBlacklistReason] = useState('');
@@ -109,10 +160,22 @@ export default function HumanResources() {
     queryFn: () => applicationApi.getStats(),
   });
 
+  const { data: questionsData } = useQuery({
+    queryKey: ['application-questions'],
+    queryFn: () => applicationApi.getQuestions(),
+  });
+
+  const { data: onboardingData } = useQuery({
+    queryKey: ['application-onboarding'],
+    queryFn: () => applicationApi.getOnboardingChecklist(),
+  });
+
   const blacklist = (blacklistData?.data || []) as BlacklistEntry[];
   const blacklistStats = blacklistStatsData?.data as { total: number; permanent: number; temporary: number } | undefined;
   const applications = (applicationsData?.data || []) as Application[];
-  const applicationStats = applicationStatsData?.data as { pending: number; interview: number; accepted: number; rejected: number; total: number } | undefined;
+  const applicationStats = applicationStatsData?.data as { criteria: number; questions: number; onboarding: number; completed: number; rejected: number; pending: number; total: number } | undefined;
+  const questions = (questionsData?.data || []) as Question[];
+  const onboardingItems = (onboardingData?.data || []) as OnboardingItem[];
 
   // Blacklist Mutations
   const createBlacklistMutation = useMutation({
@@ -150,7 +213,7 @@ export default function HumanResources() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['application-stats'] });
-      closeApplicationModal();
+      closeCreateModal();
       toast.success('Bewerbung erstellt');
     },
     onError: (error: { response?: { data?: { error?: string; message?: string } } }) => {
@@ -160,26 +223,55 @@ export default function HumanResources() {
     },
   });
 
-  const scheduleInterviewMutation = useMutation({
-    mutationFn: ({ id, date }: { id: string; date: string }) =>
-      applicationApi.scheduleInterview(id, date),
-    onSuccess: () => {
+  const updateCriteriaMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Record<string, boolean> }) =>
+      applicationApi.updateCriteria(id, data),
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['application-stats'] });
-      closeInterviewModal();
-      toast.success('Gespräch geplant');
+      setSelectedApplication(response.data);
+      if (response.data.status === 'QUESTIONS') {
+        toast.success('Alle Kriterien erfüllt - weiter zum Fragenkatalog');
+      }
     },
   });
 
-  const acceptApplicationMutation = useMutation({
-    mutationFn: ({ id, notes }: { id: string; notes?: string }) =>
-      applicationApi.accept(id, notes),
+  const updateQuestionsMutation = useMutation({
+    mutationFn: ({ id, questionsCompleted }: { id: string; questionsCompleted: string[] }) =>
+      applicationApi.updateQuestions(id, questionsCompleted),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['application-stats'] });
+      setSelectedApplication(response.data);
+      if (response.data.status === 'ONBOARDING') {
+        toast.success('Fragenkatalog abgeschlossen - weiter zum Onboarding');
+      }
+    },
+  });
+
+  const updateOnboardingMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      applicationApi.updateOnboarding(id, data as {
+        onboardingCompleted?: string[];
+        discordId?: string;
+        discordUsername?: string;
+        discordInviteLink?: string;
+        discordRolesAssigned?: boolean;
+      }),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      setSelectedApplication(response.data.application);
+    },
+  });
+
+  const completeApplicationMutation = useMutation({
+    mutationFn: applicationApi.complete,
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['application-stats'] });
       queryClient.invalidateQueries({ queryKey: ['employees'] });
-      closeAcceptModal();
-      toast.success(response.data.message || 'Bewerbung angenommen');
+      closeDetailModal();
+      toast.success(response.data.message || 'Bewerbung abgeschlossen');
     },
     onError: (error: { response?: { data?: { error?: string; message?: string } } }) => {
       if (error.response?.data?.error === 'BLACKLISTED') {
@@ -199,6 +291,7 @@ export default function HumanResources() {
         queryClient.invalidateQueries({ queryKey: ['blacklist-stats'] });
       }
       closeRejectModal();
+      closeDetailModal();
       toast.success('Bewerbung abgelehnt');
     },
   });
@@ -209,6 +302,31 @@ export default function HumanResources() {
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['application-stats'] });
       toast.success('Bewerbung gelöscht');
+    },
+  });
+
+  const generateInviteMutation = useMutation({
+    mutationFn: applicationApi.generateInvite,
+    onSuccess: (response) => {
+      const inviteUrl = response.data.inviteUrl;
+      setDiscordInviteLink(inviteUrl);
+      toast.success('Einladungslink generiert');
+      // Automatisch speichern
+      if (selectedApplication) {
+        updateOnboardingMutation.mutate({
+          id: selectedApplication.id,
+          data: {
+            onboardingCompleted,
+            discordId: detailDiscordId || undefined,
+            discordUsername: detailDiscordUsername || undefined,
+            discordInviteLink: inviteUrl,
+            discordRolesAssigned,
+          },
+        });
+      }
+    },
+    onError: () => {
+      toast.error('Fehler beim Generieren des Einladungslinks');
     },
   });
 
@@ -256,47 +374,83 @@ export default function HumanResources() {
     }
   };
 
-  // Application Modal Functions
-  const openApplicationModal = () => {
-    setAppDiscordId('');
-    setAppUsername('');
-    setAppNotes('');
-    setShowApplicationModal(true);
+  // Create Modal Functions
+  const closeCreateModal = () => {
+    setShowCreateModal(false);
+    setApplicantName('');
+    setApplicationDate(new Date().toISOString().split('T')[0]);
+    setIdCardFile(null);
+    setCheckDiscordId('');
+    setCheckUsername('');
   };
 
-  const closeApplicationModal = () => {
-    setShowApplicationModal(false);
-    setAppDiscordId('');
-    setAppUsername('');
-    setAppNotes('');
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const formData = new FormData();
+    formData.append('applicantName', applicantName);
+    formData.append('applicationDate', applicationDate);
+    if (idCardFile) {
+      formData.append('idCardImage', idCardFile);
+    }
+    // Discord-Daten mitschicken für Blacklist-Check im Backend
+    if (checkDiscordId) {
+      formData.append('discordId', checkDiscordId);
+    }
+    if (checkUsername) {
+      formData.append('discordUsername', checkUsername);
+    }
+
+    createApplicationMutation.mutate(formData);
   };
 
-  const openInterviewModal = (app: Application) => {
+  // Detail Modal Functions
+  const openDetailModal = (app: Application) => {
     setSelectedApplication(app);
-    setInterviewDate(app.interviewDate ? app.interviewDate.split('T')[0] : '');
-    setShowInterviewModal(true);
+
+    // Criteria laden
+    const criteriaState: Record<string, boolean> = {};
+    CRITERIA_ITEMS.forEach((item) => {
+      criteriaState[item.key] = (app as Record<string, boolean>)[item.key] || false;
+    });
+    setCriteria(criteriaState);
+
+    // Questions laden
+    try {
+      setQuestionsCompleted(app.questionsCompleted ? JSON.parse(app.questionsCompleted) : []);
+    } catch {
+      setQuestionsCompleted([]);
+    }
+
+    // Onboarding laden
+    try {
+      setOnboardingCompleted(app.onboardingCompleted ? JSON.parse(app.onboardingCompleted) : []);
+    } catch {
+      setOnboardingCompleted([]);
+    }
+
+    setDetailDiscordId(app.discordId || '');
+    setDetailDiscordUsername(app.discordUsername || '');
+    setDiscordInviteLink(app.discordInviteLink || '');
+    setDiscordRolesAssigned(app.discordRolesAssigned || false);
+
+    setShowDetailModal(true);
   };
 
-  const closeInterviewModal = () => {
-    setShowInterviewModal(false);
+  const closeDetailModal = () => {
+    setShowDetailModal(false);
     setSelectedApplication(null);
-    setInterviewDate('');
+    setCriteria({});
+    setQuestionsCompleted([]);
+    setOnboardingCompleted([]);
+    setDetailDiscordId('');
+    setDetailDiscordUsername('');
+    setDiscordInviteLink('');
+    setDiscordRolesAssigned(false);
   };
 
-  const openAcceptModal = (app: Application) => {
-    setSelectedApplication(app);
-    setInterviewNotes(app.interviewNotes || '');
-    setShowAcceptModal(true);
-  };
-
-  const closeAcceptModal = () => {
-    setShowAcceptModal(false);
-    setSelectedApplication(null);
-    setInterviewNotes('');
-  };
-
-  const openRejectModal = (app: Application) => {
-    setSelectedApplication(app);
+  // Reject Modal
+  const openRejectModal = () => {
     setRejectionReason('');
     setAddToBlacklist(false);
     setBlacklistReason('');
@@ -306,50 +460,10 @@ export default function HumanResources() {
 
   const closeRejectModal = () => {
     setShowRejectModal(false);
-    setSelectedApplication(null);
     setRejectionReason('');
     setAddToBlacklist(false);
     setBlacklistReason('');
     setBlacklistExpires('');
-  };
-
-  const openDetailModal = (app: Application) => {
-    setSelectedApplication(app);
-    setShowDetailModal(true);
-  };
-
-  const closeDetailModal = () => {
-    setShowDetailModal(false);
-    setSelectedApplication(null);
-  };
-
-  const handleApplicationSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createApplicationMutation.mutate({
-      discordId: appDiscordId,
-      discordUsername: appUsername,
-      notes: appNotes || undefined,
-    });
-  };
-
-  const handleInterviewSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (selectedApplication) {
-      scheduleInterviewMutation.mutate({
-        id: selectedApplication.id,
-        date: interviewDate,
-      });
-    }
-  };
-
-  const handleAcceptSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (selectedApplication) {
-      acceptApplicationMutation.mutate({
-        id: selectedApplication.id,
-        notes: interviewNotes || undefined,
-      });
-    }
   };
 
   const handleRejectSubmit = (e: React.FormEvent) => {
@@ -359,7 +473,7 @@ export default function HumanResources() {
         id: selectedApplication.id,
         data: {
           rejectionReason,
-          addToBlacklist,
+          addToBlacklist: addToBlacklist && !!detailDiscordId,
           blacklistReason: addToBlacklist ? (blacklistReason || rejectionReason) : undefined,
           blacklistExpires: addToBlacklist && blacklistExpires ? blacklistExpires : undefined,
         },
@@ -367,14 +481,90 @@ export default function HumanResources() {
     }
   };
 
+  // Handlers
+  const handleCriteriaChange = (key: string, value: boolean) => {
+    const newCriteria = { ...criteria, [key]: value };
+    setCriteria(newCriteria);
+
+    if (selectedApplication) {
+      updateCriteriaMutation.mutate({
+        id: selectedApplication.id,
+        data: newCriteria,
+      });
+    }
+  };
+
+  const handleQuestionToggle = (questionId: string) => {
+    const newQuestions = questionsCompleted.includes(questionId)
+      ? questionsCompleted.filter((q) => q !== questionId)
+      : [...questionsCompleted, questionId];
+    setQuestionsCompleted(newQuestions);
+
+    if (selectedApplication) {
+      updateQuestionsMutation.mutate({
+        id: selectedApplication.id,
+        questionsCompleted: newQuestions,
+      });
+    }
+  };
+
+  const handleOnboardingToggle = (itemId: string) => {
+    const newOnboarding = onboardingCompleted.includes(itemId)
+      ? onboardingCompleted.filter((i) => i !== itemId)
+      : [...onboardingCompleted, itemId];
+    setOnboardingCompleted(newOnboarding);
+
+    if (selectedApplication) {
+      updateOnboardingMutation.mutate({
+        id: selectedApplication.id,
+        data: {
+          onboardingCompleted: newOnboarding,
+          discordId: detailDiscordId || undefined,
+          discordUsername: detailDiscordUsername || undefined,
+          discordInviteLink: discordInviteLink || undefined,
+          discordRolesAssigned,
+        },
+      });
+    }
+  };
+
+  const handleDiscordDataSave = () => {
+    if (selectedApplication) {
+      updateOnboardingMutation.mutate({
+        id: selectedApplication.id,
+        data: {
+          onboardingCompleted,
+          discordId: detailDiscordId || undefined,
+          discordUsername: detailDiscordUsername || undefined,
+          discordInviteLink: discordInviteLink || undefined,
+          discordRolesAssigned,
+        },
+      });
+      toast.success('Discord-Daten gespeichert');
+    }
+  };
+
+  const handleComplete = () => {
+    if (selectedApplication) {
+      if (!detailDiscordId || !detailDiscordUsername) {
+        toast.error('Discord-Daten sind erforderlich');
+        return;
+      }
+      completeApplicationMutation.mutate(selectedApplication.id);
+    }
+  };
+
+  // Utility Functions
   const getStatusBadge = (status: Application['status']) => {
     switch (status) {
-      case 'PENDING':
-        return <span className="px-2 py-0.5 text-xs bg-blue-600/20 text-blue-400 rounded-full">Offen</span>;
-      case 'INTERVIEW':
-        return <span className="px-2 py-0.5 text-xs bg-amber-600/20 text-amber-400 rounded-full">Gespräch</span>;
-      case 'ACCEPTED':
-        return <span className="px-2 py-0.5 text-xs bg-green-600/20 text-green-400 rounded-full">Angenommen</span>;
+      case 'CRITERIA':
+        return <span className="px-2 py-0.5 text-xs bg-blue-600/20 text-blue-400 rounded-full">Kriterien</span>;
+      case 'QUESTIONS':
+        return <span className="px-2 py-0.5 text-xs bg-purple-600/20 text-purple-400 rounded-full">Fragen</span>;
+      case 'ONBOARDING':
+        return <span className="px-2 py-0.5 text-xs bg-amber-600/20 text-amber-400 rounded-full">Onboarding</span>;
+      case 'COMPLETED':
+        return <span className="px-2 py-0.5 text-xs bg-green-600/20 text-green-400 rounded-full">Abgeschlossen</span>;
       case 'REJECTED':
         return <span className="px-2 py-0.5 text-xs bg-red-600/20 text-red-400 rounded-full">Abgelehnt</span>;
     }
@@ -410,13 +600,23 @@ export default function HumanResources() {
     (p: { name: string }) => p.name === 'hr.manage' || p.name === 'admin.full'
   );
 
+  // Sync selectedApplication when data changes
+  useEffect(() => {
+    if (selectedApplication && applications.length > 0) {
+      const updated = applications.find((a) => a.id === selectedApplication.id);
+      if (updated) {
+        setSelectedApplication(updated);
+      }
+    }
+  }, [applications, selectedApplication?.id]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Human Resources</h1>
-          <p className="text-slate-400 mt-1">Blacklist & Bewerbungen verwalten</p>
+          <p className="text-slate-400 mt-1">Bewerbungen & Blacklist verwalten</p>
         </div>
       </div>
 
@@ -425,9 +625,7 @@ export default function HumanResources() {
         <button
           onClick={() => setActiveTab('applications')}
           className={`px-4 py-2 font-medium transition-colors relative ${
-            activeTab === 'applications'
-              ? 'text-green-400'
-              : 'text-slate-400 hover:text-white'
+            activeTab === 'applications' ? 'text-green-400' : 'text-slate-400 hover:text-white'
           }`}
         >
           <div className="flex items-center gap-2">
@@ -439,16 +637,12 @@ export default function HumanResources() {
               </span>
             )}
           </div>
-          {activeTab === 'applications' && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-400" />
-          )}
+          {activeTab === 'applications' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-400" />}
         </button>
         <button
           onClick={() => setActiveTab('blacklist')}
           className={`px-4 py-2 font-medium transition-colors relative ${
-            activeTab === 'blacklist'
-              ? 'text-red-400'
-              : 'text-slate-400 hover:text-white'
+            activeTab === 'blacklist' ? 'text-red-400' : 'text-slate-400 hover:text-white'
           }`}
         >
           <div className="flex items-center gap-2">
@@ -460,9 +654,7 @@ export default function HumanResources() {
               </span>
             )}
           </div>
-          {activeTab === 'blacklist' && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-400" />
-          )}
+          {activeTab === 'blacklist' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-400" />}
         </button>
       </div>
 
@@ -470,54 +662,65 @@ export default function HumanResources() {
       {activeTab === 'applications' && (
         <div className="space-y-6">
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="card p-5 bg-gradient-to-br from-blue-900/20 to-slate-800/50 border-blue-700/30">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-600/20 rounded-xl">
-                  <FileText className="h-6 w-6 text-blue-400" />
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="card p-4 bg-gradient-to-br from-blue-900/20 to-slate-800/50 border-blue-700/30">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-600/20 rounded-lg">
+                  <FileCheck className="h-5 w-5 text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-blue-400">{applicationStats?.pending || 0}</p>
-                  <p className="text-sm text-slate-400">Offen</p>
+                  <p className="text-xl font-bold text-blue-400">{applicationStats?.criteria || 0}</p>
+                  <p className="text-xs text-slate-400">Kriterien</p>
                 </div>
               </div>
             </div>
-            <div className="card p-5 bg-gradient-to-br from-amber-900/20 to-slate-800/50 border-amber-700/30">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-amber-600/20 rounded-xl">
-                  <MessageSquare className="h-6 w-6 text-amber-400" />
+            <div className="card p-4 bg-gradient-to-br from-purple-900/20 to-slate-800/50 border-purple-700/30">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-600/20 rounded-lg">
+                  <MessageSquare className="h-5 w-5 text-purple-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-amber-400">{applicationStats?.interview || 0}</p>
-                  <p className="text-sm text-slate-400">Gespräch</p>
+                  <p className="text-xl font-bold text-purple-400">{applicationStats?.questions || 0}</p>
+                  <p className="text-xs text-slate-400">Fragen</p>
                 </div>
               </div>
             </div>
-            <div className="card p-5 bg-gradient-to-br from-green-900/20 to-slate-800/50 border-green-700/30">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-green-600/20 rounded-xl">
-                  <CheckCircle className="h-6 w-6 text-green-400" />
+            <div className="card p-4 bg-gradient-to-br from-amber-900/20 to-slate-800/50 border-amber-700/30">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-600/20 rounded-lg">
+                  <ClipboardList className="h-5 w-5 text-amber-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-green-400">{applicationStats?.accepted || 0}</p>
-                  <p className="text-sm text-slate-400">Angenommen</p>
+                  <p className="text-xl font-bold text-amber-400">{applicationStats?.onboarding || 0}</p>
+                  <p className="text-xs text-slate-400">Onboarding</p>
                 </div>
               </div>
             </div>
-            <div className="card p-5 bg-gradient-to-br from-red-900/20 to-slate-800/50 border-red-700/30">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-red-600/20 rounded-xl">
-                  <XCircle className="h-6 w-6 text-red-400" />
+            <div className="card p-4 bg-gradient-to-br from-green-900/20 to-slate-800/50 border-green-700/30">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-600/20 rounded-lg">
+                  <CheckCircle className="h-5 w-5 text-green-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-red-400">{applicationStats?.rejected || 0}</p>
-                  <p className="text-sm text-slate-400">Abgelehnt</p>
+                  <p className="text-xl font-bold text-green-400">{applicationStats?.completed || 0}</p>
+                  <p className="text-xs text-slate-400">Fertig</p>
+                </div>
+              </div>
+            </div>
+            <div className="card p-4 bg-gradient-to-br from-red-900/20 to-slate-800/50 border-red-700/30">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-red-600/20 rounded-lg">
+                  <XCircle className="h-5 w-5 text-red-400" />
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-red-400">{applicationStats?.rejected || 0}</p>
+                  <p className="text-xs text-slate-400">Abgelehnt</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Applications Card */}
+          {/* Applications List */}
           <div className="card">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -528,14 +731,15 @@ export default function HumanResources() {
                   className="input py-1 px-2 text-sm w-auto"
                 >
                   <option value="ALL">Alle</option>
-                  <option value="PENDING">Offen</option>
-                  <option value="INTERVIEW">Gespräch geplant</option>
-                  <option value="ACCEPTED">Angenommen</option>
+                  <option value="CRITERIA">Kriterien</option>
+                  <option value="QUESTIONS">Fragen</option>
+                  <option value="ONBOARDING">Onboarding</option>
+                  <option value="COMPLETED">Abgeschlossen</option>
                   <option value="REJECTED">Abgelehnt</option>
                 </select>
               </div>
               {canManageHR && (
-                <button onClick={openApplicationModal} className="btn-primary flex items-center gap-2">
+                <button onClick={() => setShowCreateModal(true)} className="btn-primary flex items-center gap-2">
                   <Plus className="h-4 w-4" />
                   Neue Bewerbung
                 </button>
@@ -560,60 +764,41 @@ export default function HumanResources() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-white">{app.discordUsername}</span>
-                          <span className="text-xs text-slate-500">({app.discordId})</span>
+                          <span className="font-medium text-white">{app.applicantName}</span>
                           {getStatusBadge(app.status)}
-                          {app.interviewDate && app.status === 'INTERVIEW' && (
-                            <span className="flex items-center gap-1 text-xs text-amber-400">
-                              <Calendar className="h-3 w-3" />
-                              {formatDate(app.interviewDate)}
+                          {app.idCardImage && (
+                            <span className="text-xs text-slate-500 flex items-center gap-1">
+                              <ImageIcon className="h-3 w-3" />
+                              Ausweis
                             </span>
                           )}
                         </div>
-                        {app.notes && (
-                          <p className="text-sm text-slate-400 truncate">{app.notes}</p>
-                        )}
+                        <p className="text-sm text-slate-400">
+                          Bewerbung vom {formatDate(app.applicationDate)}
+                        </p>
                         <p className="text-xs text-slate-500 mt-1">
-                          Erstellt von {app.createdBy.displayName || app.createdBy.username} am {formatDateTime(app.createdAt)}
-                          {app.processedBy && (
-                            <> | Bearbeitet von {app.processedBy.displayName || app.processedBy.username}</>
-                          )}
+                          Erstellt von {app.createdBy.displayName || app.createdBy.username}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => openDetailModal(app)}
                           className="p-2 text-slate-400 hover:text-white hover:bg-slate-600 rounded-lg transition-colors"
-                          title="Details"
+                          title="Bearbeiten"
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        {canManageHR && app.status === 'PENDING' && (
+                        {canManageHR && app.status !== 'COMPLETED' && app.status !== 'REJECTED' && (
                           <button
-                            onClick={() => openInterviewModal(app)}
-                            className="p-2 text-amber-400 hover:bg-amber-600/20 rounded-lg transition-colors"
-                            title="Gespräch planen"
+                            onClick={() => {
+                              setSelectedApplication(app);
+                              openRejectModal();
+                            }}
+                            className="p-2 text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
+                            title="Ablehnen"
                           >
-                            <Calendar className="h-4 w-4" />
+                            <XCircle className="h-4 w-4" />
                           </button>
-                        )}
-                        {canManageHR && (app.status === 'PENDING' || app.status === 'INTERVIEW') && (
-                          <>
-                            <button
-                              onClick={() => openAcceptModal(app)}
-                              className="p-2 text-green-400 hover:bg-green-600/20 rounded-lg transition-colors"
-                              title="Annehmen"
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => openRejectModal(app)}
-                              className="p-2 text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
-                              title="Ablehnen"
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </button>
-                          </>
                         )}
                         {canManageHR && (
                           <button
@@ -710,11 +895,13 @@ export default function HumanResources() {
                           <span className="font-medium text-white">{entry.username}</span>
                           <span className="text-xs text-slate-500">({entry.discordId})</span>
                           {entry.expiresAt && (
-                            <span className={`px-2 py-0.5 text-xs rounded-full ${
-                              isExpired(entry.expiresAt)
-                                ? 'bg-green-600/20 text-green-400'
-                                : 'bg-amber-600/20 text-amber-400'
-                            }`}>
+                            <span
+                              className={`px-2 py-0.5 text-xs rounded-full ${
+                                isExpired(entry.expiresAt)
+                                  ? 'bg-green-600/20 text-green-400'
+                                  : 'bg-amber-600/20 text-amber-400'
+                              }`}
+                            >
                               {isExpired(entry.expiresAt) ? 'Abgelaufen' : `Bis ${formatDate(entry.expiresAt)}`}
                             </span>
                           )}
@@ -726,7 +913,8 @@ export default function HumanResources() {
                         </div>
                         <p className="text-sm text-slate-400 truncate">{entry.reason}</p>
                         <p className="text-xs text-slate-500 mt-1">
-                          Hinzugefügt von {entry.addedBy.displayName || entry.addedBy.username} am {formatDateTime(entry.createdAt)}
+                          Hinzugefügt von {entry.addedBy.displayName || entry.addedBy.username} am{' '}
+                          {formatDateTime(entry.createdAt)}
                         </p>
                       </div>
                       {canManageBlacklist && (
@@ -754,6 +942,481 @@ export default function HumanResources() {
                 ))
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Application Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl">
+            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">Neue Bewerbung</h2>
+              <button onClick={closeCreateModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateSubmit} className="p-6 space-y-5">
+              <div className="p-4 bg-slate-700/50 rounded-lg">
+                <h3 className="font-medium text-white mb-3">Basisdaten</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="label">Name des Bewerbers *</label>
+                    <input
+                      type="text"
+                      value={applicantName}
+                      onChange={(e) => setApplicantName(e.target.value)}
+                      className="input"
+                      placeholder="Vor- und Nachname"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Bewerbungsdatum *</label>
+                    <input
+                      type="date"
+                      value={applicationDate}
+                      onChange={(e) => setApplicationDate(e.target.value)}
+                      className="input"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Personalausweis-Bild</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(e) => setIdCardFile(e.target.files?.[0] || null)}
+                        className="hidden"
+                        id="id-card-upload"
+                      />
+                      <label
+                        htmlFor="id-card-upload"
+                        className="btn-secondary flex items-center gap-2 cursor-pointer"
+                      >
+                        <Upload className="h-4 w-4" />
+                        {idCardFile ? 'Ändern' : 'Hochladen'}
+                      </label>
+                      {idCardFile && (
+                        <span className="text-sm text-slate-400">{idCardFile.name}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-red-900/20 border border-red-700/30 rounded-lg">
+                <h3 className="font-medium text-red-400 mb-3">Blacklist-Check (optional)</h3>
+                <p className="text-xs text-slate-400 mb-3">
+                  Gib Discord-Daten ein um zu prüfen ob der Bewerber auf der Blacklist steht.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label text-sm">Discord ID</label>
+                    <input
+                      type="text"
+                      value={checkDiscordId}
+                      onChange={(e) => setCheckDiscordId(e.target.value)}
+                      className="input"
+                      placeholder="123456789..."
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-sm">Discord Username</label>
+                    <input
+                      type="text"
+                      value={checkUsername}
+                      onChange={(e) => setCheckUsername(e.target.value)}
+                      className="input"
+                      placeholder="username"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={closeCreateModal} className="btn-ghost px-5">
+                  Abbrechen
+                </button>
+                <button type="submit" className="btn-primary px-5" disabled={createApplicationMutation.isPending}>
+                  Erstellen
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      {showDetailModal && selectedApplication && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-slate-800 rounded-2xl w-full max-w-3xl border border-slate-700 shadow-2xl my-8">
+            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white">{selectedApplication.applicantName}</h2>
+                <p className="text-sm text-slate-400">
+                  Bewerbung vom {formatDate(selectedApplication.applicationDate)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {getStatusBadge(selectedApplication.status)}
+                <button onClick={closeDetailModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
+                  <X className="h-5 w-5 text-slate-400" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+              {/* Personalausweis */}
+              {selectedApplication.idCardImage && (
+                <div className="p-4 bg-slate-700/50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-white">Personalausweis</h3>
+                    <button
+                      onClick={() => setShowImageModal(true)}
+                      className="btn-secondary text-sm flex items-center gap-2"
+                    >
+                      <ImageIcon className="h-4 w-4" />
+                      Anzeigen
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 1: Einstellungskriterien */}
+              <div className="p-4 bg-slate-700/50 rounded-lg">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    selectedApplication.status === 'CRITERIA' ? 'bg-blue-600' : 'bg-green-600'
+                  }`}>
+                    {selectedApplication.currentStep > 1 ? (
+                      <CheckCircle className="h-5 w-5 text-white" />
+                    ) : (
+                      <span className="text-white font-bold">1</span>
+                    )}
+                  </div>
+                  <h3 className="font-medium text-white">Einstellungskriterien</h3>
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {CRITERIA_ITEMS.map((item) => (
+                    <label
+                      key={item.key}
+                      className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                        criteria[item.key] ? 'bg-green-900/20' : 'hover:bg-slate-600/50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={criteria[item.key] || false}
+                        onChange={(e) => handleCriteriaChange(item.key, e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-green-500 focus:ring-green-500"
+                        disabled={selectedApplication.status !== 'CRITERIA' && selectedApplication.status !== 'QUESTIONS'}
+                      />
+                      <span className={`text-sm ${criteria[item.key] ? 'text-green-400' : 'text-slate-300'}`}>
+                        {item.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Step 2: Fragenkatalog */}
+              {(selectedApplication.currentStep >= 2 || selectedApplication.status === 'QUESTIONS') && (
+                <div className="p-4 bg-slate-700/50 rounded-lg">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      selectedApplication.status === 'QUESTIONS' ? 'bg-purple-600' :
+                      selectedApplication.currentStep > 2 ? 'bg-green-600' : 'bg-slate-600'
+                    }`}>
+                      {selectedApplication.currentStep > 2 ? (
+                        <CheckCircle className="h-5 w-5 text-white" />
+                      ) : (
+                        <span className="text-white font-bold">2</span>
+                      )}
+                    </div>
+                    <h3 className="font-medium text-white">Fragenkatalog</h3>
+                    <span className="text-xs text-slate-400">(Informativ)</span>
+                  </div>
+                  <div className="space-y-2">
+                    {questions.map((q, index) => (
+                      <div
+                        key={q.id}
+                        className="flex items-start gap-3 p-3 rounded-lg bg-slate-600/30"
+                      >
+                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-purple-600/30 text-purple-400 text-xs flex items-center justify-center font-medium">
+                          {index + 1}
+                        </span>
+                        <span className="text-sm text-slate-300">{q.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Onboarding */}
+              {(selectedApplication.currentStep >= 3 || selectedApplication.status === 'ONBOARDING') && (
+                <div className="p-4 bg-slate-700/50 rounded-lg">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      selectedApplication.status === 'ONBOARDING' ? 'bg-amber-600' :
+                      selectedApplication.status === 'COMPLETED' ? 'bg-green-600' : 'bg-slate-600'
+                    }`}>
+                      {selectedApplication.status === 'COMPLETED' ? (
+                        <CheckCircle className="h-5 w-5 text-white" />
+                      ) : (
+                        <span className="text-white font-bold">3</span>
+                      )}
+                    </div>
+                    <h3 className="font-medium text-white">Onboarding & Discord</h3>
+                  </div>
+
+                  {/* Discord Server Einladung */}
+                  <div className="mb-4 p-3 bg-[#5865F2]/20 border border-[#5865F2]/30 rounded-lg">
+                    <h4 className="text-sm font-medium text-[#5865F2] mb-3">Discord Server Einladung</h4>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="label text-xs">Discord ID *</label>
+                        <input
+                          type="text"
+                          value={detailDiscordId}
+                          onChange={(e) => setDetailDiscordId(e.target.value)}
+                          className="input text-sm"
+                          placeholder="123456789..."
+                          disabled={selectedApplication.status === 'COMPLETED' || selectedApplication.status === 'REJECTED'}
+                        />
+                      </div>
+                      <div>
+                        <label className="label text-xs">Discord Username *</label>
+                        <input
+                          type="text"
+                          value={detailDiscordUsername}
+                          onChange={(e) => setDetailDiscordUsername(e.target.value)}
+                          className="input text-sm"
+                          placeholder="username"
+                          disabled={selectedApplication.status === 'COMPLETED' || selectedApplication.status === 'REJECTED'}
+                        />
+                      </div>
+                    </div>
+                    <div className="mb-3">
+                      <label className="label text-xs">Einladungslink</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={discordInviteLink}
+                          onChange={(e) => setDiscordInviteLink(e.target.value)}
+                          className="input text-sm flex-1"
+                          placeholder="https://discord.gg/..."
+                          disabled={selectedApplication.status === 'COMPLETED' || selectedApplication.status === 'REJECTED'}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => generateInviteMutation.mutate()}
+                          className="btn-primary text-sm flex items-center gap-1"
+                          disabled={selectedApplication.status === 'COMPLETED' || selectedApplication.status === 'REJECTED' || generateInviteMutation.isPending}
+                          title="Einladungslink generieren"
+                        >
+                          {generateInviteMutation.isPending ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Link className="h-4 w-4" />
+                          )}
+                          Generieren
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDiscordDataSave}
+                          className="btn-secondary text-sm"
+                          disabled={selectedApplication.status === 'COMPLETED' || selectedApplication.status === 'REJECTED'}
+                        >
+                          Speichern
+                        </button>
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={discordRolesAssigned}
+                        onChange={(e) => {
+                          setDiscordRolesAssigned(e.target.checked);
+                          if (selectedApplication && selectedApplication.status === 'ONBOARDING') {
+                            updateOnboardingMutation.mutate({
+                              id: selectedApplication.id,
+                              data: {
+                                onboardingCompleted,
+                                discordId: detailDiscordId || undefined,
+                                discordUsername: detailDiscordUsername || undefined,
+                                discordInviteLink: discordInviteLink || undefined,
+                                discordRolesAssigned: e.target.checked,
+                              },
+                            });
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-green-500 focus:ring-green-500"
+                        disabled={selectedApplication.status === 'COMPLETED' || selectedApplication.status === 'REJECTED'}
+                      />
+                      <span className="text-sm text-white">Discord Rollen vergeben</span>
+                    </label>
+                  </div>
+
+                  {/* Onboarding Checkliste */}
+                  <h4 className="text-sm font-medium text-white mb-3">Onboarding Checkliste</h4>
+                  <div className="space-y-2">
+                    {onboardingItems.map((item) => (
+                      <label
+                        key={item.id}
+                        className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                          onboardingCompleted.includes(item.id) ? 'bg-green-900/20' : 'hover:bg-slate-600/50'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={onboardingCompleted.includes(item.id)}
+                          onChange={() => handleOnboardingToggle(item.id)}
+                          className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-green-500 focus:ring-green-500"
+                          disabled={selectedApplication.status !== 'ONBOARDING'}
+                        />
+                        <span className={`text-sm ${onboardingCompleted.includes(item.id) ? 'text-green-400' : 'text-slate-300'}`}>
+                          {item.text}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Rejection Info */}
+              {selectedApplication.status === 'REJECTED' && selectedApplication.rejectionReason && (
+                <div className="p-4 bg-red-900/20 border border-red-700/30 rounded-lg">
+                  <h3 className="font-medium text-red-400 mb-2">Ablehnungsgrund</h3>
+                  <p className="text-sm text-slate-300">{selectedApplication.rejectionReason}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            {selectedApplication.status === 'ONBOARDING' && (
+              <div className="px-6 py-4 border-t border-slate-700 flex justify-between">
+                <button onClick={openRejectModal} className="btn-danger flex items-center gap-2">
+                  <XCircle className="h-4 w-4" />
+                  Ablehnen
+                </button>
+                <button
+                  onClick={handleComplete}
+                  className="btn-primary bg-green-600 hover:bg-green-700 flex items-center gap-2"
+                  disabled={!detailDiscordId || !detailDiscordUsername || completeApplicationMutation.isPending}
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  Bewerbung abschließen
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Image Modal */}
+      {showImageModal && selectedApplication?.idCardImage && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4" onClick={() => setShowImageModal(false)}>
+          <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowImageModal(false)}
+              className="absolute -top-12 right-0 p-2 text-white hover:text-slate-300"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <img
+              src={applicationApi.getIdCardUrl(selectedApplication.id)}
+              alt="Personalausweis"
+              className="max-w-full max-h-[80vh] object-contain rounded-lg"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {showRejectModal && selectedApplication && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+          <div className="bg-slate-800 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl">
+            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">Bewerbung ablehnen</h2>
+              <button onClick={closeRejectModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRejectSubmit} className="p-6 space-y-5">
+              <div className="p-4 bg-red-900/20 border border-red-700/30 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <XCircle className="h-6 w-6 text-red-400" />
+                  <div>
+                    <p className="text-white font-medium">{selectedApplication.applicantName}</p>
+                    <p className="text-sm text-slate-400">Bewerbung wird abgelehnt</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Ablehnungsgrund *</label>
+                <textarea
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="input min-h-[80px]"
+                  placeholder="Grund für die Ablehnung..."
+                  required
+                />
+              </div>
+
+              {detailDiscordId && (
+                <div className="p-4 bg-slate-700/50 rounded-lg space-y-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={addToBlacklist}
+                      onChange={(e) => setAddToBlacklist(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-red-500 focus:ring-red-500"
+                    />
+                    <span className="text-white">Zur Blacklist hinzufügen</span>
+                  </label>
+
+                  {addToBlacklist && (
+                    <>
+                      <div>
+                        <label className="label text-sm">Blacklist-Grund</label>
+                        <input
+                          type="text"
+                          value={blacklistReason}
+                          onChange={(e) => setBlacklistReason(e.target.value)}
+                          className="input"
+                          placeholder="Leer = Ablehnungsgrund verwenden"
+                        />
+                      </div>
+                      <div>
+                        <label className="label text-sm">Ablaufdatum (optional)</label>
+                        <input
+                          type="date"
+                          value={blacklistExpires}
+                          onChange={(e) => setBlacklistExpires(e.target.value)}
+                          className="input"
+                          min={new Date().toISOString().split('T')[0]}
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Leer = Permanente Sperre</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={closeRejectModal} className="btn-ghost px-5">
+                  Abbrechen
+                </button>
+                <button type="submit" className="btn-primary bg-red-600 hover:bg-red-700 px-5">
+                  Ablehnen
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -832,313 +1495,6 @@ export default function HumanResources() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Application Create Modal */}
-      {showApplicationModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl">
-            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">Neue Bewerbung</h2>
-              <button onClick={closeApplicationModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
-                <X className="h-5 w-5 text-slate-400" />
-              </button>
-            </div>
-
-            <form onSubmit={handleApplicationSubmit} className="p-6 space-y-5">
-              <div>
-                <label className="label">Discord ID *</label>
-                <input
-                  type="text"
-                  value={appDiscordId}
-                  onChange={(e) => setAppDiscordId(e.target.value)}
-                  className="input"
-                  placeholder="z.B. 123456789012345678"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="label">Discord Username *</label>
-                <input
-                  type="text"
-                  value={appUsername}
-                  onChange={(e) => setAppUsername(e.target.value)}
-                  className="input"
-                  placeholder="Discord Username"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="label">Notizen</label>
-                <textarea
-                  value={appNotes}
-                  onChange={(e) => setAppNotes(e.target.value)}
-                  className="input min-h-[80px]"
-                  placeholder="Notizen zur Bewerbung..."
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={closeApplicationModal} className="btn-ghost px-5">
-                  Abbrechen
-                </button>
-                <button type="submit" className="btn-primary px-5">
-                  Erstellen
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Interview Schedule Modal */}
-      {showInterviewModal && selectedApplication && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl">
-            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">Gespräch planen</h2>
-              <button onClick={closeInterviewModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
-                <X className="h-5 w-5 text-slate-400" />
-              </button>
-            </div>
-
-            <form onSubmit={handleInterviewSubmit} className="p-6 space-y-5">
-              <div className="p-4 bg-slate-700/50 rounded-lg">
-                <p className="text-white font-medium">{selectedApplication.discordUsername}</p>
-                <p className="text-sm text-slate-400">{selectedApplication.discordId}</p>
-              </div>
-
-              <div>
-                <label className="label">Gesprächstermin *</label>
-                <input
-                  type="datetime-local"
-                  value={interviewDate}
-                  onChange={(e) => setInterviewDate(e.target.value)}
-                  className="input"
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={closeInterviewModal} className="btn-ghost px-5">
-                  Abbrechen
-                </button>
-                <button type="submit" className="btn-primary px-5">
-                  Planen
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Accept Modal */}
-      {showAcceptModal && selectedApplication && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl">
-            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">Bewerbung annehmen</h2>
-              <button onClick={closeAcceptModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
-                <X className="h-5 w-5 text-slate-400" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAcceptSubmit} className="p-6 space-y-5">
-              <div className="p-4 bg-green-900/20 border border-green-700/30 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-6 w-6 text-green-400" />
-                  <div>
-                    <p className="text-white font-medium">{selectedApplication.discordUsername}</p>
-                    <p className="text-sm text-slate-400">Wird als Cadet eingestellt</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="label">Gesprächsnotizen</label>
-                <textarea
-                  value={interviewNotes}
-                  onChange={(e) => setInterviewNotes(e.target.value)}
-                  className="input min-h-[80px]"
-                  placeholder="Notizen vom Bewerbungsgespräch..."
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={closeAcceptModal} className="btn-ghost px-5">
-                  Abbrechen
-                </button>
-                <button type="submit" className="btn-primary bg-green-600 hover:bg-green-700 px-5">
-                  Einstellen
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Reject Modal */}
-      {showRejectModal && selectedApplication && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl">
-            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">Bewerbung ablehnen</h2>
-              <button onClick={closeRejectModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
-                <X className="h-5 w-5 text-slate-400" />
-              </button>
-            </div>
-
-            <form onSubmit={handleRejectSubmit} className="p-6 space-y-5">
-              <div className="p-4 bg-red-900/20 border border-red-700/30 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <XCircle className="h-6 w-6 text-red-400" />
-                  <div>
-                    <p className="text-white font-medium">{selectedApplication.discordUsername}</p>
-                    <p className="text-sm text-slate-400">{selectedApplication.discordId}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="label">Ablehnungsgrund *</label>
-                <textarea
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  className="input min-h-[80px]"
-                  placeholder="Grund für die Ablehnung..."
-                  required
-                />
-              </div>
-
-              <div className="p-4 bg-slate-700/50 rounded-lg space-y-4">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={addToBlacklist}
-                    onChange={(e) => setAddToBlacklist(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-red-500 focus:ring-red-500"
-                  />
-                  <span className="text-white">Zur Blacklist hinzufügen</span>
-                </label>
-
-                {addToBlacklist && (
-                  <>
-                    <div>
-                      <label className="label text-sm">Blacklist-Grund</label>
-                      <input
-                        type="text"
-                        value={blacklistReason}
-                        onChange={(e) => setBlacklistReason(e.target.value)}
-                        className="input"
-                        placeholder="Leer = Ablehnungsgrund verwenden"
-                      />
-                    </div>
-                    <div>
-                      <label className="label text-sm">Ablaufdatum (optional)</label>
-                      <input
-                        type="date"
-                        value={blacklistExpires}
-                        onChange={(e) => setBlacklistExpires(e.target.value)}
-                        className="input"
-                        min={new Date().toISOString().split('T')[0]}
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Leer = Permanente Sperre</p>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={closeRejectModal} className="btn-ghost px-5">
-                  Abbrechen
-                </button>
-                <button type="submit" className="btn-primary bg-red-600 hover:bg-red-700 px-5">
-                  Ablehnen
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Detail Modal */}
-      {showDetailModal && selectedApplication && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl">
-            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">Bewerbungsdetails</h2>
-              <button onClick={closeDetailModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
-                <X className="h-5 w-5 text-slate-400" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-white font-medium text-lg">{selectedApplication.discordUsername}</p>
-                  <p className="text-sm text-slate-400">{selectedApplication.discordId}</p>
-                </div>
-                {getStatusBadge(selectedApplication.status)}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-slate-500">Erstellt am</p>
-                  <p className="text-white">{formatDateTime(selectedApplication.createdAt)}</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Erstellt von</p>
-                  <p className="text-white">
-                    {selectedApplication.createdBy.displayName || selectedApplication.createdBy.username}
-                  </p>
-                </div>
-                {selectedApplication.interviewDate && (
-                  <div>
-                    <p className="text-slate-500">Gesprächstermin</p>
-                    <p className="text-white">{formatDateTime(selectedApplication.interviewDate)}</p>
-                  </div>
-                )}
-                {selectedApplication.processedBy && (
-                  <div>
-                    <p className="text-slate-500">Bearbeitet von</p>
-                    <p className="text-white">
-                      {selectedApplication.processedBy.displayName || selectedApplication.processedBy.username}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {selectedApplication.notes && (
-                <div>
-                  <p className="text-slate-500 text-sm mb-1">Notizen</p>
-                  <p className="text-white bg-slate-700/50 rounded-lg p-3">{selectedApplication.notes}</p>
-                </div>
-              )}
-
-              {selectedApplication.interviewNotes && (
-                <div>
-                  <p className="text-slate-500 text-sm mb-1">Gesprächsnotizen</p>
-                  <p className="text-white bg-slate-700/50 rounded-lg p-3">{selectedApplication.interviewNotes}</p>
-                </div>
-              )}
-
-              {selectedApplication.rejectionReason && (
-                <div>
-                  <p className="text-slate-500 text-sm mb-1">Ablehnungsgrund</p>
-                  <p className="text-red-400 bg-red-900/20 rounded-lg p-3">{selectedApplication.rejectionReason}</p>
-                </div>
-              )}
-
-              <div className="flex justify-end pt-2">
-                <button onClick={closeDetailModal} className="btn-ghost px-5">
-                  Schließen
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}

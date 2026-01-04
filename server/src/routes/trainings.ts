@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { triggerTrainingConducted, triggerTrainingParticipated, getEmployeeIdFromUserId } from '../services/bonusService.js';
 
 const router = Router();
 
@@ -274,6 +275,17 @@ router.put('/:id', requirePermission('academy.manage'), async (req: AuthRequest,
     const { id } = req.params;
     const { typeId, title, description, scheduledAt, location, maxParticipants, status, notes } = req.body;
 
+    // Hole vorherigen Status für Bonus-Trigger
+    const previousTraining = await prisma.training.findUnique({
+      where: { id },
+      include: {
+        participants: {
+          where: { status: 'ATTENDED' },
+          select: { employeeId: true }
+        }
+      }
+    });
+
     const training = await prisma.training.update({
       where: { id },
       data: {
@@ -302,6 +314,22 @@ router.put('/:id', requirePermission('academy.manage'), async (req: AuthRequest,
         }
       }
     });
+
+    // Bonus-Trigger wenn Training abgeschlossen wird
+    if (status === 'COMPLETED' && previousTraining?.status !== 'COMPLETED') {
+      // Bonus für Instructor
+      const instructorEmployeeId = await getEmployeeIdFromUserId(training.instructorId);
+      if (instructorEmployeeId) {
+        await triggerTrainingConducted(instructorEmployeeId, training.title, id);
+      }
+
+      // Bonus für alle Teilnehmer die teilgenommen haben
+      for (const participant of training.participants) {
+        if (participant.status === 'ATTENDED') {
+          await triggerTrainingParticipated(participant.employeeId, training.title, id);
+        }
+      }
+    }
 
     res.json(training);
   } catch (error) {

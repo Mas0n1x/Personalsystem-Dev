@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { triggerRobberyLeader, triggerRobberyNegotiator } from '../services/bonusService.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -266,6 +267,10 @@ router.post('/', authMiddleware, requirePermission('robbery.create'), upload.sin
         },
       },
     });
+
+    // Bonus-Trigger für Einsatzleitung und Verhandlungsführung
+    await triggerRobberyLeader(leaderId, robbery.id);
+    await triggerRobberyNegotiator(negotiatorId, robbery.id);
 
     res.status(201).json(robbery);
   } catch (error) {

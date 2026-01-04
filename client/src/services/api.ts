@@ -254,17 +254,53 @@ export const uprankLockApi = {
 export const applicationApi = {
   getAll: (params?: Record<string, string>) => api.get('/applications', { params }),
   getStats: () => api.get('/applications/stats'),
+  getById: (id: string) => api.get(`/applications/${id}`),
+  getQuestions: () => api.get('/applications/questions'),
+  getOnboardingChecklist: () => api.get('/applications/onboarding-checklist'),
+  getIdCardUrl: (id: string) => `/api/applications/${id}/id-card`,
   checkBlacklist: (discordId: string) => api.get(`/applications/check-blacklist/${discordId}`),
-  create: (data: { discordId: string; discordUsername: string; notes?: string }) =>
-    api.post('/applications', data),
-  update: (id: string, data: { notes?: string; interviewDate?: string; interviewNotes?: string }) =>
-    api.put(`/applications/${id}`, data),
-  scheduleInterview: (id: string, interviewDate: string) =>
-    api.put(`/applications/${id}/schedule-interview`, { interviewDate }),
-  accept: (id: string, interviewNotes?: string) =>
-    api.put(`/applications/${id}/accept`, { interviewNotes }),
+  generateInvite: () => api.post('/applications/generate-invite'),
+
+  // Neue Bewerbung mit Bild-Upload
+  create: (formData: FormData) => api.post('/applications', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+
+  // Schritt 1: Einstellungskriterien
+  updateCriteria: (id: string, data: {
+    criteriaStabilization?: boolean;
+    criteriaVisa?: boolean;
+    criteriaNoOffenses?: boolean;
+    criteriaAppearance?: boolean;
+    criteriaNoFactionLock?: boolean;
+    criteriaNoOpenBills?: boolean;
+    criteriaSearched?: boolean;
+    criteriaBlacklistChecked?: boolean;
+    criteriaHandbookGiven?: boolean;
+    criteriaEmploymentTest?: boolean;
+    criteriaRpSituation?: boolean;
+  }) => api.put(`/applications/${id}/criteria`, data),
+
+  // Schritt 2: Fragenkatalog
+  updateQuestions: (id: string, questionsCompleted: string[]) =>
+    api.put(`/applications/${id}/questions`, { questionsCompleted }),
+
+  // Schritt 3: Onboarding
+  updateOnboarding: (id: string, data: {
+    onboardingCompleted?: string[];
+    discordId?: string;
+    discordUsername?: string;
+    discordInviteLink?: string;
+    discordRolesAssigned?: boolean;
+  }) => api.put(`/applications/${id}/onboarding`, data),
+
+  // Abschluss
+  complete: (id: string) => api.put(`/applications/${id}/complete`),
+
+  // Ablehnen
   reject: (id: string, data: { rejectionReason: string; addToBlacklist?: boolean; blacklistReason?: string; blacklistExpires?: string }) =>
     api.put(`/applications/${id}/reject`, data),
+
   delete: (id: string) => api.delete(`/applications/${id}`),
 };
 
@@ -457,4 +493,31 @@ export const academyApi = {
   updateRetraining: (id: string, data: { status?: string; notes?: string }) =>
     api.put(`/academy/retrainings/${id}`, data),
   deleteRetraining: (id: string) => api.delete(`/academy/retrainings/${id}`),
+};
+
+// Bonus / Sonderzahlungen API
+export const bonusApi = {
+  // Konfiguration
+  getConfigs: () => api.get('/bonus/config'),
+  initConfigs: () => api.post('/bonus/config/init'),
+  updateConfig: (id: string, data: { amount?: number; isActive?: boolean; displayName?: string; description?: string }) =>
+    api.put(`/bonus/config/${id}`, data),
+  createConfig: (data: { activityType: string; displayName: string; description?: string; amount: number; category: string; isActive?: boolean }) =>
+    api.post('/bonus/config', data),
+  deleteConfig: (id: string) => api.delete(`/bonus/config/${id}`),
+
+  // Zahlungen
+  getPayments: (params?: Record<string, string>) => api.get('/bonus/payments', { params }),
+  getSummary: (params?: Record<string, string>) => api.get('/bonus/summary', { params }),
+  getMyBonuses: () => api.get('/bonus/my'),
+  createPayment: (data: { employeeId: string; configId: string; reason?: string }) =>
+    api.post('/bonus/payments', data),
+  payBonus: (id: string) => api.put(`/bonus/payments/${id}/pay`),
+  payEmployee: (employeeId: string, week?: string) => api.put(`/bonus/payments/pay-employee/${employeeId}`, { week }),
+  payAll: (week?: string) => api.put('/bonus/payments/pay-all', { week }),
+  cancelPayment: (id: string) => api.delete(`/bonus/payments/${id}`),
+
+  // Wochen
+  getWeeks: () => api.get('/bonus/weeks'),
+  submitWeek: (week?: string) => api.post('/bonus/weeks/submit', { week }),
 };

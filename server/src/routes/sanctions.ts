@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { triggerSanctionIssued, getEmployeeIdFromUserId } from '../services/bonusService.js';
 
 const router = Router();
 
@@ -146,6 +147,13 @@ router.post('/', authMiddleware, requirePermission('sanctions.manage'), async (r
         },
       },
     });
+
+    // Bonus-Trigger für erteilte Sanktion
+    const issuedByEmployeeId = await getEmployeeIdFromUserId(req.user!.id);
+    if (issuedByEmployeeId) {
+      const employeeName = sanction.employee.user.displayName || sanction.employee.user.username;
+      await triggerSanctionIssued(issuedByEmployeeId, employeeName, sanction.id);
+    }
 
     res.status(201).json(sanction);
   } catch (error) {

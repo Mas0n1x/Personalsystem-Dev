@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { uprankRequestsApi, tuningApi, employeesApi } from '../services/api';
+import { uprankRequestsApi, tuningApi, employeesApi, bonusApi } from '../services/api';
 import { usePermissions } from '../hooks/usePermissions';
 import {
   Building2,
@@ -17,6 +17,8 @@ import {
   Image,
   Trash2,
   UserMinus,
+  Wallet,
+  Check,
 } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
@@ -80,6 +82,42 @@ interface Employee {
   };
 }
 
+interface BonusPayment {
+  id: string;
+  amount: number;
+  reason: string | null;
+  status: string;
+  createdAt: string;
+  paidAt: string | null;
+  config: {
+    displayName: string;
+    category: string;
+  };
+  employee: {
+    id: string;
+    rank: string;
+    badgeNumber: string | null;
+    user: {
+      displayName: string | null;
+      username: string;
+      avatar: string | null;
+    };
+  };
+  paidBy?: {
+    displayName: string | null;
+    username: string;
+  };
+}
+
+interface BonusSummary {
+  totalPending: number;
+  totalPaid: number;
+  countPending: number;
+  countPaid: number;
+  weekStart: string;
+  weekEnd: string;
+}
+
 const formatDate = (date: string) => {
   return new Date(date).toLocaleDateString('de-DE', {
     day: '2-digit',
@@ -111,11 +149,13 @@ export default function Management() {
   const queryClient = useQueryClient();
   const canManageUprank = permissions.hasAnyPermission('management.uprank', 'admin.full');
   const canManageTuning = permissions.hasAnyPermission('tuning.manage', 'admin.full');
+  const canManageBonus = permissions.hasAnyPermission('bonus.pay', 'admin.full');
 
-  const [activeTab, setActiveTab] = useState<'uprank' | 'tuning' | 'nounit'>('uprank');
+  const [activeTab, setActiveTab] = useState<'uprank' | 'tuning' | 'nounit' | 'bonus'>('uprank');
   const [selectedRequest, setSelectedRequest] = useState<UprankRequest | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<TuningInvoice | null>(null);
   const [filter, setFilter] = useState<string>('PENDING');
+  const [bonusFilter, setBonusFilter] = useState<'PENDING' | 'PAID' | 'all'>('PENDING');
 
   // Uprank Requests Queries
   const { data: uprankStats } = useQuery({
@@ -149,6 +189,17 @@ export default function Management() {
   const employeesWithoutUnit = (allEmployeesData?.data || []).filter((emp: Employee) => {
     const dept = emp.department?.trim() || '';
     return dept === '' || dept === 'Patrol' || dept === '-';
+  });
+
+  // Bonus Queries
+  const { data: bonusSummary } = useQuery<BonusSummary>({
+    queryKey: ['bonus', 'summary'],
+    queryFn: () => bonusApi.getSummary().then(res => res.data),
+  });
+
+  const { data: bonusPayments = [], isLoading: isLoadingBonus } = useQuery<BonusPayment[]>({
+    queryKey: ['bonus', 'payments', bonusFilter],
+    queryFn: () => bonusApi.getPayments(bonusFilter !== 'all' ? { status: bonusFilter } : {}).then(res => res.data),
   });
 
   // Mutations
@@ -185,6 +236,55 @@ export default function Management() {
       toast.success('Rechnung gelöscht');
     },
   });
+
+  // Bonus Mutations
+  const payBonus = useMutation({
+    mutationFn: (id: string) => bonusApi.payBonus(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bonus'] });
+      toast.success('Bonus als bezahlt markiert');
+    },
+    onError: () => {
+      toast.error('Fehler beim Bezahlen');
+    },
+  });
+
+  const payEmployeeBonuses = useMutation({
+    mutationFn: (employeeId: string) => bonusApi.payEmployee(employeeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bonus'] });
+      toast.success('Alle Boni des Mitarbeiters bezahlt');
+    },
+    onError: () => {
+      toast.error('Fehler beim Bezahlen');
+    },
+  });
+
+  const payAllBonuses = useMutation({
+    mutationFn: () => bonusApi.payAll(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bonus'] });
+      toast.success('Alle offenen Boni bezahlt');
+    },
+    onError: () => {
+      toast.error('Fehler beim Bezahlen');
+    },
+  });
+
+  // Group bonuses by employee
+  const groupedBonuses = bonusPayments.reduce((acc: Record<string, { employee: BonusPayment['employee']; payments: BonusPayment[]; total: number }>, payment) => {
+    const key = payment.employee.id;
+    if (!acc[key]) {
+      acc[key] = {
+        employee: payment.employee,
+        payments: [],
+        total: 0,
+      };
+    }
+    acc[key].payments.push(payment);
+    acc[key].total += payment.amount;
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-6">
@@ -258,6 +358,27 @@ export default function Management() {
             )}
           </div>
         </button>
+        {canManageBonus && (
+          <button
+            onClick={() => setActiveTab('bonus')}
+            className={clsx(
+              'px-4 py-2 -mb-px transition-colors',
+              activeTab === 'bonus'
+                ? 'text-purple-400 border-b-2 border-purple-400'
+                : 'text-slate-400 hover:text-white'
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <Wallet className="h-4 w-4" />
+              Sonderzahlungen
+              {bonusSummary && bonusSummary.countPending > 0 && (
+                <span className="px-1.5 py-0.5 text-xs bg-yellow-500/20 text-yellow-400 rounded-full">
+                  {bonusSummary.countPending}
+                </span>
+              )}
+            </div>
+          </button>
+        )}
       </div>
 
       {/* Uprank Tab */}
@@ -530,6 +651,176 @@ export default function Management() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Bonus Tab */}
+      {activeTab === 'bonus' && canManageBonus && (
+        <>
+          {/* Summary */}
+          {bonusSummary && (
+            <div className="space-y-4">
+              <div className="text-sm text-slate-400">
+                Woche: {new Date(bonusSummary.weekStart).toLocaleDateString('de-DE')} - {new Date(bonusSummary.weekEnd).toLocaleDateString('de-DE')}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="card p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-yellow-500/20 rounded-lg">
+                      <Clock className="h-5 w-5 text-yellow-400" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-yellow-400">${bonusSummary.totalPending.toLocaleString()}</p>
+                      <p className="text-sm text-slate-400">{bonusSummary.countPending} offene Zahlungen</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="card p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-500/20 rounded-lg">
+                      <CheckCircle className="h-5 w-5 text-green-400" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-green-400">${bonusSummary.totalPaid.toLocaleString()}</p>
+                      <p className="text-sm text-slate-400">{bonusSummary.countPaid} bezahlt</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="card p-4 flex items-center justify-center">
+                  {bonusSummary.countPending > 0 && (
+                    <button
+                      onClick={() => {
+                        if (confirm(`Alle ${bonusSummary.countPending} offenen Boni (${formatCurrency(bonusSummary.totalPending)}) bezahlen?`)) {
+                          payAllBonuses.mutate();
+                        }
+                      }}
+                      className="btn-primary bg-green-600 hover:bg-green-700 flex items-center gap-2"
+                      disabled={payAllBonuses.isPending}
+                    >
+                      <Check className="h-4 w-4" />
+                      Alle bezahlen
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Filter */}
+          <div className="flex gap-2">
+            {(['PENDING', 'PAID', 'all'] as const).map((status) => (
+              <button
+                key={status}
+                onClick={() => setBonusFilter(status)}
+                className={clsx(
+                  'px-4 py-2 rounded-lg transition-colors',
+                  bonusFilter === status
+                    ? 'bg-purple-500/20 text-purple-400'
+                    : 'text-slate-400 hover:text-white'
+                )}
+              >
+                {status === 'PENDING' ? 'Offen' :
+                 status === 'PAID' ? 'Bezahlt' : 'Alle'}
+              </button>
+            ))}
+          </div>
+
+          {/* Grouped Payments List */}
+          <div className="space-y-4">
+            {isLoadingBonus ? (
+              <div className="card p-8 text-center">
+                <div className="animate-spin h-8 w-8 border-2 border-purple-500 border-t-transparent rounded-full mx-auto"></div>
+              </div>
+            ) : Object.keys(groupedBonuses).length === 0 ? (
+              <div className="card p-8 text-center text-slate-400">
+                Keine Sonderzahlungen gefunden
+              </div>
+            ) : (
+              Object.values(groupedBonuses).map(({ employee, payments, total }) => (
+                <div key={employee.id} className="card">
+                  <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden">
+                        {employee.user.avatar ? (
+                          <img src={employee.user.avatar} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="h-6 w-6 text-slate-400" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">
+                          {employee.user.displayName || employee.user.username}
+                        </p>
+                        <div className="flex items-center gap-2 text-sm text-slate-400">
+                          <span>{employee.rank}</span>
+                          {employee.badgeNumber && (
+                            <>
+                              <span>•</span>
+                              <span>#{employee.badgeNumber}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-yellow-400">${total.toLocaleString()}</p>
+                        <p className="text-sm text-slate-400">{payments.length} Tätigkeiten</p>
+                      </div>
+                      {bonusFilter === 'PENDING' && (
+                        <button
+                          onClick={() => payEmployeeBonuses.mutate(employee.id)}
+                          className="btn-primary bg-green-600 hover:bg-green-700 flex items-center gap-2"
+                          disabled={payEmployeeBonuses.isPending}
+                        >
+                          <Check className="h-4 w-4" />
+                          Alle bezahlen
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="divide-y divide-slate-700/50">
+                    {payments.map((payment) => (
+                      <div key={payment.id} className="p-4 flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-white">{payment.config.displayName}</p>
+                          {payment.reason && (
+                            <p className="text-xs text-slate-400">{payment.reason}</p>
+                          )}
+                          <p className="text-xs text-slate-500 mt-1">
+                            {formatDateTime(payment.createdAt)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className={clsx(
+                            'px-2 py-0.5 rounded-full text-xs',
+                            payment.status === 'PENDING'
+                              ? 'bg-yellow-500/20 text-yellow-400'
+                              : 'bg-green-500/20 text-green-400'
+                          )}>
+                            {payment.status === 'PENDING' ? 'Offen' : 'Bezahlt'}
+                          </span>
+                          <span className="text-sm font-medium text-yellow-400">
+                            ${payment.amount.toLocaleString()}
+                          </span>
+                          {payment.status === 'PENDING' && (
+                            <button
+                              onClick={() => payBonus.mutate(payment.id)}
+                              className="p-1 hover:bg-green-500/20 rounded transition-colors"
+                              title="Als bezahlt markieren"
+                              disabled={payBonus.isPending}
+                            >
+                              <Check className="h-4 w-4 text-green-400" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </>

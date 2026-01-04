@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { triggerExamConducted, triggerRetrainingCompleted, triggerAcademyModuleCompleted, getEmployeeIdFromUserId } from '../services/bonusService.js';
 
 const router = Router();
 
@@ -238,6 +239,15 @@ router.post('/progress/toggle', requirePermission('academy.manage'), async (req:
           },
         },
       });
+
+      // Bonus-Trigger wenn Modul abgeschlossen wird (nicht wenn es wieder geöffnet wird)
+      if (updated.completed && !existingProgress.completed) {
+        const completedByEmployeeId = await getEmployeeIdFromUserId(userId);
+        if (completedByEmployeeId) {
+          await triggerAcademyModuleCompleted(completedByEmployeeId, updated.module.name, updated.id);
+        }
+      }
+
       res.json(updated);
     } else {
       // Erstelle neuen Progress als completed
@@ -256,6 +266,13 @@ router.post('/progress/toggle', requirePermission('academy.manage'), async (req:
           },
         },
       });
+
+      // Bonus-Trigger für neu abgeschlossenes Modul
+      const completedByEmployeeId = await getEmployeeIdFromUserId(userId);
+      if (completedByEmployeeId) {
+        await triggerAcademyModuleCompleted(completedByEmployeeId, created.module.name, created.id);
+      }
+
       res.json(created);
     }
   } catch (error) {
@@ -578,6 +595,13 @@ router.post('/exams', requirePermission('academy.manage'), async (req: AuthReque
       },
     });
 
+    // Bonus-Trigger für abgenommene Prüfung
+    const examinerEmployeeId = await getEmployeeIdFromUserId(userId);
+    if (examinerEmployeeId) {
+      const candidateName = exam.employee.user.displayName || exam.employee.user.username;
+      await triggerExamConducted(examinerEmployeeId, candidateName, exam.id);
+    }
+
     res.status(201).json(exam);
   } catch (error) {
     console.error('Error creating exam:', error);
@@ -772,6 +796,12 @@ router.put('/retrainings/:id', requirePermission('academy.manage'), async (req: 
     const { status, notes } = req.body;
     const userId = req.user!.id;
 
+    // Hole vorherigen Status für Bonus-Trigger
+    const previousRetraining = await prisma.academyRetraining.findUnique({
+      where: { id },
+      select: { status: true }
+    });
+
     const updateData: Record<string, unknown> = {};
     if (notes !== undefined) updateData.notes = notes;
     if (status) {
@@ -801,6 +831,15 @@ router.put('/retrainings/:id', requirePermission('academy.manage'), async (req: 
         },
       },
     });
+
+    // Bonus-Trigger wenn Nachschulung abgeschlossen wird
+    if (status === 'COMPLETED' && previousRetraining?.status !== 'COMPLETED') {
+      const completedByEmployeeId = await getEmployeeIdFromUserId(userId);
+      if (completedByEmployeeId) {
+        const employeeName = retraining.employee.user.displayName || retraining.employee.user.username;
+        await triggerRetrainingCompleted(completedByEmployeeId, employeeName, id);
+      }
+    }
 
     res.json(retraining);
   } catch (error) {

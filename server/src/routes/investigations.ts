@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { triggerInvestigationOpened, triggerInvestigationClosed, getEmployeeIdFromUserId } from '../services/bonusService.js';
 
 const router = Router();
 
@@ -176,6 +177,12 @@ router.post('/', requirePermission('ia.manage'), async (req: AuthRequest, res: R
       }
     });
 
+    // Bonus-Trigger für eröffnete IA-Ermittlung
+    const leadEmployeeId = await getEmployeeIdFromUserId(userId);
+    if (leadEmployeeId) {
+      await triggerInvestigationOpened(leadEmployeeId, caseNumber, investigation.id);
+    }
+
     res.status(201).json(investigation);
   } catch (error) {
     console.error('Error creating investigation:', error);
@@ -188,6 +195,12 @@ router.put('/:id', requirePermission('ia.manage'), async (req: AuthRequest, res:
   try {
     const { id } = req.params;
     const { title, description, status, priority, category, accusedId, complainant, findings, recommendation } = req.body;
+
+    // Hole vorherigen Status für Bonus-Trigger
+    const previousInvestigation = await prisma.investigation.findUnique({
+      where: { id },
+      select: { status: true, caseNumber: true, leadInvestigatorId: true }
+    });
 
     const updateData: Record<string, unknown> = {};
     if (title) updateData.title = title;
@@ -219,6 +232,14 @@ router.put('/:id', requirePermission('ia.manage'), async (req: AuthRequest, res:
         }
       }
     });
+
+    // Bonus-Trigger wenn Ermittlung abgeschlossen wird
+    if ((status === 'CLOSED' || status === 'ARCHIVED') && previousInvestigation?.status !== 'CLOSED' && previousInvestigation?.status !== 'ARCHIVED') {
+      const leadEmployeeId = await getEmployeeIdFromUserId(investigation.leadInvestigator.id);
+      if (leadEmployeeId && previousInvestigation) {
+        await triggerInvestigationClosed(leadEmployeeId, previousInvestigation.caseNumber, id);
+      }
+    }
 
     res.json(investigation);
   } catch (error) {

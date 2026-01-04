@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../services/api';
-import { Settings as SettingsIcon, RefreshCw, Database, Bot, Save } from 'lucide-react';
+import { Settings as SettingsIcon, RefreshCw, Database, Bot, Save, UserPlus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface DiscordInfo {
@@ -208,6 +208,105 @@ export default function Settings() {
               Einstellungen speichern
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* HR Onboarding Rollen */}
+      <div className="card">
+        <div className="card-header flex items-center gap-2">
+          <UserPlus className="h-5 w-5 text-green-400" />
+          <h2 className="font-semibold text-white">HR Onboarding - Discord Rollen</h2>
+        </div>
+        <div className="card-body space-y-4">
+          <p className="text-sm text-slate-400">
+            Diese Rollen werden bei der Einstellung neuer Mitarbeiter automatisch vergeben.
+            Gib die Discord Rollen-IDs ein (kommasepariert für mehrere Rollen).
+          </p>
+
+          <div>
+            <label className="label">Rollen-IDs für neue Cadets</label>
+            <input
+              className="input"
+              value={settings.hrOnboardingRoleIds || ''}
+              onChange={(e) => setSettings({ ...settings, hrOnboardingRoleIds: e.target.value })}
+              placeholder="z.B. 123456789012345678, 987654321098765432"
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              Mehrere Rollen-IDs mit Komma trennen. Diese Rollen werden beim Abschluss des Onboardings vergeben.
+            </p>
+          </div>
+
+          {discordInfo && (
+            <div className="p-3 bg-slate-700/50 rounded-lg">
+              <p className="text-xs text-slate-400 mb-2">Verfügbare Rollen (klicken zum Hinzufügen):</p>
+              <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+                {discordInfo.roles.map((role) => (
+                  <button
+                    key={role.id}
+                    onClick={() => {
+                      const currentIds = settings.hrOnboardingRoleIds?.split(',').map(id => id.trim()).filter(Boolean) || [];
+                      if (!currentIds.includes(role.id)) {
+                        const newIds = [...currentIds, role.id].join(', ');
+                        setSettings({ ...settings, hrOnboardingRoleIds: newIds });
+                      }
+                    }}
+                    className="px-2 py-0.5 rounded text-xs hover:opacity-80 transition-opacity"
+                    style={{ backgroundColor: role.color + '20', color: role.color || '#fff' }}
+                    title={`ID: ${role.id}`}
+                  >
+                    {role.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {settings.hrOnboardingRoleIds && (
+            <div className="p-3 bg-green-900/20 border border-green-700/30 rounded-lg">
+              <p className="text-xs text-green-400 mb-2">Ausgewählte Rollen:</p>
+              <div className="flex flex-wrap gap-2">
+                {settings.hrOnboardingRoleIds.split(',').map((id, idx) => {
+                  const roleId = id.trim();
+                  if (!roleId) return null;
+                  const role = discordInfo?.roles.find(r => r.id === roleId);
+                  return (
+                    <span
+                      key={idx}
+                      className="px-2 py-1 rounded text-xs flex items-center gap-1"
+                      style={{
+                        backgroundColor: role?.color ? role.color + '20' : '#374151',
+                        color: role?.color || '#9CA3AF'
+                      }}
+                    >
+                      {role?.name || roleId}
+                      <button
+                        onClick={() => {
+                          const newIds = settings.hrOnboardingRoleIds
+                            ?.split(',')
+                            .map(i => i.trim())
+                            .filter(i => i !== roleId)
+                            .join(', ');
+                          setSettings({ ...settings, hrOnboardingRoleIds: newIds || '' });
+                        }}
+                        className="hover:text-red-400 transition-colors"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={handleSave}
+            disabled={updateSettingsMutation.isPending}
+            className="btn-primary w-full"
+          >
+            <Save className="h-4 w-4" />
+            Rollen-Einstellungen speichern
+          </button>
         </div>
       </div>
 

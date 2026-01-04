@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { triggerEvidenceStored, getEmployeeIdFromUserId } from '../services/bonusService.js';
 
 const router = Router();
 
@@ -120,6 +121,12 @@ router.post('/', authMiddleware, requirePermission('evidence.manage'), async (re
         },
       },
     });
+
+    // Bonus-Trigger für eingelagertes Asservat
+    const storedByEmployeeId = await getEmployeeIdFromUserId(req.user!.id);
+    if (storedByEmployeeId) {
+      await triggerEvidenceStored(storedByEmployeeId, name, evidence.id);
+    }
 
     res.status(201).json(evidence);
   } catch (error) {
