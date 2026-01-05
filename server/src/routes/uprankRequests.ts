@@ -253,11 +253,27 @@ router.put('/:id/process', requirePermission('management.uprank'), async (req: A
       }
     });
 
-    // If approved, update employee rank
+    // If approved, update employee rank and archive
     if (status === 'APPROVED') {
+      // Beförderung im Archiv speichern
+      await prisma.promotionArchive.create({
+        data: {
+          employeeId: request.employeeId,
+          oldRank: request.employee.rank,
+          oldRankLevel: request.employee.rankLevel,
+          newRank: request.targetRank,
+          newRankLevel: request.employee.rankLevel + 1, // Annahme: 1 Rang höher
+          promotedById: userId,
+          reason: request.reason,
+        },
+      });
+
       await prisma.employee.update({
         where: { id: request.employeeId },
-        data: { rank: request.targetRank }
+        data: {
+          rank: request.targetRank,
+          rankLevel: request.employee.rankLevel + 1
+        }
       });
     }
 

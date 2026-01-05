@@ -544,3 +544,19 @@ export const bonusApi = {
   getWeeks: () => api.get('/bonus/weeks'),
   submitWeek: (week?: string) => api.post('/bonus/weeks/submit', { week }),
 };
+
+// Archiv API
+export const archiveApi = {
+  // Beförderungen
+  getPromotions: (params?: Record<string, string>) => api.get('/archive/promotions', { params }),
+  getEmployeePromotions: (employeeId: string) => api.get(`/archive/promotions/employee/${employeeId}`),
+
+  // Kündigungen
+  getTerminations: (params?: Record<string, string>) => api.get('/archive/terminations', { params }),
+
+  // Bewerbungen (abgeschlossen/abgelehnt)
+  getApplications: (params?: Record<string, string>) => api.get('/archive/applications', { params }),
+
+  // Statistiken
+  getStats: () => api.get('/archive/stats'),
+};

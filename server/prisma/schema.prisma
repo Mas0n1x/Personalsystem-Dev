@@ -56,6 +56,8 @@ model User {
   createdRetrainings   AcademyRetraining[] @relation("AcademyRetrainingCreatedBy")
   completedRetrainings AcademyRetraining[] @relation("AcademyRetrainingCompletedBy")
   paidBonuses          BonusPayment[] @relation("BonusPaymentPaidBy")
+  promotedEmployees    PromotionArchive[] @relation("PromotionArchivePromotedBy")
+  terminatedEmployees  TerminationArchive[] @relation("TerminationArchiveTerminatedBy")
 
   @@map("users")
 }
@@ -120,6 +122,7 @@ model Employee {
   academyExams           AcademyExam[] @relation("AcademyExamEmployee")
   academyRetrainings     AcademyRetraining[] @relation("AcademyRetrainingEmployee")
   bonusPayments          BonusPayment[] @relation("BonusPaymentEmployee")
+  promotionArchive       PromotionArchive[] @relation("PromotionArchiveEmployee")
 
   @@map("employees")
 }
@@ -918,4 +921,48 @@ model BonusWeek {
   @@unique([weekStart, weekEnd])
   @@index([status])
   @@map("bonus_weeks")
+}
+
+// ==================== ARCHIV SYSTEM ====================
+
+// Beförderungsarchiv
+model PromotionArchive {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation("PromotionArchiveEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  oldRank         String                                      // Alter Rang (Name)
+  oldRankLevel    Int                                         // Alter Rang-Level
+  newRank         String                                      // Neuer Rang (Name)
+  newRankLevel    Int                                         // Neuer Rang-Level
+  promotedById    String
+  promotedBy      User      @relation("PromotionArchivePromotedBy", fields: [promotedById], references: [id])
+  reason          String?                                     // Grund für die Beförderung
+  promotedAt      DateTime  @default(now())                   // Zeitpunkt der Beförderung
+  createdAt       DateTime  @default(now())
+
+  @@index([employeeId])
+  @@index([promotedAt])
+  @@map("promotion_archive")
+}
+
+// Kündigungsarchiv
+model TerminationArchive {
+  id              String    @id @default(cuid())
+  discordId       String                                      // Discord ID des Mitarbeiters
+  discordUsername String                                      // Discord Username
+  displayName     String?                                     // Anzeigename
+  badgeNumber     String?                                     // Dienstnummer
+  rankName        String                                      // Rang zum Zeitpunkt der Kündigung
+  hireDate        DateTime?                                   // Einstellungsdatum
+  terminationType String    @default("RESIGNATION")           // RESIGNATION (Kündigung), TERMINATION (Entlassung), INACTIVE (Inaktivität)
+  reason          String?                                     // Kündigungsgrund
+  terminatedById  String?
+  terminatedBy    User?     @relation("TerminationArchiveTerminatedBy", fields: [terminatedById], references: [id])
+  terminatedAt    DateTime  @default(now())                   // Zeitpunkt der Kündigung
+  createdAt       DateTime  @default(now())
+
+  @@index([discordId])
+  @@index([terminatedAt])
+  @@index([terminationType])
+  @@map("termination_archive")
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { uprankRequestsApi, tuningApi, employeesApi, bonusApi } from '../services/api';
+import { uprankRequestsApi, tuningApi, employeesApi, bonusApi, archiveApi } from '../services/api';
 import { usePermissions } from '../hooks/usePermissions';
 import {
   Building2,
@@ -19,6 +19,9 @@ import {
   UserMinus,
   Wallet,
   Check,
+  Archive,
+  UserPlus,
+  UserX,
 } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
@@ -121,6 +124,81 @@ interface BonusSummary {
   };
 }
 
+interface PromotionArchive {
+  id: string;
+  employeeId: string;
+  oldRank: string;
+  oldRankLevel: number;
+  newRank: string;
+  newRankLevel: number;
+  reason: string | null;
+  promotedAt: string;
+  employee: {
+    id: string;
+    rank: string;
+    badgeNumber: string | null;
+    user: {
+      displayName: string | null;
+      username: string;
+      avatar: string | null;
+    };
+  };
+  promotedBy: {
+    displayName: string | null;
+    username: string;
+  };
+}
+
+interface TerminationArchive {
+  id: string;
+  discordId: string;
+  discordUsername: string;
+  displayName: string | null;
+  badgeNumber: string | null;
+  rankName: string;
+  hireDate: string | null;
+  terminationType: string;
+  reason: string | null;
+  terminatedAt: string;
+  terminatedBy: {
+    displayName: string | null;
+    username: string;
+  } | null;
+}
+
+interface ApplicationArchive {
+  id: string;
+  applicantName: string;
+  applicationDate: string;
+  status: string;
+  rejectionReason: string | null;
+  processedAt: string | null;
+  createdBy: {
+    displayName: string | null;
+    username: string;
+  };
+  processedBy: {
+    displayName: string | null;
+    username: string;
+  } | null;
+}
+
+interface ArchiveStats {
+  promotions: {
+    total: number;
+    recent: number;
+  };
+  terminations: {
+    total: number;
+    recent: number;
+  };
+  applications: {
+    completed: number;
+    rejected: number;
+    recent: number;
+  };
+}
+
 const formatDate = (date: string) => {
   return new Date(date).toLocaleDateString('de-DE', {
     day: '2-digit',
@@ -154,11 +232,13 @@ export default function Management() {
   const canManageTuning = permissions.hasAnyPermission('tuning.manage', 'admin.full');
   const canManageBonus = permissions.hasAnyPermission('bonus.pay', 'admin.full');
 
-  const [activeTab, setActiveTab] = useState<'uprank' | 'tuning' | 'nounit' | 'bonus'>('uprank');
+  const [activeTab, setActiveTab] = useState<'uprank' | 'tuning' | 'nounit' | 'bonus' | 'archive'>('uprank');
   const [selectedRequest, setSelectedRequest] = useState<UprankRequest | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<TuningInvoice | null>(null);
   const [filter, setFilter] = useState<string>('PENDING');
   const [bonusFilter, setBonusFilter] = useState<'PENDING' | 'PAID' | 'all'>('PENDING');
+  const [archiveTab, setArchiveTab] = useState<'promotions' | 'terminations' | 'applications'>('promotions');
+  const [archiveAppFilter, setArchiveAppFilter] = useState<'ALL' | 'COMPLETED' | 'REJECTED'>('ALL');
 
   // Uprank Requests Queries
   const { data: uprankStats } = useQuery({
@@ -203,6 +283,31 @@ export default function Management() {
   const { data: bonusPayments = [], isLoading: isLoadingBonus } = useQuery<BonusPayment[]>({
     queryKey: ['bonus', 'payments', bonusFilter],
     queryFn: () => bonusApi.getPayments(bonusFilter !== 'all' ? { status: bonusFilter } : {}).then(res => res.data),
+  });
+
+  // Archive Queries
+  const { data: archiveStats } = useQuery<ArchiveStats>({
+    queryKey: ['archive', 'stats'],
+    queryFn: () => archiveApi.getStats().then(res => res.data),
+    enabled: activeTab === 'archive',
+  });
+
+  const { data: promotionsData, isLoading: isLoadingPromotions } = useQuery<{ data: PromotionArchive[]; total: number }>({
+    queryKey: ['archive', 'promotions'],
+    queryFn: () => archiveApi.getPromotions({ limit: '100' }).then(res => res.data),
+    enabled: activeTab === 'archive' && archiveTab === 'promotions',
+  });
+
+  const { data: terminationsData, isLoading: isLoadingTerminations } = useQuery<{ data: TerminationArchive[]; total: number }>({
+    queryKey: ['archive', 'terminations'],
+    queryFn: () => archiveApi.getTerminations({ limit: '100' }).then(res => res.data),
+    enabled: activeTab === 'archive' && archiveTab === 'terminations',
+  });
+
+  const { data: applicationsData, isLoading: isLoadingApplications } = useQuery<{ data: ApplicationArchive[]; total: number }>({
+    queryKey: ['archive', 'applications', archiveAppFilter],
+    queryFn: () => archiveApi.getApplications({ limit: '100', status: archiveAppFilter }).then(res => res.data),
+    enabled: activeTab === 'archive' && archiveTab === 'applications',
   });
 
   // Mutations
@@ -382,6 +487,20 @@ export default function Management() {
             </div>
           </button>
         )}
+        <button
+          onClick={() => setActiveTab('archive')}
+          className={clsx(
+            'px-4 py-2 -mb-px transition-colors',
+            activeTab === 'archive'
+              ? 'text-purple-400 border-b-2 border-purple-400'
+              : 'text-slate-400 hover:text-white'
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <Archive className="h-4 w-4" />
+            Archiv
+          </div>
+        </button>
       </div>
 
       {/* Uprank Tab */}
@@ -826,6 +945,291 @@ export default function Management() {
               ))
             )}
           </div>
+        </>
+      )}
+
+      {/* Archive Tab */}
+      {activeTab === 'archive' && (
+        <>
+          {/* Archive Stats */}
+          {archiveStats && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="card p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-500/20 rounded-lg">
+                    <TrendingUp className="h-5 w-5 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-white">{archiveStats.promotions.total}</p>
+                    <p className="text-sm text-slate-400">Beförderungen gesamt</p>
+                    <p className="text-xs text-green-400">+{archiveStats.promotions.recent} letzte 30 Tage</p>
+                  </div>
+                </div>
+              </div>
+              <div className="card p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-red-500/20 rounded-lg">
+                    <UserX className="h-5 w-5 text-red-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-white">{archiveStats.terminations.total}</p>
+                    <p className="text-sm text-slate-400">Kündigungen gesamt</p>
+                    <p className="text-xs text-red-400">+{archiveStats.terminations.recent} letzte 30 Tage</p>
+                  </div>
+                </div>
+              </div>
+              <div className="card p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                    <UserPlus className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-white">{archiveStats.applications.completed + archiveStats.applications.rejected}</p>
+                    <p className="text-sm text-slate-400">Bewerbungen abgeschlossen</p>
+                    <p className="text-xs text-blue-400">+{archiveStats.applications.recent} letzte 30 Tage</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Archive Sub-Tabs */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setArchiveTab('promotions')}
+              className={clsx(
+                'px-4 py-2 rounded-lg transition-colors flex items-center gap-2',
+                archiveTab === 'promotions'
+                  ? 'bg-green-500/20 text-green-400'
+                  : 'text-slate-400 hover:text-white'
+              )}
+            >
+              <TrendingUp className="h-4 w-4" />
+              Beförderungen
+            </button>
+            <button
+              onClick={() => setArchiveTab('terminations')}
+              className={clsx(
+                'px-4 py-2 rounded-lg transition-colors flex items-center gap-2',
+                archiveTab === 'terminations'
+                  ? 'bg-red-500/20 text-red-400'
+                  : 'text-slate-400 hover:text-white'
+              )}
+            >
+              <UserX className="h-4 w-4" />
+              Kündigungen
+            </button>
+            <button
+              onClick={() => setArchiveTab('applications')}
+              className={clsx(
+                'px-4 py-2 rounded-lg transition-colors flex items-center gap-2',
+                archiveTab === 'applications'
+                  ? 'bg-blue-500/20 text-blue-400'
+                  : 'text-slate-400 hover:text-white'
+              )}
+            >
+              <UserPlus className="h-4 w-4" />
+              Bewerbungen
+            </button>
+          </div>
+
+          {/* Promotions Archive */}
+          {archiveTab === 'promotions' && (
+            <div className="card">
+              {isLoadingPromotions ? (
+                <div className="p-8 text-center">
+                  <div className="animate-spin h-8 w-8 border-2 border-purple-500 border-t-transparent rounded-full mx-auto"></div>
+                </div>
+              ) : !promotionsData?.data.length ? (
+                <div className="p-8 text-center text-slate-400">
+                  Keine Beförderungen im Archiv
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-700">
+                  {promotionsData.data.map((promotion) => (
+                    <div key={promotion.id} className="p-4 hover:bg-slate-700/30 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden">
+                            {promotion.employee.user.avatar ? (
+                              <img src={promotion.employee.user.avatar} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <User className="h-6 w-6 text-slate-400" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium text-white">
+                              {promotion.employee.user.displayName || promotion.employee.user.username}
+                            </p>
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-slate-400">{promotion.oldRank}</span>
+                              <ArrowUp className="h-4 w-4 text-green-400" />
+                              <span className="text-green-400 font-medium">{promotion.newRank}</span>
+                            </div>
+                            {promotion.reason && (
+                              <p className="text-xs text-slate-500 mt-1">{promotion.reason}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-slate-400">{formatDate(promotion.promotedAt)}</p>
+                          <p className="text-xs text-slate-500">
+                            von {promotion.promotedBy.displayName || promotion.promotedBy.username}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Terminations Archive */}
+          {archiveTab === 'terminations' && (
+            <div className="card">
+              {isLoadingTerminations ? (
+                <div className="p-8 text-center">
+                  <div className="animate-spin h-8 w-8 border-2 border-purple-500 border-t-transparent rounded-full mx-auto"></div>
+                </div>
+              ) : !terminationsData?.data.length ? (
+                <div className="p-8 text-center text-slate-400">
+                  Keine Kündigungen im Archiv
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-700">
+                  {terminationsData.data.map((termination) => (
+                    <div key={termination.id} className="p-4 hover:bg-slate-700/30 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                            <UserX className="h-6 w-6 text-red-400" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-white">
+                              {termination.displayName || termination.discordUsername}
+                            </p>
+                            <p className="text-sm text-slate-400">{termination.rankName}</p>
+                            {termination.badgeNumber && (
+                              <p className="text-xs text-slate-500">#{termination.badgeNumber}</p>
+                            )}
+                            {termination.reason && (
+                              <p className="text-xs text-slate-500 mt-1">{termination.reason}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className={clsx(
+                            'px-2 py-0.5 rounded-full text-xs',
+                            termination.terminationType === 'RESIGNATION'
+                              ? 'bg-yellow-500/20 text-yellow-400'
+                              : termination.terminationType === 'TERMINATION'
+                              ? 'bg-red-500/20 text-red-400'
+                              : 'bg-slate-500/20 text-slate-400'
+                          )}>
+                            {termination.terminationType === 'RESIGNATION' ? 'Kündigung' :
+                             termination.terminationType === 'TERMINATION' ? 'Entlassung' : 'Sonstig'}
+                          </span>
+                          <p className="text-sm text-slate-400 mt-1">{formatDate(termination.terminatedAt)}</p>
+                          {termination.terminatedBy && (
+                            <p className="text-xs text-slate-500">
+                              von {termination.terminatedBy.displayName || termination.terminatedBy.username}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Applications Archive */}
+          {archiveTab === 'applications' && (
+            <>
+              {/* Application Filter */}
+              <div className="flex gap-2 -mt-2">
+                {(['ALL', 'COMPLETED', 'REJECTED'] as const).map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setArchiveAppFilter(status)}
+                    className={clsx(
+                      'px-3 py-1 rounded text-sm transition-colors',
+                      archiveAppFilter === status
+                        ? status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
+                          status === 'REJECTED' ? 'bg-red-500/20 text-red-400' :
+                          'bg-purple-500/20 text-purple-400'
+                        : 'text-slate-400 hover:text-white'
+                    )}
+                  >
+                    {status === 'ALL' ? 'Alle' :
+                     status === 'COMPLETED' ? 'Angenommen' : 'Abgelehnt'}
+                  </button>
+                ))}
+              </div>
+
+              <div className="card">
+                {isLoadingApplications ? (
+                  <div className="p-8 text-center">
+                    <div className="animate-spin h-8 w-8 border-2 border-purple-500 border-t-transparent rounded-full mx-auto"></div>
+                  </div>
+                ) : !applicationsData?.data.length ? (
+                  <div className="p-8 text-center text-slate-400">
+                    Keine Bewerbungen im Archiv
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-700">
+                    {applicationsData.data.map((application) => (
+                      <div key={application.id} className="p-4 hover:bg-slate-700/30 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className={clsx(
+                              'w-12 h-12 rounded-full flex items-center justify-center',
+                              application.status === 'COMPLETED' ? 'bg-green-500/20' : 'bg-red-500/20'
+                            )}>
+                              {application.status === 'COMPLETED' ? (
+                                <UserPlus className="h-6 w-6 text-green-400" />
+                              ) : (
+                                <XCircle className="h-6 w-6 text-red-400" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium text-white">{application.applicantName}</p>
+                              <p className="text-sm text-slate-400">
+                                Bewerbung vom {formatDate(application.applicationDate)}
+                              </p>
+                              {application.rejectionReason && (
+                                <p className="text-xs text-red-400 mt-1">{application.rejectionReason}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className={clsx(
+                              'px-2 py-0.5 rounded-full text-xs',
+                              application.status === 'COMPLETED'
+                                ? 'bg-green-500/20 text-green-400'
+                                : 'bg-red-500/20 text-red-400'
+                            )}>
+                              {application.status === 'COMPLETED' ? 'Angenommen' : 'Abgelehnt'}
+                            </span>
+                            {application.processedAt && (
+                              <p className="text-sm text-slate-400 mt-1">{formatDate(application.processedAt)}</p>
+                            )}
+                            {application.processedBy && (
+                              <p className="text-xs text-slate-500">
+                                von {application.processedBy.displayName || application.processedBy.username}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
 

@@ -290,10 +290,27 @@ router.post('/:id/uprank', authMiddleware, requirePermission('employees.edit'), 
       updateData.badgeNumber = result.newBadgeNumber;
     }
 
+    // Alten Rang für Archiv speichern
+    const oldRank = employee.rank;
+    const oldRankLevel = employee.rankLevel;
+
     const updatedEmployee = await prisma.employee.update({
       where: { id: req.params.id },
       data: updateData,
       include: { user: true },
+    });
+
+    // Beförderung im Archiv speichern
+    await prisma.promotionArchive.create({
+      data: {
+        employeeId: employee.id,
+        oldRank: oldRank,
+        oldRankLevel: oldRankLevel,
+        newRank: result.newRank!,
+        newRankLevel: result.newLevel!,
+        promotedById: req.userId!,
+        reason: req.body.reason || null,
+      },
     });
 
     // Nickname auf Discord aktualisieren (mit neuer Badge-Nummer falls geändert)
@@ -404,7 +421,7 @@ router.post('/:id/downrank', authMiddleware, requirePermission('employees.edit')
 // Mitarbeiter kündigen (löschen + Discord kick)
 router.post('/:id/terminate', authMiddleware, requirePermission('employees.delete'), async (req: AuthRequest, res: Response) => {
   try {
-    const { reason } = req.body;
+    const { reason, terminationType = 'TERMINATION' } = req.body;
 
     const employee = await prisma.employee.findUnique({
       where: { id: req.params.id },
@@ -415,6 +432,21 @@ router.post('/:id/terminate', authMiddleware, requirePermission('employees.delet
       res.status(404).json({ error: 'Mitarbeiter nicht gefunden' });
       return;
     }
+
+    // Kündigung im Archiv speichern (vor dem Löschen!)
+    await prisma.terminationArchive.create({
+      data: {
+        discordId: employee.user.discordId,
+        discordUsername: employee.user.username,
+        displayName: employee.user.displayName,
+        badgeNumber: employee.badgeNumber,
+        rankName: employee.rank,
+        hireDate: employee.hireDate,
+        terminationType: terminationType,
+        reason: reason || null,
+        terminatedById: req.userId!,
+      },
+    });
 
     const kickResult = await kickMember(employee.user.discordId, reason || 'Kündigung');
 
