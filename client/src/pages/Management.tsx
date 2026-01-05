@@ -763,7 +763,7 @@ export default function Management() {
                         </div>
                       </div>
                       <a
-                        href={`/employees?search=${encodeURIComponent(employee.user.displayName || employee.user.username)}`}
+                        href={`/employees/${employee.id}`}
                         className="btn-secondary text-sm"
                         onClick={(e) => e.stopPropagation()}
                       >
