@@ -21,6 +21,7 @@ import {
   Building2,
   Database,
   DollarSign,
+  HelpCircle,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -79,6 +80,7 @@ export default function Sidebar() {
       items: [
         { name: 'Rollen', href: '/admin/roles', icon: Shield, permission: 'admin.full' },
         { name: 'Academy Module', href: '/admin/academy-modules', icon: GraduationCap, permission: 'admin.full' },
+        { name: 'Fragen & Kriterien', href: '/admin/academy-settings', icon: HelpCircle, permission: 'admin.full' },
         { name: 'Sonderzahlungen', href: '/admin/bonus', icon: DollarSign, permission: 'admin.full' },
         { name: 'Audit-Logs', href: '/admin/audit-logs', icon: FileText, permission: 'audit.view' },
         { name: 'Backups', href: '/admin/backups', icon: Database, permission: 'admin.full' },

@@ -764,6 +764,228 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+// ==================== ACADEMY QUESTIONS (Fragenkatalog) ====================
+
+// Alle Fragen abrufen
+router.get('/academy-questions', authMiddleware, async (_req: AuthRequest, res: Response) => {
+  try {
+    const questions = await prisma.academyQuestion.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    res.json(questions);
+  } catch (error) {
+    console.error('Get academy questions error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Fragen' });
+  }
+});
+
+// Alle Fragen abrufen (inkl. inaktive - nur Admin)
+router.get('/academy-questions/all', authMiddleware, requirePermission('admin.full'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const questions = await prisma.academyQuestion.findMany({
+      orderBy: { sortOrder: 'asc' },
+    });
+    res.json(questions);
+  } catch (error) {
+    console.error('Get all academy questions error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Fragen' });
+  }
+});
+
+// Neue Frage erstellen
+router.post('/academy-questions', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { question, sortOrder } = req.body;
+
+    // Hole höchste sortOrder wenn nicht angegeben
+    let order = sortOrder;
+    if (order === undefined) {
+      const maxOrder = await prisma.academyQuestion.findFirst({
+        orderBy: { sortOrder: 'desc' },
+        select: { sortOrder: true },
+      });
+      order = (maxOrder?.sortOrder ?? -1) + 1;
+    }
+
+    const newQuestion = await prisma.academyQuestion.create({
+      data: {
+        question,
+        sortOrder: order,
+      },
+    });
+
+    res.status(201).json(newQuestion);
+  } catch (error) {
+    console.error('Create academy question error:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen der Frage' });
+  }
+});
+
+// Frage aktualisieren
+router.put('/academy-questions/:id', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { question, sortOrder, isActive } = req.body;
+
+    const updatedQuestion = await prisma.academyQuestion.update({
+      where: { id: req.params.id },
+      data: {
+        question,
+        sortOrder,
+        isActive,
+      },
+    });
+
+    res.json(updatedQuestion);
+  } catch (error) {
+    console.error('Update academy question error:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren der Frage' });
+  }
+});
+
+// Frage löschen
+router.delete('/academy-questions/:id', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    await prisma.academyQuestion.delete({
+      where: { id: req.params.id },
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete academy question error:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen der Frage' });
+  }
+});
+
+// Reihenfolge aktualisieren (Bulk-Update)
+router.put('/academy-questions/reorder', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { items } = req.body; // Array von { id, sortOrder }
+
+    for (const item of items) {
+      await prisma.academyQuestion.update({
+        where: { id: item.id },
+        data: { sortOrder: item.sortOrder },
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Reorder academy questions error:', error);
+    res.status(500).json({ error: 'Fehler beim Neuordnen der Fragen' });
+  }
+});
+
+// ==================== ACADEMY CRITERIA (Einstellungskriterien) ====================
+
+// Alle Kriterien abrufen
+router.get('/academy-criteria', authMiddleware, async (_req: AuthRequest, res: Response) => {
+  try {
+    const criteria = await prisma.academyCriterion.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    res.json(criteria);
+  } catch (error) {
+    console.error('Get academy criteria error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Kriterien' });
+  }
+});
+
+// Alle Kriterien abrufen (inkl. inaktive - nur Admin)
+router.get('/academy-criteria/all', authMiddleware, requirePermission('admin.full'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const criteria = await prisma.academyCriterion.findMany({
+      orderBy: { sortOrder: 'asc' },
+    });
+    res.json(criteria);
+  } catch (error) {
+    console.error('Get all academy criteria error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Kriterien' });
+  }
+});
+
+// Neues Kriterium erstellen
+router.post('/academy-criteria', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, sortOrder } = req.body;
+
+    // Hole höchste sortOrder wenn nicht angegeben
+    let order = sortOrder;
+    if (order === undefined) {
+      const maxOrder = await prisma.academyCriterion.findFirst({
+        orderBy: { sortOrder: 'desc' },
+        select: { sortOrder: true },
+      });
+      order = (maxOrder?.sortOrder ?? -1) + 1;
+    }
+
+    const newCriterion = await prisma.academyCriterion.create({
+      data: {
+        name,
+        sortOrder: order,
+      },
+    });
+
+    res.status(201).json(newCriterion);
+  } catch (error) {
+    console.error('Create academy criterion error:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen des Kriteriums' });
+  }
+});
+
+// Kriterium aktualisieren
+router.put('/academy-criteria/:id', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, sortOrder, isActive } = req.body;
+
+    const updatedCriterion = await prisma.academyCriterion.update({
+      where: { id: req.params.id },
+      data: {
+        name,
+        sortOrder,
+        isActive,
+      },
+    });
+
+    res.json(updatedCriterion);
+  } catch (error) {
+    console.error('Update academy criterion error:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren des Kriteriums' });
+  }
+});
+
+// Kriterium löschen
+router.delete('/academy-criteria/:id', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    await prisma.academyCriterion.delete({
+      where: { id: req.params.id },
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete academy criterion error:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen des Kriteriums' });
+  }
+});
+
+// Reihenfolge aktualisieren (Bulk-Update)
+router.put('/academy-criteria/reorder', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { items } = req.body; // Array von { id, sortOrder }
+
+    for (const item of items) {
+      await prisma.academyCriterion.update({
+        where: { id: item.id },
+        data: { sortOrder: item.sortOrder },
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Reorder academy criteria error:', error);
+    res.status(500).json({ error: 'Fehler beim Neuordnen der Kriterien' });
+  }
+});
+
 // ==================== SYSTEM STATS ====================
 
 router.get('/stats', authMiddleware, requirePermission('admin.full'), async (_req: AuthRequest, res: Response) => {

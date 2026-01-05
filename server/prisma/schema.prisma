@@ -822,6 +822,36 @@ model AcademyRetraining {
   @@map("academy_retrainings")
 }
 
+// ==================== ACADEMY - FRAGENKATALOG & EINSTELLUNGSKRITERIEN ====================
+
+// Fragenkatalog für Bewerbungen
+model AcademyQuestion {
+  id          String    @id @default(cuid())
+  question    String                              // Die Frage
+  sortOrder   Int       @default(0)               // Reihenfolge
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("academy_questions")
+}
+
+// Einstellungskriterien für Bewerbungen
+model AcademyCriterion {
+  id          String    @id @default(cuid())
+  name        String                              // Name des Kriteriums
+  sortOrder   Int       @default(0)               // Reihenfolge
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("academy_criteria")
+}
+
 // ==================== SONDERZAHLUNGEN / BONUS SYSTEM ====================
 
 // Konfiguration der Bonus-Arten (im Admin-Bereich einstellbar)

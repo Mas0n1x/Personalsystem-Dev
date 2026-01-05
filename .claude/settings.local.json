@@ -34,7 +34,14 @@
       "Bash(npm run db:push:*)",
       "Bash(cat:*)",
       "Bash(node check-bonuses.mjs:*)",
-      "Bash(cmd //c \"taskkill /PID 10140 /F\")"
+      "Bash(cmd //c \"taskkill /PID 10140 /F\")",
+      "Bash(echo:*)",
+      "Bash(cmd //c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && npm run dev\")",
+      "Bash(cmd //c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\client && npm run dev\")",
+      "Bash(cmd //c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && npx prisma db push\")",
+      "Bash(cmd //c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && node seed-academy.mjs\")",
+      "Bash(cmd //c \"taskkill /F /PID 43264\")",
+      "Bash(cmd //c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && npx prisma generate\")"
     ]
   }
 }

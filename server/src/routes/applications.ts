@@ -43,29 +43,6 @@ const upload = multer({
 
 const router = Router();
 
-// Fragenkatalog - statisch definiert
-const QUESTION_CATALOG = [
-  { id: 'q1', text: 'Was macht man vor Dienstbeginn?' },
-  { id: 'q2', text: 'Wie lautet die Telefonseelsorge?' },
-  { id: 'q3', text: 'Wer ist der Polizeichef?' },
-  { id: 'q5', text: 'Wie schnell darf man in der Stadt und außerhalb fahren?' },
-  { id: 'q6', text: 'Wie ist der Tacklebefehl?' },
-  { id: 'q7', text: 'Wer muss einem Befehl folge leisten und warum? (Befehlskette)' },
-  { id: 'q8', text: 'Bei wem müssen Abmeldungen und Dienstfrei beantragt werden?' },
-  { id: 'q9', text: 'Was für Streifenfahrzeuge gibt es, nenne 3?' },
-  { id: 'q10', text: 'Welche Fraktionsfunkfrequenz nutzen wir?' },
-  { id: 'q11', text: 'Wie verhält man sich an einer Unfallstelle?' },
-  { id: 'q12', text: 'Was ist der Unterschied zwischen Ermahnung/Verwarnung und wie lange bleiben diese im System?' },
-];
-
-// Onboarding-Checkliste - statisch definiert
-const ONBOARDING_CHECKLIST = [
-  { id: 'clothes', text: 'Klamotten besorgen (Dienstkleidung)' },
-  { id: 'discord', text: 'Discord Rollen vergeben' },
-  { id: 'inventory', text: 'Standardinventar erklärt' },
-  { id: 'garage', text: 'Fahrzeuggarage erklärt' },
-];
-
 // GET alle Bewerbungen
 router.get('/', authMiddleware, requirePermission('hr.view'), async (req: AuthRequest, res: Response) => {
   try {
@@ -128,13 +105,43 @@ router.get('/stats', authMiddleware, requirePermission('hr.view'), async (_req: 
   }
 });
 
-// GET Fragenkatalog
+// GET Fragenkatalog (dynamisch aus Datenbank)
 router.get('/questions', authMiddleware, requirePermission('hr.view'), async (_req: AuthRequest, res: Response) => {
-  res.json(QUESTION_CATALOG);
+  try {
+    const questions = await prisma.academyQuestion.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    // Format für Frontend-Kompatibilität
+    res.json(questions.map(q => ({ id: q.id, text: q.question })));
+  } catch (error) {
+    console.error('Get questions error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Fragen' });
+  }
 });
 
-// GET Onboarding-Checkliste
+// GET Einstellungskriterien (dynamisch aus Datenbank)
+router.get('/criteria', authMiddleware, requirePermission('hr.view'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const criteria = await prisma.academyCriterion.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    res.json(criteria.map(c => ({ id: c.id, name: c.name })));
+  } catch (error) {
+    console.error('Get criteria error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Kriterien' });
+  }
+});
+
+// GET Onboarding-Checkliste (statisch, könnte später auch dynamisch werden)
 router.get('/onboarding-checklist', authMiddleware, requirePermission('hr.view'), async (_req: AuthRequest, res: Response) => {
+  const ONBOARDING_CHECKLIST = [
+    { id: 'clothes', text: 'Klamotten besorgen (Dienstkleidung)' },
+    { id: 'discord', text: 'Discord Rollen vergeben' },
+    { id: 'inventory', text: 'Standardinventar erklärt' },
+    { id: 'garage', text: 'Fahrzeuggarage erklärt' },
+  ];
   res.json(ONBOARDING_CHECKLIST);
 });
 

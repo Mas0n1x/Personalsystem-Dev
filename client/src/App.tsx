@@ -14,6 +14,7 @@ import Roles from './pages/admin/Roles';
 import AuditLogs from './pages/admin/AuditLogs';
 import Settings from './pages/admin/Settings';
 import AcademyModules from './pages/admin/AcademyModules';
+import AcademySettings from './pages/admin/AcademySettings';
 import Backups from './pages/admin/Backups';
 import BonusSettings from './pages/admin/BonusSettings';
 
@@ -88,6 +89,7 @@ function App() {
         <Route path="admin/audit-logs" element={<AuditLogs />} />
         <Route path="admin/settings" element={<Settings />} />
         <Route path="admin/academy-modules" element={<AcademyModules />} />
+        <Route path="admin/academy-settings" element={<AcademySettings />} />
         <Route path="admin/backups" element={<Backups />} />
         <Route path="admin/bonus" element={<BonusSettings />} />
       </Route>

@@ -121,6 +121,28 @@ export const adminApi = {
 
   // Stats
   getStats: () => api.get('/admin/stats'),
+
+  // Academy Questions (Fragenkatalog)
+  getAcademyQuestions: () => api.get('/admin/academy-questions'),
+  getAllAcademyQuestions: () => api.get('/admin/academy-questions/all'),
+  createAcademyQuestion: (data: { question: string; sortOrder?: number }) =>
+    api.post('/admin/academy-questions', data),
+  updateAcademyQuestion: (id: string, data: { question?: string; sortOrder?: number; isActive?: boolean }) =>
+    api.put(`/admin/academy-questions/${id}`, data),
+  deleteAcademyQuestion: (id: string) => api.delete(`/admin/academy-questions/${id}`),
+  reorderAcademyQuestions: (items: { id: string; sortOrder: number }[]) =>
+    api.put('/admin/academy-questions/reorder', { items }),
+
+  // Academy Criteria (Einstellungskriterien)
+  getAcademyCriteria: () => api.get('/admin/academy-criteria'),
+  getAllAcademyCriteria: () => api.get('/admin/academy-criteria/all'),
+  createAcademyCriterion: (data: { name: string; sortOrder?: number }) =>
+    api.post('/admin/academy-criteria', data),
+  updateAcademyCriterion: (id: string, data: { name?: string; sortOrder?: number; isActive?: boolean }) =>
+    api.put(`/admin/academy-criteria/${id}`, data),
+  deleteAcademyCriterion: (id: string) => api.delete(`/admin/academy-criteria/${id}`),
+  reorderAcademyCriteria: (items: { id: string; sortOrder: number }[]) =>
+    api.put('/admin/academy-criteria/reorder', { items }),
 };
 
 // Absences API
@@ -256,6 +278,7 @@ export const applicationApi = {
   getStats: () => api.get('/applications/stats'),
   getById: (id: string) => api.get(`/applications/${id}`),
   getQuestions: () => api.get('/applications/questions'),
+  getCriteria: () => api.get('/applications/criteria'),
   getOnboardingChecklist: () => api.get('/applications/onboarding-checklist'),
   getIdCardUrl: (id: string) => `/api/applications/${id}/id-card`,
   checkBlacklist: (discordId: string) => api.get(`/applications/check-blacklist/${discordId}`),

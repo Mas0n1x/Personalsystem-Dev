@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { blacklistApi, applicationApi } from '../services/api';
+import { blacklistApi, applicationApi, adminApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   Plus,
@@ -74,6 +74,11 @@ interface Question {
   text: string;
 }
 
+interface Criterion {
+  id: string;
+  name: string;
+}
+
 interface OnboardingItem {
   id: string;
   text: string;
@@ -81,19 +86,20 @@ interface OnboardingItem {
 
 type Tab = 'applications' | 'blacklist';
 
-// Einstellungskriterien
-const CRITERIA_ITEMS = [
-  { key: 'criteriaStabilization', label: 'Stabilisationsschein geprüft' },
-  { key: 'criteriaVisa', label: 'Visumsstufe geprüft' },
-  { key: 'criteriaNoOffenses', label: 'Keine Straftaten (7 Tage)' },
-  { key: 'criteriaAppearance', label: 'Angemessenes Aussehen' },
-  { key: 'criteriaNoFactionLock', label: 'Keine Fraktionssperre' },
-  { key: 'criteriaNoOpenBills', label: 'Keine offenen Rechnungen' },
-  { key: 'criteriaSearched', label: 'Durchsuchen' },
-  { key: 'criteriaBlacklistChecked', label: 'Blacklist gecheckt' },
-  { key: 'criteriaHandbookGiven', label: 'Diensthandbuch ausgegeben' },
-  { key: 'criteriaEmploymentTest', label: 'Einstellungstest' },
-  { key: 'criteriaRpSituation', label: 'RP Situation dargestellt (AVK) & Smalltalk' },
+// Mapping von dynamischen Kriterien-IDs zu Datenbank-Feldern
+// Neue Kriterien werden über criteriaCustom (JSON-Feld) gespeichert
+const LEGACY_CRITERIA_KEYS = [
+  'criteriaStabilization',
+  'criteriaVisa',
+  'criteriaNoOffenses',
+  'criteriaAppearance',
+  'criteriaNoFactionLock',
+  'criteriaNoOpenBills',
+  'criteriaSearched',
+  'criteriaBlacklistChecked',
+  'criteriaHandbookGiven',
+  'criteriaEmploymentTest',
+  'criteriaRpSituation',
 ];
 
 export default function HumanResources() {
@@ -170,12 +176,48 @@ export default function HumanResources() {
     queryFn: () => applicationApi.getOnboardingChecklist(),
   });
 
+  // Dynamische Einstellungskriterien aus der Admin-API
+  const { data: criteriaData } = useQuery({
+    queryKey: ['academy-criteria'],
+    queryFn: () => adminApi.getAcademyCriteria(),
+  });
+
   const blacklist = (blacklistData?.data || []) as BlacklistEntry[];
   const blacklistStats = blacklistStatsData?.data as { total: number; permanent: number; temporary: number } | undefined;
   const applications = (applicationsData?.data || []) as Application[];
   const applicationStats = applicationStatsData?.data as { criteria: number; questions: number; onboarding: number; completed: number; rejected: number; pending: number; total: number } | undefined;
   const questions = (questionsData?.data || []) as Question[];
   const onboardingItems = (onboardingData?.data || []) as OnboardingItem[];
+  const dynamicCriteria = (criteriaData?.data || []) as Criterion[];
+
+  // Mapping von dynamischen Kriterien zu Legacy-Feldern
+  // Index 0-10 entspricht den Legacy-Feldern
+  const CRITERIA_ITEMS = useMemo(() => {
+    if (dynamicCriteria.length === 0) {
+      // Fallback zu den Legacy-Kriterien, wenn keine dynamischen geladen
+      return LEGACY_CRITERIA_KEYS.map((key, index) => ({
+        key,
+        label: [
+          'Stabilisationsschein geprüft',
+          'Visumsstufe geprüft',
+          'Keine Straftaten (7 Tage)',
+          'Angemessenes Aussehen',
+          'Keine Fraktionssperre',
+          'Keine offenen Rechnungen',
+          'Durchsuchen',
+          'Blacklist gecheckt',
+          'Diensthandbuch ausgegeben',
+          'Einstellungstest',
+          'RP Situation dargestellt (AVK) & Smalltalk',
+        ][index] || key,
+      }));
+    }
+    // Dynamische Kriterien mit Legacy-Keys mappen
+    return dynamicCriteria.map((c, index) => ({
+      key: LEGACY_CRITERIA_KEYS[index] || `criteria_${c.id}`,
+      label: c.name,
+    }));
+  }, [dynamicCriteria]);
 
   // Blacklist Mutations
   const createBlacklistMutation = useMutation({
