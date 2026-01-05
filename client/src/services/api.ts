@@ -74,6 +74,11 @@ export const employeesApi = {
   getUnits: (id: string) => api.get(`/employees/${id}/units`),
   setUnits: (id: string, unitRoleIds: string[]) => api.post(`/employees/${id}/units`, { unitRoleIds }),
   terminate: (id: string, reason?: string) => api.post(`/employees/${id}/terminate`, { reason }),
+  // Mitarbeiter-Statistiken
+  getPromotions: (id: string) => api.get(`/employees/${id}/promotions`),
+  getBonuses: (id: string, limit?: number) => api.get(`/employees/${id}/bonuses`, { params: { limit } }),
+  getUnitStats: (id: string, period?: 'week' | 'month' | 'all') =>
+    api.get(`/employees/${id}/unit-stats`, { params: { period } }),
 };
 
 // Dashboard API
@@ -543,6 +548,17 @@ export const bonusApi = {
   // Wochen
   getWeeks: () => api.get('/bonus/weeks'),
   submitWeek: (week?: string) => api.post('/bonus/weeks/submit', { week }),
+};
+
+// Notifications API
+export const notificationsApi = {
+  getAll: (params?: { limit?: number; unreadOnly?: boolean }) =>
+    api.get('/notifications', { params }),
+  getUnreadCount: () => api.get('/notifications/unread-count'),
+  markAsRead: (id: string) => api.put(`/notifications/${id}/read`),
+  markAllAsRead: () => api.put('/notifications/read-all'),
+  delete: (id: string) => api.delete(`/notifications/${id}`),
+  deleteAll: () => api.delete('/notifications'),
 };
 
 // Archiv API

@@ -5,6 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { notifyTuningPayment } from '../services/notificationService.js';
 
 const router = Router();
 
@@ -150,8 +151,13 @@ router.put('/:id/complete', authMiddleware, requirePermission('tuning.manage'), 
   try {
     const { id } = req.params;
 
-    // Hole die Rechnung
-    const invoice = await prisma.tuningInvoice.findUnique({ where: { id } });
+    // Hole die Rechnung mit User-Info für Notification
+    const invoice = await prisma.tuningInvoice.findUnique({
+      where: { id },
+      include: {
+        submittedBy: { select: { id: true } },
+      },
+    });
 
     if (!invoice) {
       res.status(404).json({ error: 'Rechnung nicht gefunden' });
@@ -163,6 +169,19 @@ router.put('/:id/complete', authMiddleware, requirePermission('tuning.manage'), 
     if (fs.existsSync(imagePath)) {
       fs.unlinkSync(imagePath);
     }
+
+    // Benachrichtigung an den Einreicher senden
+    const completedByUser = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { displayName: true, username: true },
+    });
+    const completedByName = completedByUser?.displayName || completedByUser?.username || 'Unbekannt';
+
+    await notifyTuningPayment(
+      invoice.submittedById,
+      invoice.amount,
+      completedByName
+    );
 
     // Lösche die Rechnung aus der Datenbank
     await prisma.tuningInvoice.delete({ where: { id } });

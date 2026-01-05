@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { notifyPromotion } from '../services/notificationService.js';
 
 const router = Router();
 
@@ -275,6 +276,15 @@ router.put('/:id/process', requirePermission('management.uprank'), async (req: A
           rankLevel: request.employee.rankLevel + 1
         }
       });
+
+      // Benachrichtigung an den beförderten Mitarbeiter senden
+      const promotedByName = updatedRequest.processedBy?.displayName || updatedRequest.processedBy?.username || 'Unbekannt';
+      await notifyPromotion(
+        request.employee.userId,
+        request.employee.rank,
+        request.targetRank,
+        promotedByName
+      );
     }
 
     res.json(updatedRequest);

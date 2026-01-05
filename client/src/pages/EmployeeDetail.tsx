@@ -3,9 +3,25 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeesApi } from '../services/api';
 import { StatusBadge } from '../components/ui/Badge';
-import { ArrowLeft, Edit, Clock, X, Save, CalendarOff } from 'lucide-react';
+import {
+  ArrowLeft,
+  Edit,
+  Clock,
+  X,
+  Save,
+  CalendarOff,
+  TrendingUp,
+  ArrowUp,
+  DollarSign,
+  Briefcase,
+  GraduationCap,
+  ShieldAlert,
+  Search,
+  Users,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
+import clsx from 'clsx';
 
 interface AbsenceData {
   id: string;
@@ -36,11 +52,86 @@ interface EmployeeDetailData {
   };
 }
 
+interface PromotionData {
+  id: string;
+  oldRank: string;
+  oldRankLevel: number;
+  newRank: string;
+  newRankLevel: number;
+  reason: string | null;
+  promotedAt: string;
+  promotedBy: {
+    displayName: string | null;
+    username: string;
+  };
+}
+
+interface BonusPaymentData {
+  id: string;
+  amount: number;
+  reason: string | null;
+  status: string;
+  createdAt: string;
+  paidAt: string | null;
+  config: {
+    displayName: string;
+    category: string;
+    activityType: string;
+  };
+  paidBy: {
+    displayName: string | null;
+    username: string;
+  } | null;
+}
+
+interface BonusStats {
+  totalEarned: number;
+  totalPending: number;
+  paymentCount: number;
+  byCategory: Record<string, { count: number; amount: number }>;
+}
+
+interface UnitStats {
+  departments: string[];
+  stats: {
+    academy: {
+      trainingsCompleted: number;
+      trainingsParticipated: number;
+      examsGiven: number;
+      total: number;
+    };
+    internalAffairs: {
+      investigationsOpened: number;
+      investigationsClosed: number;
+      unitReviews: number;
+      total: number;
+    };
+    detective: {
+      casesOpened: number;
+      casesClosed: number;
+      total: number;
+    };
+    humanResources: {
+      applicationsProcessed: number;
+      total: number;
+    };
+  };
+}
+
+const formatDate = (date: string) => {
+  return format(new Date(date), 'dd.MM.yyyy', { locale: de });
+};
+
+const formatDateTime = (date: string) => {
+  return format(new Date(date), 'dd.MM.yyyy HH:mm', { locale: de });
+};
+
 export default function EmployeeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [unitStatsPeriod, setUnitStatsPeriod] = useState<'week' | 'month' | 'all'>('all');
   const [editForm, setEditForm] = useState({
     badgeNumber: '',
     displayName: '',
@@ -53,7 +144,32 @@ export default function EmployeeDetail() {
     enabled: !!id,
   });
 
+  // Beförderungshistorie
+  const { data: promotionsData } = useQuery({
+    queryKey: ['employee', id, 'promotions'],
+    queryFn: () => employeesApi.getPromotions(id!),
+    enabled: !!id,
+  });
+
+  // Sonderzahlungen
+  const { data: bonusesData } = useQuery({
+    queryKey: ['employee', id, 'bonuses'],
+    queryFn: () => employeesApi.getBonuses(id!, 10),
+    enabled: !!id,
+  });
+
+  // Unit-Statistiken
+  const { data: unitStatsData } = useQuery({
+    queryKey: ['employee', id, 'unit-stats', unitStatsPeriod],
+    queryFn: () => employeesApi.getUnitStats(id!, unitStatsPeriod),
+    enabled: !!id,
+  });
+
   const employee = data?.data as EmployeeDetailData | undefined;
+  const promotions = (promotionsData?.data || []) as PromotionData[];
+  const bonusPayments = (bonusesData?.data?.payments || []) as BonusPaymentData[];
+  const bonusStats = bonusesData?.data?.stats as BonusStats | undefined;
+  const unitStats = unitStatsData?.data as UnitStats | undefined;
 
   const updateMutation = useMutation({
     mutationFn: (data: typeof editForm) => employeesApi.update(id!, data),
@@ -154,7 +270,7 @@ export default function EmployeeDetail() {
               </div>
               <div>
                 <p className="text-sm text-slate-400">Abteilung</p>
-                <p className="text-white font-medium">{employee.department}</p>
+                <p className="text-white font-medium">{employee.department || '-'}</p>
               </div>
               <div>
                 <p className="text-sm text-slate-400">Eingestellt am</p>
@@ -172,6 +288,154 @@ export default function EmployeeDetail() {
             <p className="text-slate-300">{employee.notes}</p>
           </div>
         )}
+      </div>
+
+      {/* Statistik-Karten */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Beförderungen */}
+        <div className="card p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-green-500/20 rounded-lg">
+              <TrendingUp className="h-5 w-5 text-green-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">{promotions.length}</p>
+              <p className="text-sm text-slate-400">Beförderungen</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Sonderzahlungen Total */}
+        <div className="card p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-yellow-500/20 rounded-lg">
+              <DollarSign className="h-5 w-5 text-yellow-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">
+                ${(bonusStats?.totalEarned || 0).toLocaleString()}
+              </p>
+              <p className="text-sm text-slate-400">Sonderzahlungen erhalten</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Unit-Aktivitäten */}
+        <div className="card p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-500/20 rounded-lg">
+              <Briefcase className="h-5 w-5 text-purple-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">
+                {unitStats ? (
+                  unitStats.stats.academy.total +
+                  unitStats.stats.internalAffairs.total +
+                  unitStats.stats.detective.total +
+                  unitStats.stats.humanResources.total
+                ) : 0}
+              </p>
+              <p className="text-sm text-slate-400">Unit-Aktivitäten</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Zwei-Spalten-Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Beförderungshistorie */}
+        <div className="card">
+          <div className="card-header flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-green-400" />
+            <h3 className="font-semibold text-white">Beförderungshistorie</h3>
+          </div>
+          <div className="card-body">
+            {promotions.length === 0 ? (
+              <p className="text-slate-400 text-center py-4">Keine Beförderungen vorhanden</p>
+            ) : (
+              <div className="space-y-3">
+                {promotions.map((promotion) => (
+                  <div
+                    key={promotion.id}
+                    className="p-3 bg-slate-700/50 rounded-lg border border-slate-600"
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-slate-400">{promotion.oldRank}</span>
+                      <ArrowUp className="h-4 w-4 text-green-400" />
+                      <span className="text-green-400 font-medium">{promotion.newRank}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>{formatDate(promotion.promotedAt)}</span>
+                      <span>
+                        von {promotion.promotedBy.displayName || promotion.promotedBy.username}
+                      </span>
+                    </div>
+                    {promotion.reason && (
+                      <p className="text-xs text-slate-400 mt-2">{promotion.reason}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Letzte Sonderzahlungen */}
+        <div className="card">
+          <div className="card-header flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-yellow-400" />
+              <h3 className="font-semibold text-white">Letzte Sonderzahlungen</h3>
+            </div>
+            {bonusStats && bonusStats.totalPending > 0 && (
+              <span className="text-xs text-yellow-400">
+                ${bonusStats.totalPending.toLocaleString()} offen
+              </span>
+            )}
+          </div>
+          <div className="card-body">
+            {bonusPayments.length === 0 ? (
+              <p className="text-slate-400 text-center py-4">Keine Sonderzahlungen vorhanden</p>
+            ) : (
+              <div className="space-y-2">
+                {bonusPayments.map((payment) => (
+                  <div
+                    key={payment.id}
+                    className="p-3 bg-slate-700/50 rounded-lg border border-slate-600 flex items-center justify-between"
+                  >
+                    <div>
+                      <p className="text-sm text-white">{payment.config.displayName}</p>
+                      <p className="text-xs text-slate-500">
+                        {formatDateTime(payment.createdAt)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-yellow-400">
+                        ${payment.amount.toLocaleString()}
+                      </p>
+                      <span
+                        className={clsx(
+                          'text-xs px-1.5 py-0.5 rounded',
+                          payment.status === 'PAID'
+                            ? 'bg-green-500/20 text-green-400'
+                            : payment.status === 'PENDING'
+                            ? 'bg-yellow-500/20 text-yellow-400'
+                            : 'bg-slate-500/20 text-slate-400'
+                        )}
+                      >
+                        {payment.status === 'PAID'
+                          ? 'Bezahlt'
+                          : payment.status === 'PENDING'
+                          ? 'Offen'
+                          : 'Storniert'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Abmeldungen */}
@@ -235,6 +499,132 @@ export default function EmployeeDetail() {
           )}
         </div>
       </div>
+
+      {/* Unit-Statistiken */}
+      {unitStats && (
+        <div className="card">
+          <div className="card-header flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-purple-400" />
+              <h3 className="font-semibold text-white">Unit-Aktivitäten</h3>
+            </div>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setUnitStatsPeriod('week')}
+                className={clsx(
+                  'px-3 py-1 text-xs rounded-md transition-colors',
+                  unitStatsPeriod === 'week'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                )}
+              >
+                Woche
+              </button>
+              <button
+                onClick={() => setUnitStatsPeriod('month')}
+                className={clsx(
+                  'px-3 py-1 text-xs rounded-md transition-colors',
+                  unitStatsPeriod === 'month'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                )}
+              >
+                Monat
+              </button>
+              <button
+                onClick={() => setUnitStatsPeriod('all')}
+                className={clsx(
+                  'px-3 py-1 text-xs rounded-md transition-colors',
+                  unitStatsPeriod === 'all'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                )}
+              >
+                Gesamt
+              </button>
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Academy */}
+              <div className="p-4 bg-slate-700/50 rounded-lg border border-slate-600">
+                <div className="flex items-center gap-2 mb-3">
+                  <GraduationCap className="h-5 w-5 text-blue-400" />
+                  <h4 className="font-medium text-white">Police Academy</h4>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Schulungen durchgeführt</span>
+                    <span className="text-white">{unitStats.stats.academy.trainingsCompleted}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Prüfungen abgenommen</span>
+                    <span className="text-white">{unitStats.stats.academy.examsGiven}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Schulungen besucht</span>
+                    <span className="text-white">{unitStats.stats.academy.trainingsParticipated}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Internal Affairs */}
+              <div className="p-4 bg-slate-700/50 rounded-lg border border-slate-600">
+                <div className="flex items-center gap-2 mb-3">
+                  <ShieldAlert className="h-5 w-5 text-red-400" />
+                  <h4 className="font-medium text-white">Internal Affairs</h4>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Ermittlungen eröffnet</span>
+                    <span className="text-white">{unitStats.stats.internalAffairs.investigationsOpened}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Ermittlungen abgeschlossen</span>
+                    <span className="text-white">{unitStats.stats.internalAffairs.investigationsClosed}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Unit-Überprüfungen</span>
+                    <span className="text-white">{unitStats.stats.internalAffairs.unitReviews}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detective */}
+              <div className="p-4 bg-slate-700/50 rounded-lg border border-slate-600">
+                <div className="flex items-center gap-2 mb-3">
+                  <Search className="h-5 w-5 text-orange-400" />
+                  <h4 className="font-medium text-white">Detektive</h4>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Akten eröffnet</span>
+                    <span className="text-white">{unitStats.stats.detective.casesOpened}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Akten abgeschlossen</span>
+                    <span className="text-white">{unitStats.stats.detective.casesClosed}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Human Resources */}
+              <div className="p-4 bg-slate-700/50 rounded-lg border border-slate-600">
+                <div className="flex items-center gap-2 mb-3">
+                  <Users className="h-5 w-5 text-green-400" />
+                  <h4 className="font-medium text-white">Human Resources</h4>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Bewerbungen bearbeitet</span>
+                    <span className="text-white">{unitStats.stats.humanResources.applicationsProcessed}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Modal */}
       {isEditModalOpen && (

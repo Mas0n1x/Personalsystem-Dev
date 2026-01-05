@@ -1,16 +1,117 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
-import { Bell, LogOut, User, ChevronDown, Wifi, WifiOff } from 'lucide-react';
+import { notificationsApi } from '../../services/api';
+import {
+  Bell,
+  LogOut,
+  User,
+  ChevronDown,
+  Wifi,
+  WifiOff,
+  Check,
+  CheckCheck,
+  Trash2,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  DollarSign,
+  Car,
+  Users,
+  Award,
+} from 'lucide-react';
 import clsx from 'clsx';
+import { formatDistanceToNow } from 'date-fns';
+import { de } from 'date-fns/locale';
+
+interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  data: string | null;
+  isRead: boolean;
+  readAt: string | null;
+  createdAt: string;
+}
+
+const getNotificationIcon = (type: string) => {
+  switch (type) {
+    case 'PROMOTION':
+      return <TrendingUp className="h-5 w-5 text-green-400" />;
+    case 'DEMOTION':
+      return <TrendingDown className="h-5 w-5 text-red-400" />;
+    case 'SANCTION':
+      return <AlertTriangle className="h-5 w-5 text-orange-400" />;
+    case 'BONUS':
+      return <DollarSign className="h-5 w-5 text-yellow-400" />;
+    case 'TUNING':
+      return <Car className="h-5 w-5 text-blue-400" />;
+    case 'UNIT_CHANGE':
+      return <Users className="h-5 w-5 text-purple-400" />;
+    case 'UNIT_PROMOTION':
+      return <Award className="h-5 w-5 text-cyan-400" />;
+    default:
+      return <Bell className="h-5 w-5 text-slate-400" />;
+  }
+};
 
 export default function Header() {
   const { user, logout } = useAuth();
   const { isConnected, onlineUsers } = useSocket();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showOnlineUsers, setShowOnlineUsers] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const onlineMenuRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
+
+  // Benachrichtigungen laden
+  const { data: notificationsData } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => notificationsApi.getAll({ limit: 20 }),
+    refetchInterval: 30000, // Alle 30 Sekunden aktualisieren
+  });
+
+  const { data: unreadCountData } = useQuery({
+    queryKey: ['notifications-unread-count'],
+    queryFn: () => notificationsApi.getUnreadCount(),
+    refetchInterval: 15000, // Alle 15 Sekunden aktualisieren
+  });
+
+  const notifications = (notificationsData?.data || []) as Notification[];
+  const unreadCount = (unreadCountData?.data?.count || 0) as number;
+
+  // Mutation: Als gelesen markieren
+  const markAsReadMutation = useMutation({
+    mutationFn: notificationsApi.markAsRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+    },
+  });
+
+  // Mutation: Alle als gelesen markieren
+  const markAllAsReadMutation = useMutation({
+    mutationFn: notificationsApi.markAllAsRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+    },
+  });
+
+  // Mutation: Benachrichtigung löschen
+  const deleteMutation = useMutation({
+    mutationFn: notificationsApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+    },
+  });
 
   // Außerhalb klicken schließt Menüs
   useEffect(() => {
@@ -20,6 +121,9 @@ export default function Header() {
       }
       if (onlineMenuRef.current && !onlineMenuRef.current.contains(event.target as Node)) {
         setShowOnlineUsers(false);
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
       }
     }
 
@@ -101,11 +205,106 @@ export default function Header() {
         </div>
 
         {/* Notifications */}
-        <button className="relative p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
-          <Bell className="h-5 w-5" />
-          {/* Badge für ungelesene Benachrichtigungen */}
-          {/* <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full" /> */}
-        </button>
+        <div className="relative" ref={notificationsRef}>
+          <button
+            onClick={() => setShowNotifications(!showNotifications)}
+            className={clsx(
+              'relative p-2 rounded-lg transition-colors',
+              showNotifications
+                ? 'text-white bg-slate-700'
+                : 'text-slate-400 hover:text-white hover:bg-slate-700'
+            )}
+          >
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center bg-red-500 text-white text-xs font-bold rounded-full">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+
+          {showNotifications && (
+            <div className="absolute right-0 mt-2 w-96 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 animate-fade-in">
+              <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+                <p className="text-sm font-medium text-white">Benachrichtigungen</p>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={() => markAllAsReadMutation.mutate()}
+                    className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1"
+                  >
+                    <CheckCheck className="h-3 w-3" />
+                    Alle gelesen
+                  </button>
+                )}
+              </div>
+              <div className="max-h-96 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <div className="px-4 py-8 text-center">
+                    <Bell className="h-10 w-10 text-slate-600 mx-auto mb-2" />
+                    <p className="text-sm text-slate-400">Keine Benachrichtigungen</p>
+                  </div>
+                ) : (
+                  notifications.map((notification) => (
+                    <div
+                      key={notification.id}
+                      className={clsx(
+                        'px-4 py-3 border-b border-slate-700/50 hover:bg-slate-700/50 transition-colors',
+                        !notification.isRead && 'bg-slate-700/30'
+                      )}
+                    >
+                      <div className="flex gap-3">
+                        <div className="flex-shrink-0 mt-0.5">
+                          {getNotificationIcon(notification.type)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={clsx(
+                            'text-sm font-medium',
+                            notification.isRead ? 'text-slate-300' : 'text-white'
+                          )}>
+                            {notification.title}
+                          </p>
+                          <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">
+                            {notification.message}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            {formatDistanceToNow(new Date(notification.createdAt), {
+                              addSuffix: true,
+                              locale: de,
+                            })}
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0 flex flex-col gap-1">
+                          {!notification.isRead && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markAsReadMutation.mutate(notification.id);
+                              }}
+                              className="p-1 text-slate-400 hover:text-green-400 transition-colors"
+                              title="Als gelesen markieren"
+                            >
+                              <Check className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteMutation.mutate(notification.id);
+                            }}
+                            className="p-1 text-slate-400 hover:text-red-400 transition-colors"
+                            title="Löschen"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* User Menu */}
         <div className="relative" ref={userMenuRef}>
@@ -142,7 +341,19 @@ export default function Header() {
                 <p className="text-xs text-slate-400">@{user?.username}</p>
               </div>
               <div className="py-1">
-                <button className="dropdown-item w-full text-left">
+                <button
+                  onClick={() => {
+                    if (user?.employee?.id) {
+                      navigate(`/employees/${user.employee.id}`);
+                      setShowUserMenu(false);
+                    }
+                  }}
+                  disabled={!user?.employee?.id}
+                  className={clsx(
+                    'dropdown-item w-full text-left',
+                    !user?.employee?.id && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
                   <User className="h-4 w-4" />
                   Mein Profil
                 </button>

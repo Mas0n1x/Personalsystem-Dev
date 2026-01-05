@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { notifyBonus } from '../services/notificationService.js';
 
 const router = Router();
 
@@ -457,6 +458,20 @@ router.put('/payments/pay-employee/:employeeId', authMiddleware, requirePermissi
       weekEnd = bounds.weekEnd;
     }
 
+    // Zuerst offene Zahlungen holen für Notification
+    const pendingPayments = await prisma.bonusPayment.findMany({
+      where: {
+        employeeId,
+        weekStart,
+        weekEnd,
+        status: 'PENDING',
+      },
+      include: {
+        employee: { select: { userId: true } },
+        config: { select: { displayName: true } },
+      },
+    });
+
     const result = await prisma.bonusPayment.updateMany({
       where: {
         employeeId,
@@ -470,6 +485,24 @@ router.put('/payments/pay-employee/:employeeId', authMiddleware, requirePermissi
         paidById: userId,
       },
     });
+
+    // Benachrichtigung senden wenn Zahlungen vorhanden
+    if (pendingPayments.length > 0 && result.count > 0) {
+      const totalAmount = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
+      const paidByUser = await prisma.user.findUnique({
+        where: { id: userId! },
+        select: { displayName: true, username: true },
+      });
+      const paidByName = paidByUser?.displayName || paidByUser?.username || 'Unbekannt';
+      const reasons = pendingPayments.map(p => p.config.displayName).join(', ');
+
+      await notifyBonus(
+        pendingPayments[0].employee.userId,
+        totalAmount,
+        reasons,
+        paidByName
+      );
+    }
 
     res.json({ success: true, updated: result.count });
   } catch (error) {

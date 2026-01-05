@@ -43,7 +43,12 @@
       "Bash(cmd //c \"taskkill /F /PID 43264\")",
       "Bash(cmd //c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && npx prisma generate\")",
       "Bash(cmd //c \"taskkill /PID 6904 /F\")",
-      "Bash(cmd //c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && npx prisma generate && npx prisma db push\")"
+      "Bash(cmd //c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && npx prisma generate && npx prisma db push\")",
+      "Bash(cmd //c \"taskkill /PID 53944 /F\")",
+      "Bash(cmd //c \"tasklist | findstr node\")",
+      "Bash(cmd //c \"taskkill /PID 32360 /F\")",
+      "Bash(cmd //c \"taskkill /PID 42108 /F\")",
+      "Bash(cmd //c \"taskkill /PID 7228 /F\")"
     ]
   }
 }

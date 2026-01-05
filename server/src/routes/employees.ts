@@ -13,6 +13,7 @@ import {
   findFreeBadgeNumber,
   getTeamConfigForLevel
 } from '../services/discordBot.js';
+import { notifyPromotion, notifyDemotion, notifyUnitChange } from '../services/notificationService.js';
 
 const router = Router();
 
@@ -235,6 +236,9 @@ router.post('/:id/units', authMiddleware, requirePermission('employees.edit'), a
       return;
     }
 
+    // Alte Units für Vergleich speichern
+    const oldDepartment = employee.department;
+
     const result = await setUnitRoles(employee.user.discordId, unitRoleIds || []);
 
     if (!result.success) {
@@ -249,6 +253,15 @@ router.post('/:id/units', authMiddleware, requirePermission('employees.edit'), a
       include: { user: true },
     });
 
+    // Benachrichtigung bei Unit-Änderung senden
+    if (updatedEmployee && updatedEmployee.department !== oldDepartment) {
+      await notifyUnitChange(
+        updatedEmployee.userId,
+        oldDepartment || null,
+        updatedEmployee.department || 'Keine Unit'
+      );
+    }
+
     res.json({
       success: true,
       employee: updatedEmployee,
@@ -256,6 +269,235 @@ router.post('/:id/units', authMiddleware, requirePermission('employees.edit'), a
   } catch (error) {
     console.error('Set units error:', error);
     res.status(500).json({ error: 'Fehler beim Setzen der Units' });
+  }
+});
+
+// Beförderungshistorie eines Mitarbeiters
+router.get('/:id/promotions', authMiddleware, requirePermission('employees.view'), async (req: AuthRequest, res: Response) => {
+  try {
+    const promotions = await prisma.promotionArchive.findMany({
+      where: { employeeId: req.params.id },
+      include: {
+        promotedBy: {
+          select: {
+            displayName: true,
+            username: true,
+          },
+        },
+      },
+      orderBy: { promotedAt: 'desc' },
+      take: 10, // Letzte 10 Beförderungen
+    });
+
+    res.json(promotions);
+  } catch (error) {
+    console.error('Get employee promotions error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Beförderungen' });
+  }
+});
+
+// Sonderzahlungen eines Mitarbeiters (alle Zeit)
+router.get('/:id/bonuses', authMiddleware, requirePermission('employees.view'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { limit = '20' } = req.query;
+
+    const payments = await prisma.bonusPayment.findMany({
+      where: { employeeId: req.params.id },
+      include: {
+        config: {
+          select: {
+            displayName: true,
+            category: true,
+            activityType: true,
+          },
+        },
+        paidBy: {
+          select: {
+            displayName: true,
+            username: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: parseInt(limit as string),
+    });
+
+    // Statistiken berechnen
+    const allPayments = await prisma.bonusPayment.findMany({
+      where: { employeeId: req.params.id },
+      include: { config: true },
+    });
+
+    const stats = {
+      totalEarned: allPayments.filter(p => p.status === 'PAID').reduce((sum, p) => sum + p.amount, 0),
+      totalPending: allPayments.filter(p => p.status === 'PENDING').reduce((sum, p) => sum + p.amount, 0),
+      paymentCount: allPayments.length,
+      byCategory: {} as Record<string, { count: number; amount: number }>,
+    };
+
+    // Nach Kategorie gruppieren
+    for (const payment of allPayments) {
+      const category = payment.config.category;
+      if (!stats.byCategory[category]) {
+        stats.byCategory[category] = { count: 0, amount: 0 };
+      }
+      stats.byCategory[category].count++;
+      if (payment.status === 'PAID') {
+        stats.byCategory[category].amount += payment.amount;
+      }
+    }
+
+    res.json({ payments, stats });
+  } catch (error) {
+    console.error('Get employee bonuses error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Sonderzahlungen' });
+  }
+});
+
+// Unit-Aktivitätsstatistiken eines Mitarbeiters
+router.get('/:id/unit-stats', authMiddleware, requirePermission('employees.view'), async (req: AuthRequest, res: Response) => {
+  try {
+    const employeeId = req.params.id;
+    const period = req.query.period as string | undefined; // 'week', 'month', 'all'
+
+    // Hole den Mitarbeiter für die Unit-Zuordnung und User-ID
+    const employee = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { department: true, userId: true },
+    });
+
+    if (!employee) {
+      res.status(404).json({ error: 'Mitarbeiter nicht gefunden' });
+      return;
+    }
+
+    const userId = employee.userId;
+    const departments = (employee.department || '').split(',').map(d => d.trim()).filter(Boolean);
+
+    // Zeitfilter berechnen
+    let dateFilter: { gte: Date } | undefined;
+    if (period === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      dateFilter = { gte: weekAgo };
+    } else if (period === 'month') {
+      const monthAgo = new Date();
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      dateFilter = { gte: monthAgo };
+    }
+    // period === 'all' oder undefined => kein Filter
+
+    // Hole alle relevanten Statistiken
+    const [
+      trainingsCompleted,
+      trainingsParticipated,
+      investigationsOpened,
+      investigationsClosed,
+      casesOpened,
+      casesClosed,
+      unitReviews,
+      applicationsProcessed,
+      examsGiven,
+    ] = await Promise.all([
+      // Academy: Durchgeführte Trainings (als Instructor)
+      prisma.training.count({
+        where: {
+          instructorId: userId,
+          status: 'COMPLETED',
+          ...(dateFilter && { updatedAt: dateFilter }),
+        },
+      }),
+      // Academy: Teilgenommene Trainings
+      prisma.trainingParticipant.count({
+        where: {
+          employeeId,
+          status: 'COMPLETED',
+          ...(dateFilter && { updatedAt: dateFilter }),
+        },
+      }),
+      // IA: Ermittlungen eröffnet (als Lead Investigator)
+      prisma.investigation.count({
+        where: {
+          leadInvestigatorId: userId,
+          ...(dateFilter && { createdAt: dateFilter }),
+        },
+      }),
+      // IA: Ermittlungen abgeschlossen (als Lead Investigator)
+      prisma.investigation.count({
+        where: {
+          leadInvestigatorId: userId,
+          status: 'CLOSED',
+          ...(dateFilter && { closedAt: dateFilter }),
+        },
+      }),
+      // Detective: Akten eröffnet
+      prisma.case.count({
+        where: {
+          createdById: userId,
+          ...(dateFilter && { createdAt: dateFilter }),
+        },
+      }),
+      // Detective: Akten abgeschlossen
+      prisma.case.count({
+        where: {
+          createdById: userId,
+          status: 'CLOSED',
+          ...(dateFilter && { closedAt: dateFilter }),
+        },
+      }),
+      // QA: Unit Reviews durchgeführt
+      prisma.unitReview.count({
+        where: {
+          reviewerId: userId,
+          ...(dateFilter && { createdAt: dateFilter }),
+        },
+      }),
+      // HR: Bewerbungen bearbeitet
+      prisma.application.count({
+        where: {
+          processedById: userId,
+          status: { in: ['COMPLETED', 'REJECTED'] },
+          ...(dateFilter && { processedAt: dateFilter }),
+        },
+      }),
+      // Academy: Prüfungen abgenommen
+      prisma.academyExam.count({
+        where: {
+          examinerId: userId,
+          ...(dateFilter && { createdAt: dateFilter }),
+        },
+      }),
+    ]);
+
+    res.json({
+      departments,
+      stats: {
+        academy: {
+          trainingsCompleted,
+          trainingsParticipated,
+          examsGiven,
+          total: trainingsCompleted + examsGiven,
+        },
+        internalAffairs: {
+          investigationsOpened,
+          investigationsClosed,
+          unitReviews,
+          total: investigationsOpened + unitReviews,
+        },
+        detective: {
+          casesOpened,
+          casesClosed,
+          total: casesOpened,
+        },
+        humanResources: {
+          applicationsProcessed,
+          total: applicationsProcessed,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Get employee unit stats error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Unit-Statistiken' });
   }
 });
 
@@ -333,6 +575,20 @@ router.post('/:id/uprank', authMiddleware, requirePermission('employees.edit'), 
 
     await syncDiscordMembers();
 
+    // Benachrichtigung an den beförderten Mitarbeiter senden
+    const promotedByUser = await prisma.user.findUnique({
+      where: { id: req.userId! },
+      select: { displayName: true, username: true },
+    });
+    const promotedByName = promotedByUser?.displayName || promotedByUser?.username || 'Unbekannt';
+
+    await notifyPromotion(
+      updatedEmployee.userId,
+      oldRank,
+      result.newRank!,
+      promotedByName
+    );
+
     res.json({
       success: true,
       employee: updatedEmployee,
@@ -359,6 +615,9 @@ router.post('/:id/downrank', authMiddleware, requirePermission('employees.edit')
       res.status(404).json({ error: 'Mitarbeiter nicht gefunden' });
       return;
     }
+
+    // Alten Rang für Notification speichern
+    const oldRank = employee.rank;
 
     const result = await changeRank(employee.user.discordId, 'down');
 
@@ -403,6 +662,21 @@ router.post('/:id/downrank', authMiddleware, requirePermission('employees.edit')
     });
 
     await syncDiscordMembers();
+
+    // Benachrichtigung an den degradierten Mitarbeiter senden
+    const demotedByUser = await prisma.user.findUnique({
+      where: { id: req.userId! },
+      select: { displayName: true, username: true },
+    });
+    const demotedByName = demotedByUser?.displayName || demotedByUser?.username || 'Unbekannt';
+
+    await notifyDemotion(
+      updatedEmployee.userId,
+      oldRank,
+      result.newRank!,
+      demotedByName,
+      req.body.reason
+    );
 
     res.json({
       success: true,

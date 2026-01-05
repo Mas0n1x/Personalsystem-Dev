@@ -58,6 +58,7 @@ model User {
   paidBonuses          BonusPayment[] @relation("BonusPaymentPaidBy")
   promotedEmployees    PromotionArchive[] @relation("PromotionArchivePromotedBy")
   terminatedEmployees  TerminationArchive[] @relation("TerminationArchiveTerminatedBy")
+  notifications        Notification[] @relation("NotificationUser")
 
   @@map("users")
 }
@@ -921,6 +922,26 @@ model BonusWeek {
   @@unique([weekStart, weekEnd])
   @@index([status])
   @@map("bonus_weeks")
+}
+
+// ==================== BENACHRICHTIGUNGEN ====================
+
+model Notification {
+  id          String    @id @default(cuid())
+  userId      String                              // Empfänger der Benachrichtigung
+  user        User      @relation("NotificationUser", fields: [userId], references: [id], onDelete: Cascade)
+  type        String                              // PROMOTION, DEMOTION, SANCTION, BONUS, TUNING, UNIT_CHANGE, UNIT_PROMOTION
+  title       String                              // Titel der Benachrichtigung
+  message     String                              // Nachrichtentext
+  data        String?                             // JSON-Daten für zusätzliche Informationen
+  isRead      Boolean   @default(false)
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
 }
 
 // ==================== ARCHIV SYSTEM ====================
