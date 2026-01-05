@@ -453,12 +453,12 @@ router.get('/:id/unit-stats', authMiddleware, requirePermission('employees.view'
           ...(dateFilter && { updatedAt: dateFilter }),
         },
       }),
-      // Academy: Teilgenommene Trainings
+      // Academy: Teilgenommene Trainings (ATTENDED status)
       prisma.trainingParticipant.count({
         where: {
           employeeId,
-          status: 'COMPLETED',
-          ...(dateFilter && { updatedAt: dateFilter }),
+          status: 'ATTENDED',
+          ...(dateFilter && { attendedAt: dateFilter }),
         },
       }),
       // IA: Ermittlungen eröffnet (als Lead Investigator)

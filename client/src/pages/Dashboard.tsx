@@ -551,9 +551,9 @@ export default function Dashboard() {
               <DollarSign className="h-5 w-5 text-emerald-400" />
               Sonderzahlungen diese Woche
             </h2>
-            {weeklyBonusData?.totals && (
+            {weeklyBonusData?.totals?.total !== undefined && (
               <span className="px-2.5 py-1 text-xs font-medium bg-emerald-500/20 text-emerald-400 rounded-full">
-                ${weeklyBonusData.totals.total.toLocaleString()}
+                ${(weeklyBonusData.totals.total || 0).toLocaleString()}
               </span>
             )}
           </div>
@@ -588,9 +588,9 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div className="text-right ml-4">
-                        <p className="font-bold text-emerald-400">${employee.totalAmount.toLocaleString()}</p>
-                        {employee.pendingAmount > 0 && (
-                          <p className="text-xs text-amber-400">${employee.pendingAmount.toLocaleString()} offen</p>
+                        <p className="font-bold text-emerald-400">${(employee.totalAmount || 0).toLocaleString()}</p>
+                        {(employee.pendingAmount || 0) > 0 && (
+                          <p className="text-xs text-amber-400">${(employee.pendingAmount || 0).toLocaleString()} offen</p>
                         )}
                       </div>
                     </div>
