@@ -430,7 +430,9 @@ export default function Employees() {
           <div className="flex-1 min-w-[200px]">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <label htmlFor="employee-search" className="sr-only">Mitarbeiter suchen</label>
               <input
+                id="employee-search"
                 type="text"
                 placeholder="Suchen..."
                 value={search}
@@ -440,7 +442,9 @@ export default function Employees() {
             </div>
           </div>
 
+          <label htmlFor="department-filter" className="sr-only">Abteilung filtern</label>
           <select
+            id="department-filter"
             value={department}
             onChange={(e) => setDepartment(e.target.value)}
             className="input w-auto"
@@ -478,7 +482,9 @@ export default function Employees() {
         {/* Erweiterte Filter */}
         {showMoreFilters && (
           <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-slate-700">
+            <label htmlFor="rank-filter" className="sr-only">Rang filtern</label>
             <select
+              id="rank-filter"
               value={rank}
               onChange={(e) => setRank(e.target.value)}
               className="input w-auto"
@@ -503,7 +509,9 @@ export default function Employees() {
               <option value="Chief">Chief</option>
             </select>
 
+            <label htmlFor="team-filter" className="sr-only">Team filtern</label>
             <select
+              id="team-filter"
               value={team}
               onChange={(e) => setTeam(e.target.value)}
               className="input w-auto"
@@ -670,10 +678,11 @@ export default function Employees() {
               </p>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">
+                <label htmlFor="terminate-reason" className="block text-sm font-medium text-slate-300 mb-1">
                   Kündigungsgrund (optional)
                 </label>
                 <textarea
+                  id="terminate-reason"
                   value={terminateReason}
                   onChange={(e) => setTerminateReason(e.target.value)}
                   className="input w-full h-24 resize-none"

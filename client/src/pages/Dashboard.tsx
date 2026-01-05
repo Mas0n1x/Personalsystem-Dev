@@ -14,7 +14,6 @@ import {
   TrendingDown,
   Award,
   Shield,
-  Clock,
   AlertCircle,
   ChevronRight,
   Activity,
@@ -68,19 +67,25 @@ interface MyBonusData {
   weekEnd: string;
 }
 
-interface RecentActivity {
-  id: string;
-  action: string;
-  resource: string;
-  resourceId: string | null;
-  details: string | null;
-  createdAt: string;
-  user: {
-    id: string;
-    username: string;
-    displayName: string | null;
-    avatar: string | null;
+interface WeeklyBonusSummary {
+  employeeId: string;
+  employeeName: string;
+  totalAmount: number;
+  pendingAmount: number;
+  paidAmount: number;
+  activities: { type: string; displayName: string; amount: number; count: number }[];
+}
+
+interface WeeklyBonusData {
+  weekStart: string;
+  weekEnd: string;
+  totals: {
+    total: number;
+    pending: number;
+    paid: number;
+    employeeCount: number;
   };
+  byEmployee: WeeklyBonusSummary[];
 }
 
 interface TeamDistribution {
@@ -264,8 +269,17 @@ export default function Dashboard() {
     refetchInterval: 60000,
   });
 
+  const { data: weeklyBonusData } = useQuery({
+    queryKey: ['weekly-bonus-summary'],
+    queryFn: async () => {
+      const res = await bonusApi.getSummary({ week: 'current' });
+      return res.data as WeeklyBonusData;
+    },
+    refetchInterval: 60000,
+    enabled: canViewAllBonuses,
+  });
+
   const stats = statsData?.stats;
-  const recentActivity = statsData?.recentActivity || [];
   const teamDistribution = statsData?.teamDistribution || [];
   const activeAbsences = activeAbsencesData?.data as ActiveAbsence[] | undefined;
   const myBonus = myBonusData;
@@ -282,32 +296,6 @@ export default function Dashboard() {
 
   const getTeamColor = (team: string) => {
     return teamColors[team] || 'bg-slate-500';
-  };
-
-  // Formatiere Aktivitäts-Text
-  const formatActivity = (activity: RecentActivity) => {
-    const actionMap: Record<string, string> = {
-      'CREATE': 'erstellt',
-      'UPDATE': 'aktualisiert',
-      'DELETE': 'gelöscht',
-      'PROMOTE': 'befördert',
-      'DEMOTE': 'degradiert',
-      'TERMINATE': 'gekündigt',
-      'LOGIN': 'eingeloggt',
-    };
-    return actionMap[activity.action] || activity.action;
-  };
-
-  const formatResource = (resource: string) => {
-    const resourceMap: Record<string, string> = {
-      'EMPLOYEE': 'Mitarbeiter',
-      'USER': 'Benutzer',
-      'PROMOTION': 'Beförderung',
-      'ABSENCE': 'Abmeldung',
-      'BONUS': 'Sonderzahlung',
-      'APPLICATION': 'Bewerbung',
-    };
-    return resourceMap[resource] || resource;
   };
 
   if (isLoading) {
@@ -554,52 +542,69 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Unterer Bereich: Aktivität & Abmeldungen */}
+      {/* Unterer Bereich: Sonderzahlungen & Abmeldungen */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Letzte Aktivitäten */}
+        {/* Sonderzahlungen dieser Woche */}
         <div className="card overflow-hidden">
           <div className="card-header flex items-center justify-between border-b border-slate-700/50">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Clock className="h-5 w-5 text-blue-400" />
-              Letzte Aktivitäten
+              <DollarSign className="h-5 w-5 text-emerald-400" />
+              Sonderzahlungen diese Woche
             </h2>
-          </div>
-          <div className="divide-y divide-slate-700/50">
-            {recentActivity.length === 0 ? (
-              <p className="text-slate-400 text-center py-8">Keine Aktivitäten</p>
-            ) : (
-              recentActivity.map((activity) => (
-                <div key={activity.id} className="p-4 hover:bg-slate-750/50 transition-colors">
-                  <div className="flex items-start gap-3">
-                    <img
-                      src={activity.user?.avatar || `https://ui-avatars.com/api/?name=${activity.user?.username || 'System'}&background=random`}
-                      alt={activity.user?.username || 'System'}
-                      className="h-9 w-9 rounded-full"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white">
-                        <span className="font-medium">{activity.user?.displayName || activity.user?.username || 'System'}</span>
-                        <span className="text-slate-400"> hat </span>
-                        <span className="text-slate-300">{formatResource(activity.resource)}</span>
-                        <span className="text-slate-400"> {formatActivity(activity)}</span>
-                      </p>
-                      {activity.details && (
-                        <p className="text-xs text-slate-500 mt-0.5 truncate">{activity.details}</p>
-                      )}
-                      <p className="text-xs text-slate-500 mt-1">
-                        {new Date(activity.createdAt).toLocaleString('de-DE', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))
+            {weeklyBonusData?.totals && (
+              <span className="px-2.5 py-1 text-xs font-medium bg-emerald-500/20 text-emerald-400 rounded-full">
+                ${weeklyBonusData.totals.total.toLocaleString()}
+              </span>
             )}
           </div>
+          <div className="divide-y divide-slate-700/50 max-h-[400px] overflow-y-auto">
+            {!canViewAllBonuses ? (
+              <p className="text-slate-400 text-center py-8">Keine Berechtigung</p>
+            ) : !weeklyBonusData?.byEmployee?.length ? (
+              <p className="text-slate-400 text-center py-8">Keine Sonderzahlungen diese Woche</p>
+            ) : (
+              weeklyBonusData.byEmployee
+                .sort((a, b) => b.totalAmount - a.totalAmount)
+                .slice(0, 10)
+                .map((employee) => (
+                  <div key={employee.employeeId} className="p-4 hover:bg-slate-750/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-white truncate">{employee.employeeName}</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {employee.activities.slice(0, 3).map((act, idx) => (
+                            <span
+                              key={idx}
+                              className="px-1.5 py-0.5 text-xs bg-slate-700/50 text-slate-300 rounded"
+                            >
+                              {act.count}x {act.displayName}
+                            </span>
+                          ))}
+                          {employee.activities.length > 3 && (
+                            <span className="px-1.5 py-0.5 text-xs bg-slate-700/50 text-slate-400 rounded">
+                              +{employee.activities.length - 3} mehr
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right ml-4">
+                        <p className="font-bold text-emerald-400">${employee.totalAmount.toLocaleString()}</p>
+                        {employee.pendingAmount > 0 && (
+                          <p className="text-xs text-amber-400">${employee.pendingAmount.toLocaleString()} offen</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+            )}
+          </div>
+          {canViewAllBonuses && weeklyBonusData?.byEmployee && weeklyBonusData.byEmployee.length > 10 && (
+            <div className="p-3 border-t border-slate-700/50 text-center">
+              <Link to="/bonus" className="text-sm text-blue-400 hover:text-blue-300">
+                Alle {weeklyBonusData.byEmployee.length} Mitarbeiter anzeigen →
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Aktive Abmeldungen */}
