@@ -572,13 +572,13 @@ export default function Dashboard() {
                 <div key={activity.id} className="p-4 hover:bg-slate-750/50 transition-colors">
                   <div className="flex items-start gap-3">
                     <img
-                      src={activity.user.avatar || `https://ui-avatars.com/api/?name=${activity.user.username}&background=random`}
-                      alt={activity.user.username}
+                      src={activity.user?.avatar || `https://ui-avatars.com/api/?name=${activity.user?.username || 'System'}&background=random`}
+                      alt={activity.user?.username || 'System'}
                       className="h-9 w-9 rounded-full"
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-white">
-                        <span className="font-medium">{activity.user.displayName || activity.user.username}</span>
+                        <span className="font-medium">{activity.user?.displayName || activity.user?.username || 'System'}</span>
                         <span className="text-slate-400"> hat </span>
                         <span className="text-slate-300">{formatResource(activity.resource)}</span>
                         <span className="text-slate-400"> {formatActivity(activity)}</span>

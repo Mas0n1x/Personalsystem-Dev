@@ -121,12 +121,12 @@ router.get('/', authMiddleware, requirePermission('employees.view'), async (req:
       ];
     }
 
-    console.log('Employee filter:', { search, department, rank, team, all, sortBy, where });
-
     // Wenn all=true, alle Mitarbeiter ohne Pagination laden
     const loadAll = all === 'true';
     const skip = loadAll ? undefined : (parseInt(page as string) - 1) * parseInt(limit as string);
     const take = loadAll ? undefined : parseInt(limit as string);
+
+    console.log('Employee filter:', { search, department, rank, team, all, sortBy, loadAll, skip, take, where });
 
     const [employees, total] = await Promise.all([
       prisma.employee.findMany({

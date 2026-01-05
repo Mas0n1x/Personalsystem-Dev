@@ -54,7 +54,14 @@
       "Bash(cmd /c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && npx prisma db push\")",
       "Bash(cmd /c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && npx prisma db push 2>&1\")",
       "Bash(cmd /c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && npm run dev\")",
-      "Bash(cmd.exe /c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && npm run dev\")"
+      "Bash(cmd.exe /c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && npm run dev\")",
+      "Bash(cmd.exe /c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\client && npm run dev\")",
+      "Bash(cmd.exe /c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server & npm run dev\")",
+      "Bash(start /B npm run dev)",
+      "Bash(cmd //c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && start npm run dev\")",
+      "Bash(cmd //c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\client && start npm run dev\")",
+      "Bash(cmd //c \"taskkill /F /IM node.exe 2>nul & timeout /t 2 /nobreak >nul & cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && start cmd /k npm run dev & timeout /t 2 /nobreak >nul & cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\client && start cmd /k npm run dev\")",
+      "Bash(cmd //c \"timeout /t 8 /nobreak >nul & tasklist | findstr node\")"
     ]
   }
 }

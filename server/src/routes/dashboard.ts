@@ -71,23 +71,22 @@ router.get('/stats', authMiddleware, async (_req: AuthRequest, res: Response) =>
       }),
 
       // Beförderungen diese Woche
-      prisma.promotion.count({
+      prisma.promotionArchive.count({
         where: {
-          createdAt: { gte: startOfWeek },
+          promotedAt: { gte: startOfWeek },
         },
       }),
 
       // Beförderungen diesen Monat
-      prisma.promotion.count({
+      prisma.promotionArchive.count({
         where: {
-          createdAt: { gte: startOfMonth },
+          promotedAt: { gte: startOfMonth },
         },
       }),
 
-      // Aktive Abmeldungen
+      // Aktive Abmeldungen (ohne status, da Absence kein status Feld hat)
       prisma.absence.count({
         where: {
-          status: 'APPROVED',
           startDate: { lte: now },
           endDate: { gte: now },
         },
@@ -130,9 +129,9 @@ router.get('/stats', authMiddleware, async (_req: AuthRequest, res: Response) =>
         },
       }),
 
-      // Team-Verteilung
+      // Team-Verteilung basierend auf rankLevel
       prisma.employee.groupBy({
-        by: ['team'],
+        by: ['rankLevel'],
         where: { status: 'ACTIVE' },
         _count: true,
       }),
@@ -172,10 +171,19 @@ router.get('/stats', authMiddleware, async (_req: AuthRequest, res: Response) =>
         activeUnitsCount,
       },
       recentActivity,
-      teamDistribution: teamDistribution.map(t => ({
-        team: t.team || 'Kein Team',
-        count: t._count,
-      })),
+      teamDistribution: (() => {
+        // RankLevel zu Team Mapping: 1-5=Green, 6-9=Silver, 10-12=Gold, 13-15=Red, 16-17=White
+        const teams: { [key: string]: number } = { Green: 0, Silver: 0, Gold: 0, Red: 0, White: 0 };
+        teamDistribution.forEach(t => {
+          const level = t.rankLevel || 0;
+          if (level >= 16) teams.White += t._count;
+          else if (level >= 13) teams.Red += t._count;
+          else if (level >= 10) teams.Gold += t._count;
+          else if (level >= 6) teams.Silver += t._count;
+          else if (level >= 1) teams.Green += t._count;
+        });
+        return Object.entries(teams).map(([team, count]) => ({ team, count }));
+      })(),
       rankDistribution: rankDistribution.map(r => ({
         rank: r.rank,
         count: r._count,
@@ -256,10 +264,10 @@ router.get('/my-overview', authMiddleware, async (req: AuthRequest, res: Respons
 
     // Hole zusätzliche Infos
     const [promotionCount, lastPromotion, bonusThisWeek] = await Promise.all([
-      prisma.promotion.count({ where: { employeeId: employee.id } }),
-      prisma.promotion.findFirst({
+      prisma.promotionArchive.count({ where: { employeeId: employee.id } }),
+      prisma.promotionArchive.findFirst({
         where: { employeeId: employee.id },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { promotedAt: 'desc' },
       }),
       prisma.bonusPayment.aggregate({
         where: {
@@ -278,7 +286,7 @@ router.get('/my-overview', authMiddleware, async (req: AuthRequest, res: Respons
         ...employee,
         promotionCount,
         daysSinceLastPromotion: lastPromotion
-          ? Math.floor((Date.now() - lastPromotion.createdAt.getTime()) / (1000 * 60 * 60 * 24))
+          ? Math.floor((Date.now() - lastPromotion.promotedAt.getTime()) / (1000 * 60 * 60 * 24))
           : null,
         bonusThisWeek: bonusThisWeek._sum.amount || 0,
         bonusCountThisWeek: bonusThisWeek._count,
