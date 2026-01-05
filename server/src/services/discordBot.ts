@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, EmbedBuilder, TextChannel, Guild, ChannelType, GuildMember } from 'discord.js';
 import { prisma } from '../index.js';
+import { setDiscordClient } from './discordAnnouncements.js';
 
 let client: Client | null = null;
 let guild: Guild | null = null;
@@ -187,6 +188,12 @@ export async function initializeDiscordBot(): Promise<void> {
 
   client.on('ready', async () => {
     console.log(`Discord Bot eingeloggt als ${client?.user?.tag}`);
+
+    // Discord Client für Announcements setzen
+    if (client) {
+      setDiscordClient(client);
+      console.log('[Discord Announcements] Client verbunden');
+    }
 
     // Debug: Zeige alle Server auf denen der Bot ist
     console.log(`Bot ist auf ${client?.guilds.cache.size} Server(n):`);

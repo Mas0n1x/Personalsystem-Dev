@@ -34,6 +34,7 @@ import academyRoutes from './routes/academy.js';
 import bonusRoutes from './routes/bonus.js';
 import archiveRoutes from './routes/archive.js';
 import notificationRoutes from './routes/notifications.js';
+import discordAnnouncementRoutes from './routes/discordAnnouncements.js';
 
 // Services
 import { initializeDiscordBot } from './services/discordBot.js';
@@ -96,6 +97,7 @@ app.use('/api/academy', academyRoutes);
 app.use('/api/bonus', bonusRoutes);
 app.use('/api/archive', archiveRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/discord-announcements', discordAnnouncementRoutes);
 
 // Error handling
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

@@ -48,7 +48,9 @@
       "Bash(cmd //c \"tasklist | findstr node\")",
       "Bash(cmd //c \"taskkill /PID 32360 /F\")",
       "Bash(cmd //c \"taskkill /PID 42108 /F\")",
-      "Bash(cmd //c \"taskkill /PID 7228 /F\")"
+      "Bash(cmd //c \"taskkill /PID 7228 /F\")",
+      "Bash(cd:*)",
+      "Bash(cmd //c \"taskkill /F /IM node.exe 2>nul\")"
     ]
   }
 }

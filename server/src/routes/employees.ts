@@ -14,6 +14,7 @@ import {
   getTeamConfigForLevel
 } from '../services/discordBot.js';
 import { notifyPromotion, notifyDemotion, notifyUnitChange } from '../services/notificationService.js';
+import { announcePromotion, announceDemotion, announceUnitChange, announceTermination } from '../services/discordAnnouncements.js';
 
 const router = Router();
 
@@ -260,6 +261,21 @@ router.post('/:id/units', authMiddleware, requirePermission('employees.edit'), a
         oldDepartment || null,
         updatedEmployee.department || 'Keine Unit'
       );
+
+      // Discord Announcement senden
+      const cleanName = (name: string | null) => {
+        if (!name) return null;
+        return name.replace(/^\[[A-Z]+-\d+\]\s*/, '').trim();
+      };
+      const pureName = cleanName(updatedEmployee.user.displayName) || updatedEmployee.user.username;
+
+      await announceUnitChange({
+        employeeName: pureName,
+        employeeAvatar: updatedEmployee.user.avatar,
+        previousUnit: oldDepartment || null,
+        newUnit: updatedEmployee.department || 'Keine Unit',
+        badgeNumber: updatedEmployee.badgeNumber,
+      });
     }
 
     res.json({
@@ -589,6 +605,17 @@ router.post('/:id/uprank', authMiddleware, requirePermission('employees.edit'), 
       promotedByName
     );
 
+    // Discord Announcement senden
+    await announcePromotion({
+      employeeName: pureName,
+      employeeAvatar: updatedEmployee.user.avatar,
+      oldRank: oldRank,
+      newRank: result.newRank!,
+      promotedBy: promotedByName,
+      reason: req.body.reason || null,
+      badgeNumber: updatedEmployee.badgeNumber,
+    });
+
     res.json({
       success: true,
       employee: updatedEmployee,
@@ -678,6 +705,17 @@ router.post('/:id/downrank', authMiddleware, requirePermission('employees.edit')
       req.body.reason
     );
 
+    // Discord Announcement senden
+    await announceDemotion({
+      employeeName: pureName,
+      employeeAvatar: updatedEmployee.user.avatar,
+      oldRank: oldRank,
+      newRank: result.newRank!,
+      demotedBy: demotedByName,
+      reason: req.body.reason || null,
+      badgeNumber: updatedEmployee.badgeNumber,
+    });
+
     res.json({
       success: true,
       employee: updatedEmployee,
@@ -735,6 +773,31 @@ router.post('/:id/terminate', authMiddleware, requirePermission('employees.delet
     await prisma.user.update({
       where: { id: employee.userId },
       data: { isActive: false },
+    });
+
+    // Discord Announcement senden
+    const terminatedByUser = await prisma.user.findUnique({
+      where: { id: req.userId! },
+      select: { displayName: true, username: true },
+    });
+    const terminatedByName = terminatedByUser?.displayName || terminatedByUser?.username || 'Unbekannt';
+
+    // Name ohne Badge-Nummer extrahieren
+    const cleanName = (name: string | null) => {
+      if (!name) return null;
+      return name.replace(/^\[[A-Z]+-\d+\]\s*/, '').trim();
+    };
+    const pureName = cleanName(employee.user.displayName) || employee.user.username;
+
+    await announceTermination({
+      employeeName: pureName,
+      employeeAvatar: employee.user.avatar,
+      rank: employee.rank,
+      terminationType: terminationType as 'RESIGNATION' | 'TERMINATION' | 'INACTIVE',
+      reason: reason || null,
+      terminatedBy: terminatedByName,
+      badgeNumber: employee.badgeNumber,
+      hireDate: employee.hireDate,
     });
 
     res.json({

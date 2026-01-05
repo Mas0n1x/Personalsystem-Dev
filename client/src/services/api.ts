@@ -561,6 +561,16 @@ export const notificationsApi = {
   deleteAll: () => api.delete('/notifications'),
 };
 
+// Discord Announcements API
+export const discordAnnouncementsApi = {
+  getConfigs: () => api.get('/discord-announcements'),
+  updateConfig: (type: string, data: { channelId: string | null; enabled: boolean }) =>
+    api.put(`/discord-announcements/${type}`, data),
+  saveAllConfigs: (configs: Array<{ type: string; channelId: string | null; enabled: boolean }>) =>
+    api.put('/discord-announcements', { configs }),
+  getChannels: () => api.get('/discord-announcements/channels'),
+};
+
 // Archiv API
 export const archiveApi = {
   // Beförderungen

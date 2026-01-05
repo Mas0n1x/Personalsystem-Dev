@@ -17,6 +17,7 @@ import AcademyModules from './pages/admin/AcademyModules';
 import AcademySettings from './pages/admin/AcademySettings';
 import Backups from './pages/admin/Backups';
 import BonusSettings from './pages/admin/BonusSettings';
+import DiscordAnnouncements from './pages/admin/DiscordAnnouncements';
 
 // Leadership
 import Leadership from './pages/Leadership';
@@ -92,6 +93,7 @@ function App() {
         <Route path="admin/academy-settings" element={<AcademySettings />} />
         <Route path="admin/backups" element={<Backups />} />
         <Route path="admin/bonus" element={<BonusSettings />} />
+        <Route path="admin/discord-announcements" element={<DiscordAnnouncements />} />
       </Route>
 
       {/* Fallback */}

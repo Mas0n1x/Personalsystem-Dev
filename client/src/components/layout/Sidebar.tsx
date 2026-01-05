@@ -22,6 +22,7 @@ import {
   Database,
   DollarSign,
   HelpCircle,
+  MessageSquare,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -82,6 +83,7 @@ export default function Sidebar() {
         { name: 'Academy Module', href: '/admin/academy-modules', icon: GraduationCap, permission: 'admin.full' },
         { name: 'Fragen & Kriterien', href: '/admin/academy-settings', icon: HelpCircle, permission: 'admin.full' },
         { name: 'Sonderzahlungen', href: '/admin/bonus', icon: DollarSign, permission: 'admin.full' },
+        { name: 'Discord Ankündigungen', href: '/admin/discord-announcements', icon: MessageSquare, permission: 'admin.full' },
         { name: 'Audit-Logs', href: '/admin/audit-logs', icon: FileText, permission: 'audit.view' },
         { name: 'Backups', href: '/admin/backups', icon: Database, permission: 'admin.full' },
         { name: 'Einstellungen', href: '/admin/settings', icon: Settings, permission: 'admin.full' },

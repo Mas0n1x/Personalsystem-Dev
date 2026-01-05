@@ -3,6 +3,7 @@ import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { createInviteLink } from '../services/discordBot.js';
 import { triggerApplicationCompleted, triggerApplicationOnboarding, getEmployeeIdFromUserId } from '../services/bonusService.js';
+import { announceHire } from '../services/discordAnnouncements.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -560,6 +561,16 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
       await triggerApplicationCompleted(processorEmployeeId, application.applicantName, id);
       await triggerApplicationOnboarding(processorEmployeeId, application.applicantName, id);
     }
+
+    // Discord Announcement für Neueinstellung senden
+    const hiredByName = updatedApplication.processedBy?.displayName || updatedApplication.processedBy?.username || 'Unbekannt';
+    await announceHire({
+      employeeName: application.applicantName,
+      employeeAvatar: null, // Avatar noch nicht verfügbar
+      rank: 'Cadet',
+      badgeNumber: employee.badgeNumber || 'Noch nicht zugewiesen',
+      hiredBy: hiredByName,
+    });
 
     res.json({
       application: updatedApplication,

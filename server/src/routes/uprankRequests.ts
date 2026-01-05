@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { notifyPromotion } from '../services/notificationService.js';
+import { announcePromotion, announceAcademyGraduation } from '../services/discordAnnouncements.js';
 
 const router = Router();
 
@@ -285,6 +286,37 @@ router.put('/:id/process', requirePermission('management.uprank'), async (req: A
         request.targetRank,
         promotedByName
       );
+
+      // Name ohne Badge-Nummer extrahieren
+      const cleanName = (name: string | null) => {
+        if (!name) return null;
+        return name.replace(/^\[[A-Z]+-\d+\]\s*/, '').trim();
+      };
+      const pureName = cleanName(updatedRequest.employee.user.displayName) || updatedRequest.employee.user.username;
+
+      // Discord Announcement senden
+      if (request.isAcademyRequest) {
+        // Academy Graduation Announcement
+        await announceAcademyGraduation({
+          employeeName: pureName,
+          employeeAvatar: null, // Nicht verfügbar in diesem Context
+          graduationType: request.targetRank === 'Junior Officer' ? 'Junior Officer Ausbildung' : 'Officer Ausbildung',
+          completedBy: promotedByName,
+          badgeNumber: updatedRequest.employee.badgeNumber,
+          notes: request.achievements || null,
+        });
+      } else {
+        // Normale Promotion Announcement
+        await announcePromotion({
+          employeeName: pureName,
+          employeeAvatar: null,
+          oldRank: request.employee.rank,
+          newRank: request.targetRank,
+          promotedBy: promotedByName,
+          reason: request.reason || null,
+          badgeNumber: updatedRequest.employee.badgeNumber,
+        });
+      }
     }
 
     res.json(updatedRequest);

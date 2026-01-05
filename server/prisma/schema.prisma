@@ -987,3 +987,17 @@ model TerminationArchive {
   @@index([terminationType])
   @@map("termination_archive")
 }
+
+// ==================== SYSTEM EINSTELLUNGEN ====================
+
+// Discord Announcement Kanäle
+model DiscordAnnouncementChannel {
+  id          String    @id @default(cuid())
+  type        String    @unique                              // PROMOTION, DEMOTION, SANCTION, UNIT_CHANGE, UNIT_PROMOTION, ACADEMY_GRADUATION, TERMINATION, HIRE
+  channelId   String                                         // Discord Channel ID
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("discord_announcement_channels")
+}

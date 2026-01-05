@@ -3,6 +3,7 @@ import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { triggerSanctionIssued, getEmployeeIdFromUserId } from '../services/bonusService.js';
 import { notifySanction } from '../services/notificationService.js';
+import { announceSanction } from '../services/discordAnnouncements.js';
 
 const router = Router();
 
@@ -171,6 +172,25 @@ router.post('/', authMiddleware, requirePermission('sanctions.manage'), async (r
       issuedByName,
       hasFine ? amount : undefined
     );
+
+    // Discord Announcement senden
+    // Name ohne Badge-Nummer extrahieren
+    const cleanName = (name: string | null) => {
+      if (!name) return null;
+      return name.replace(/^\[[A-Z]+-\d+\]\s*/, '').trim();
+    };
+    const pureName = cleanName(sanction.employee.user.displayName) || sanction.employee.user.username;
+
+    await announceSanction({
+      employeeName: pureName,
+      employeeAvatar: sanction.employee.user.avatar,
+      sanctionType: sanctionType,
+      reason: reason,
+      issuedBy: issuedByName,
+      amount: hasFine ? amount : null,
+      measure: hasMeasure ? measure : null,
+      expiresAt: expiresAt ? new Date(expiresAt) : null,
+    });
 
     res.status(201).json(sanction);
   } catch (error) {
