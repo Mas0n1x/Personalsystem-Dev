@@ -133,36 +133,41 @@ export default function DiscordAnnouncements() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <MessageSquare className="h-8 w-8 text-primary-400" />
-          <div>
-            <h1 className="text-2xl font-bold text-white">Discord Ankündigungen</h1>
-            <p className="text-slate-400 text-sm">
-              Konfiguriere Discord-Kanäle für automatische Ankündigungen
-            </p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600/20 via-slate-800 to-violet-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-violet-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-indigo-500/20 rounded-2xl backdrop-blur-sm border border-indigo-500/30 shadow-lg shadow-indigo-500/20">
+              <MessageSquare className="h-8 w-8 text-indigo-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Discord Ankündigungen</h1>
+              <p className="text-slate-400 mt-0.5">Konfiguriere Discord-Kanäle für automatische Ankündigungen</p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['discord-announcement-configs'] })}
-            className="btn-secondary flex items-center gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Aktualisieren
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!hasChanges || saveMutation.isPending}
-            className={clsx(
-              'btn-primary flex items-center gap-2',
-              (!hasChanges || saveMutation.isPending) && 'opacity-50 cursor-not-allowed'
-            )}
-          >
-            <Save className="h-4 w-4" />
-            {saveMutation.isPending ? 'Speichern...' : 'Speichern'}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['discord-announcement-configs'] })}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Aktualisieren
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={!hasChanges || saveMutation.isPending}
+              className={clsx(
+                'btn-primary flex items-center gap-2',
+                (!hasChanges || saveMutation.isPending) && 'opacity-50 cursor-not-allowed'
+              )}
+            >
+              <Save className="h-4 w-4" />
+              {saveMutation.isPending ? 'Speichern...' : 'Speichern'}
+            </button>
+          </div>
         </div>
       </div>
 

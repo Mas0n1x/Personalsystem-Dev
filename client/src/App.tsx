@@ -1,38 +1,55 @@
+import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Layout from './components/layout/Layout';
+
+// Kritische Seiten - sofort laden
 import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
 import Dashboard from './pages/Dashboard';
-import Employees from './pages/Employees';
-import EmployeeDetail from './pages/EmployeeDetail';
-import Absences from './pages/Absences';
 
-// Admin
-import Users from './pages/admin/Users';
-import Roles from './pages/admin/Roles';
-import AuditLogs from './pages/admin/AuditLogs';
-import Settings from './pages/admin/Settings';
-import AcademyModules from './pages/admin/AcademyModules';
-import AcademySettings from './pages/admin/AcademySettings';
-import Backups from './pages/admin/Backups';
-import BonusSettings from './pages/admin/BonusSettings';
-import DiscordAnnouncements from './pages/admin/DiscordAnnouncements';
-import UnitsAdmin from './pages/admin/UnitsAdmin';
+// Lazy Loading für alle anderen Seiten
+const Employees = lazy(() => import('./pages/Employees'));
+const EmployeeDetail = lazy(() => import('./pages/EmployeeDetail'));
+const Absences = lazy(() => import('./pages/Absences'));
 
-// Leadership
-import UnitsOverview from './pages/UnitsOverview';
-import Leadership from './pages/Leadership';
-import Evidence from './pages/Evidence';
-import Tuning from './pages/Tuning';
-import Robbery from './pages/Robbery';
-import HumanResources from './pages/HumanResources';
-import Detectives from './pages/Detectives';
-import Academy from './pages/Academy';
-import InternalAffairs from './pages/InternalAffairs';
-import QualityAssurance from './pages/QualityAssurance';
-import Teamleitung from './pages/Teamleitung';
-import Management from './pages/Management';
+// Admin - Lazy Loading
+const Users = lazy(() => import('./pages/admin/Users'));
+const Roles = lazy(() => import('./pages/admin/Roles'));
+const AuditLogs = lazy(() => import('./pages/admin/AuditLogs'));
+const Settings = lazy(() => import('./pages/admin/Settings'));
+const AcademyModules = lazy(() => import('./pages/admin/AcademyModules'));
+const AcademySettings = lazy(() => import('./pages/admin/AcademySettings'));
+const Backups = lazy(() => import('./pages/admin/Backups'));
+const BonusSettings = lazy(() => import('./pages/admin/BonusSettings'));
+const DiscordAnnouncements = lazy(() => import('./pages/admin/DiscordAnnouncements'));
+const UnitsAdmin = lazy(() => import('./pages/admin/UnitsAdmin'));
+
+// Leadership - Lazy Loading
+const UnitsOverview = lazy(() => import('./pages/UnitsOverview'));
+const Leadership = lazy(() => import('./pages/Leadership'));
+const Evidence = lazy(() => import('./pages/Evidence'));
+const Tuning = lazy(() => import('./pages/Tuning'));
+const Robbery = lazy(() => import('./pages/Robbery'));
+const HumanResources = lazy(() => import('./pages/HumanResources'));
+const Detectives = lazy(() => import('./pages/Detectives'));
+const Academy = lazy(() => import('./pages/Academy'));
+const InternalAffairs = lazy(() => import('./pages/InternalAffairs'));
+const QualityAssurance = lazy(() => import('./pages/QualityAssurance'));
+const Teamleitung = lazy(() => import('./pages/Teamleitung'));
+const Management = lazy(() => import('./pages/Management'));
+
+// Suspense Fallback Komponente
+function PageLoader() {
+  return (
+    <div className="min-h-[50vh] flex items-center justify-center">
+      <div className="relative">
+        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-primary-500 to-purple-500 blur-xl opacity-30 animate-pulse" />
+        <div className="relative animate-spin rounded-full h-12 w-12 border-4 border-slate-700 border-t-primary-500" />
+      </div>
+    </div>
+  );
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -69,37 +86,37 @@ function App() {
         }
       >
         <Route index element={<Dashboard />} />
-        <Route path="employees" element={<Employees />} />
-        <Route path="employees/:id" element={<EmployeeDetail />} />
-        <Route path="absences" element={<Absences />} />
-        <Route path="evidence" element={<Evidence />} />
-        <Route path="tuning" element={<Tuning />} />
-        <Route path="robbery" element={<Robbery />} />
-        <Route path="hr" element={<HumanResources />} />
-        <Route path="detectives" element={<Detectives />} />
-        <Route path="academy" element={<Academy />} />
-        <Route path="internal-affairs" element={<InternalAffairs />} />
-        <Route path="quality-assurance" element={<QualityAssurance />} />
-        <Route path="teamleitung" element={<Teamleitung />} />
-        <Route path="management" element={<Management />} />
+        <Route path="employees" element={<Suspense fallback={<PageLoader />}><Employees /></Suspense>} />
+        <Route path="employees/:id" element={<Suspense fallback={<PageLoader />}><EmployeeDetail /></Suspense>} />
+        <Route path="absences" element={<Suspense fallback={<PageLoader />}><Absences /></Suspense>} />
+        <Route path="evidence" element={<Suspense fallback={<PageLoader />}><Evidence /></Suspense>} />
+        <Route path="tuning" element={<Suspense fallback={<PageLoader />}><Tuning /></Suspense>} />
+        <Route path="robbery" element={<Suspense fallback={<PageLoader />}><Robbery /></Suspense>} />
+        <Route path="hr" element={<Suspense fallback={<PageLoader />}><HumanResources /></Suspense>} />
+        <Route path="detectives" element={<Suspense fallback={<PageLoader />}><Detectives /></Suspense>} />
+        <Route path="academy" element={<Suspense fallback={<PageLoader />}><Academy /></Suspense>} />
+        <Route path="internal-affairs" element={<Suspense fallback={<PageLoader />}><InternalAffairs /></Suspense>} />
+        <Route path="quality-assurance" element={<Suspense fallback={<PageLoader />}><QualityAssurance /></Suspense>} />
+        <Route path="teamleitung" element={<Suspense fallback={<PageLoader />}><Teamleitung /></Suspense>} />
+        <Route path="management" element={<Suspense fallback={<PageLoader />}><Management /></Suspense>} />
 
         {/* Units */}
-        <Route path="units" element={<UnitsOverview />} />
+        <Route path="units" element={<Suspense fallback={<PageLoader />}><UnitsOverview /></Suspense>} />
 
         {/* Leadership */}
-        <Route path="leadership" element={<Leadership />} />
+        <Route path="leadership" element={<Suspense fallback={<PageLoader />}><Leadership /></Suspense>} />
 
         {/* Admin */}
-        <Route path="admin/users" element={<Users />} />
-        <Route path="admin/roles" element={<Roles />} />
-        <Route path="admin/audit-logs" element={<AuditLogs />} />
-        <Route path="admin/settings" element={<Settings />} />
-        <Route path="admin/academy-modules" element={<AcademyModules />} />
-        <Route path="admin/academy-settings" element={<AcademySettings />} />
-        <Route path="admin/backups" element={<Backups />} />
-        <Route path="admin/bonus" element={<BonusSettings />} />
-        <Route path="admin/discord-announcements" element={<DiscordAnnouncements />} />
-        <Route path="admin/units" element={<UnitsAdmin />} />
+        <Route path="admin/users" element={<Suspense fallback={<PageLoader />}><Users /></Suspense>} />
+        <Route path="admin/roles" element={<Suspense fallback={<PageLoader />}><Roles /></Suspense>} />
+        <Route path="admin/audit-logs" element={<Suspense fallback={<PageLoader />}><AuditLogs /></Suspense>} />
+        <Route path="admin/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
+        <Route path="admin/academy-modules" element={<Suspense fallback={<PageLoader />}><AcademyModules /></Suspense>} />
+        <Route path="admin/academy-settings" element={<Suspense fallback={<PageLoader />}><AcademySettings /></Suspense>} />
+        <Route path="admin/backups" element={<Suspense fallback={<PageLoader />}><Backups /></Suspense>} />
+        <Route path="admin/bonus" element={<Suspense fallback={<PageLoader />}><BonusSettings /></Suspense>} />
+        <Route path="admin/discord-announcements" element={<Suspense fallback={<PageLoader />}><DiscordAnnouncements /></Suspense>} />
+        <Route path="admin/units" element={<Suspense fallback={<PageLoader />}><UnitsAdmin /></Suspense>} />
       </Route>
 
       {/* Fallback */}

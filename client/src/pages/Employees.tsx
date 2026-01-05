@@ -4,8 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { employeesApi } from '../services/api';
 import { usePermissions } from '../hooks/usePermissions';
 import Table from '../components/ui/Table';
-import Pagination from '../components/ui/Pagination';
-import { Search, Filter, ChevronUp, ChevronDown, Users, UserX, X, Check } from 'lucide-react';
+import { Search, Filter, ChevronUp, ChevronDown, Users, UserX, X, Check, TrendingUp, Shield, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Employee, PaginatedResponse } from '../types';
 
@@ -43,7 +42,6 @@ export default function Employees() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { canEditEmployees, canDeleteEmployees } = usePermissions();
-  const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState('');
   const [rank, setRank] = useState('');
@@ -59,11 +57,11 @@ export default function Employees() {
   const [terminateReason, setTerminateReason] = useState('');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['employees', page, search, department, rank, team],
+    queryKey: ['employees', search, department, rank, team],
     queryFn: () =>
       employeesApi.getAll({
-        page: String(page),
-        limit: '20',
+        all: 'true',
+        sortBy: 'badgeNumber',
         ...(search && { search }),
         ...(department && { department }),
         ...(rank && { rank }),
@@ -327,23 +325,107 @@ export default function Employees() {
     setDepartment('');
     setRank('');
     setTeam('');
-    setPage(1);
   };
 
   const hasActiveFilters = search || department || rank || team;
 
+  // Stats berechnen
+  const employees = response?.data || [];
+  const totalEmployees = response?.total || 0;
+  const teamStats = {
+    white: employees.filter(e => e.rankLevel >= 16).length,
+    red: employees.filter(e => e.rankLevel >= 13 && e.rankLevel < 16).length,
+    gold: employees.filter(e => e.rankLevel >= 10 && e.rankLevel < 13).length,
+    silver: employees.filter(e => e.rankLevel >= 6 && e.rankLevel < 10).length,
+    green: employees.filter(e => e.rankLevel >= 1 && e.rankLevel < 6).length,
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Mitarbeiter</h1>
-          <p className="text-slate-400 mt-1">Übersicht aller Mitarbeiter des LSPD</p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary-600/20 via-slate-800 to-purple-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/10 rounded-full blur-3xl" />
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-primary-500/20 rounded-2xl backdrop-blur-sm border border-primary-500/30">
+              <Users className="h-8 w-8 text-primary-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Mitarbeiter</h1>
+              <p className="text-slate-400 mt-0.5">Übersicht aller Mitarbeiter des LSPD</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="text-center">
+              <p className="text-3xl font-bold text-white">{totalEmployees}</p>
+              <p className="text-xs text-slate-400">Gesamt</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Team Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="card p-4 bg-gradient-to-br from-emerald-900/30 to-slate-800/50 border-emerald-700/30 hover:border-emerald-600/50 transition-all hover:-translate-y-0.5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-emerald-500/20 rounded-lg">
+              <Shield className="h-4 w-4 text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-emerald-400">{teamStats.green}</p>
+              <p className="text-xs text-slate-400">Team Green</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 bg-gradient-to-br from-slate-500/30 to-slate-800/50 border-slate-500/30 hover:border-slate-400/50 transition-all hover:-translate-y-0.5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-slate-400/20 rounded-lg">
+              <Shield className="h-4 w-4 text-slate-300" />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-slate-300">{teamStats.silver}</p>
+              <p className="text-xs text-slate-400">Team Silver</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 bg-gradient-to-br from-amber-900/30 to-slate-800/50 border-amber-700/30 hover:border-amber-600/50 transition-all hover:-translate-y-0.5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-500/20 rounded-lg">
+              <Star className="h-4 w-4 text-amber-400" />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-amber-400">{teamStats.gold}</p>
+              <p className="text-xs text-slate-400">Team Gold</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 bg-gradient-to-br from-red-900/30 to-slate-800/50 border-red-700/30 hover:border-red-600/50 transition-all hover:-translate-y-0.5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-red-500/20 rounded-lg">
+              <TrendingUp className="h-4 w-4 text-red-400" />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-red-400">{teamStats.red}</p>
+              <p className="text-xs text-slate-400">Team Red</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 bg-gradient-to-br from-white/10 to-slate-800/50 border-white/20 hover:border-white/40 transition-all hover:-translate-y-0.5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <Star className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-white">{teamStats.white}</p>
+              <p className="text-xs text-slate-400">Team White</p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Filter */}
-      <div className="card p-4">
+      <div className="card p-4 backdrop-blur-xl">
         <div className="flex flex-wrap gap-4">
           <div className="flex-1 min-w-[200px]">
             <div className="relative">
@@ -447,21 +529,11 @@ export default function Employees() {
         emptyMessage="Keine Mitarbeiter gefunden"
       />
 
-      {/* Pagination */}
-      {response && response.totalPages > 1 && (
-        <Pagination
-          page={page}
-          totalPages={response.totalPages}
-          onPageChange={setPage}
-          total={response.total}
-          limit={response.limit}
-        />
-      )}
 
       {/* Units Modal */}
       {unitsModalOpen && selectedEmployee && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-2xl mx-4 border border-slate-700 max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl p-6 w-full max-w-2xl mx-4 border border-slate-700/50 max-h-[80vh] overflow-y-auto shadow-2xl shadow-black/50 animate-scale-in">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-white">
                 Units bearbeiten - {selectedEmployee.user?.displayName || selectedEmployee.user?.username}
@@ -560,8 +632,8 @@ export default function Employees() {
 
       {/* Terminate Modal */}
       {terminateModalOpen && selectedEmployee && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md mx-4 border border-slate-700">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl p-6 w-full max-w-md mx-4 border border-red-900/50 shadow-2xl shadow-red-900/20 animate-scale-in">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-red-400">Mitarbeiter kündigen</h2>
               <button

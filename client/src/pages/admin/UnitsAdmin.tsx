@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { unitsApi } from '../../services/api';
+import toast from 'react-hot-toast';
+import clsx from 'clsx';
 import {
   Shield,
   Plus,
@@ -13,9 +15,52 @@ import {
   Crown,
   Save,
   Settings,
+  Crosshair,
+  Scale,
+  GraduationCap,
+  Search,
+  UserCheck,
+  Bike,
+  PartyPopper,
+  Car,
+  BadgeCheck,
+  type LucideIcon,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
-import clsx from 'clsx';
+
+// Icon Mapping fuer Units basierend auf Name/ShortName
+const unitIconMap: Record<string, LucideIcon> = {
+  'SWAT': Crosshair,
+  'Special Weapons & Tactics': Crosshair,
+  'IA': Scale,
+  'Internal Affairs': Scale,
+  'PA': GraduationCap,
+  'Police Academy': GraduationCap,
+  'DET': Search,
+  'Detectives': Search,
+  'HR': UserCheck,
+  'Human Ressource': UserCheck,
+  'Biker': Bike,
+  'MGMT': Settings,
+  'Management': Settings,
+  'ET': PartyPopper,
+  'Eventteam': PartyPopper,
+  'SHP': Car,
+  'State & Highway Patrol': Car,
+  'QA': BadgeCheck,
+  'Quality Assurance': BadgeCheck,
+  'TL': Crown,
+  'Teamleitung': Crown,
+};
+
+function getUnitIcon(unit: { name: string; shortName: string | null }): LucideIcon {
+  if (unit.shortName && unitIconMap[unit.shortName]) {
+    return unitIconMap[unit.shortName];
+  }
+  if (unitIconMap[unit.name]) {
+    return unitIconMap[unit.name];
+  }
+  return Shield;
+}
 
 interface UnitRole {
   id: string;
@@ -286,24 +331,29 @@ export default function UnitsAdmin() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Settings className="h-8 w-8 text-primary-400" />
-          <div>
-            <h1 className="text-2xl font-bold text-white">Units Verwaltung</h1>
-            <p className="text-slate-400 text-sm">
-              Units erstellen und Discord-Rollen zuweisen
-            </p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-600/20 via-slate-800 to-teal-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-cyan-500/20 rounded-2xl backdrop-blur-sm border border-cyan-500/30 shadow-lg shadow-cyan-500/20">
+              <Settings className="h-8 w-8 text-cyan-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Units Verwaltung</h1>
+              <p className="text-slate-400 mt-0.5">Units erstellen und Discord-Rollen zuweisen</p>
+            </div>
           </div>
+          <button
+            onClick={() => openUnitModal()}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Neue Unit
+          </button>
         </div>
-        <button
-          onClick={() => openUnitModal()}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Neue Unit
-        </button>
       </div>
 
       {/* Discord Info */}
@@ -355,12 +405,17 @@ export default function UnitsAdmin() {
                     <ChevronRight className="h-5 w-5 text-slate-400" />
                   )}
                 </button>
-                <div
-                  className="p-3 rounded-xl"
-                  style={{ backgroundColor: `${unit.color}20` }}
-                >
-                  <Shield className="h-6 w-6" style={{ color: unit.color }} />
-                </div>
+                {(() => {
+                  const UnitIcon = getUnitIcon(unit);
+                  return (
+                    <div
+                      className="p-3 rounded-xl"
+                      style={{ backgroundColor: `${unit.color}20` }}
+                    >
+                      <UnitIcon className="h-6 w-6" style={{ color: unit.color }} />
+                    </div>
+                  );
+                })()}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-white">{unit.name}</h3>
@@ -490,8 +545,8 @@ export default function UnitsAdmin() {
 
       {/* Unit Modal */}
       {showUnitModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-lg border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-xl font-bold text-white">
                 {editingUnit ? 'Unit bearbeiten' : 'Neue Unit'}
@@ -598,8 +653,8 @@ export default function UnitsAdmin() {
 
       {/* Role Modal */}
       {showRoleModal && selectedUnitForRole && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-md border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-xl font-bold text-white">
                 {editingRole ? 'Rolle bearbeiten' : 'Rolle hinzufügen'}

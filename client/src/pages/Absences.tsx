@@ -131,34 +131,86 @@ export default function Absences() {
     );
   }
 
+  // Stats berechnen
+  const absences = response?.data || [];
+  const activeAbsences = absences.filter(isActive).length;
+  const dayOffs = absences.filter(a => a.type === 'DAY_OFF').length;
+  const regularAbsences = absences.filter(a => a.type === 'ABSENCE').length;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Abmeldungen</h1>
-          <p className="text-slate-400 mt-1">Abmeldungen und Dienstfrei verwalten</p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-600/20 via-slate-800 to-blue-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-orange-500/20 rounded-2xl backdrop-blur-sm border border-orange-500/30">
+              <CalendarOff className="h-8 w-8 text-orange-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Abmeldungen</h1>
+              <p className="text-slate-400 mt-0.5">Abmeldungen und Dienstfrei verwalten</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleDayOff}
+              className="btn-secondary flex items-center gap-2 backdrop-blur-sm"
+            >
+              <Coffee className="h-4 w-4" />
+              Dienstfrei (heute)
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Abmeldung eintragen
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleDayOff}
-            className="btn-secondary flex items-center gap-2"
-          >
-            <Coffee className="h-4 w-4" />
-            Dienstfrei (heute)
-          </button>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn-primary flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Abmeldung eintragen
-          </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="card p-4 bg-gradient-to-br from-green-900/30 to-slate-800/50 border-green-700/30">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-green-500/20 rounded-lg">
+              <Clock className="h-4 w-4 text-green-400" />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-green-400">{activeAbsences}</p>
+              <p className="text-xs text-slate-400">Aktuell Aktiv</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 bg-gradient-to-br from-orange-900/30 to-slate-800/50 border-orange-700/30">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-500/20 rounded-lg">
+              <Calendar className="h-4 w-4 text-orange-400" />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-orange-400">{regularAbsences}</p>
+              <p className="text-xs text-slate-400">Abmeldungen</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 bg-gradient-to-br from-blue-900/30 to-slate-800/50 border-blue-700/30">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-500/20 rounded-lg">
+              <Coffee className="h-4 w-4 text-blue-400" />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-blue-400">{dayOffs}</p>
+              <p className="text-xs text-slate-400">Dienstfrei</p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Filter */}
-      <div className="card p-4">
+      <div className="card p-4 backdrop-blur-xl">
         <div className="flex gap-4">
           <select
             value={filterType}
@@ -276,8 +328,8 @@ export default function Absences() {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md mx-4 border border-slate-700">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl p-6 w-full max-w-md mx-4 border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <h2 className="text-xl font-bold text-white mb-6">Abmeldung eintragen</h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">

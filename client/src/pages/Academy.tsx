@@ -853,17 +853,26 @@ export default function Academy() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-          <GraduationCap className="h-8 w-8 text-blue-400" />
-          Police Academy
-        </h1>
-        <p className="text-slate-400 mt-1">Ausbildung, Prüfungen und Nachschulungen verwalten</p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600/20 via-slate-800 to-cyan-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-500/20 rounded-2xl backdrop-blur-sm border border-blue-500/30 shadow-lg shadow-blue-500/20">
+              <GraduationCap className="h-8 w-8 text-blue-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Police Academy</h1>
+              <p className="text-slate-400 mt-0.5">Ausbildung, Prüfungen und Nachschulungen verwalten</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-700 pb-2">
+      <div className="flex gap-2 border-b border-slate-700 pb-2 bg-slate-800/50 rounded-t-xl px-2">
         <button
           onClick={() => setActiveTab('training')}
           className={clsx(
@@ -909,8 +918,8 @@ export default function Academy() {
 
       {/* Notes Modal */}
       {showNotesFor && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-lg w-full max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl max-w-lg w-full max-h-[80vh] flex flex-col border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                 <StickyNote className="h-5 w-5 text-amber-400" />
@@ -994,8 +1003,8 @@ export default function Academy() {
 
       {/* Exam Modal */}
       {showExamModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between sticky top-0 bg-slate-800">
               <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                 <ClipboardCheck className="h-5 w-5 text-blue-400" />
@@ -1164,8 +1173,8 @@ export default function Academy() {
 
       {/* Retraining Modal */}
       {showRetrainingModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-lg w-full">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl max-w-lg w-full border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                 <BookOpen className="h-5 w-5 text-amber-400" />

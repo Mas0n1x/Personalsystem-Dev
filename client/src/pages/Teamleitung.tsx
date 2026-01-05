@@ -327,24 +327,34 @@ export default function Teamleitung() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Teamleitung</h1>
-          <p className="text-slate-400">Uprank-Anträge und Sperren verwalten</p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600/20 via-slate-800 to-amber-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-500/20 rounded-2xl backdrop-blur-sm border border-blue-500/30 shadow-lg shadow-blue-500/20">
+              <TrendingUp className="h-8 w-8 text-blue-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Teamleitung</h1>
+              <p className="text-slate-400 mt-0.5">Uprank-Anträge und Sperren verwalten</p>
+            </div>
+          </div>
+          {activeTab === 'requests' && canManage && (
+            <button onClick={() => setShowCreateModal(true)} className="btn-primary flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Neuer Antrag
+            </button>
+          )}
+          {activeTab === 'locks' && canManageLocks && (
+            <button onClick={openLockModal} className="btn-primary flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Sperre erstellen
+            </button>
+          )}
         </div>
-        {activeTab === 'requests' && canManage && (
-          <button onClick={() => setShowCreateModal(true)} className="btn-primary flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Neuer Antrag
-          </button>
-        )}
-        {activeTab === 'locks' && canManageLocks && (
-          <button onClick={openLockModal} className="btn-primary flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Sperre erstellen
-          </button>
-        )}
       </div>
 
       {/* Tabs */}
@@ -398,46 +408,46 @@ export default function Teamleitung() {
         <>
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="card p-4">
+            <div className="card p-4 bg-gradient-to-br from-blue-900/30 to-slate-900/80 hover:border-blue-600/50 transition-all group">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-500/20">
+                <div className="p-2 rounded-lg bg-blue-500/20 group-hover:scale-110 transition-transform">
                   <TrendingUp className="h-5 w-5 text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{stats?.total || 0}</p>
+                  <p className="text-2xl font-bold text-blue-400">{stats?.total || 0}</p>
                   <p className="text-sm text-slate-400">Gesamt</p>
                 </div>
               </div>
             </div>
-            <div className="card p-4">
+            <div className="card p-4 bg-gradient-to-br from-yellow-900/30 to-slate-900/80 hover:border-yellow-600/50 transition-all group">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-yellow-500/20">
+                <div className="p-2 rounded-lg bg-yellow-500/20 group-hover:scale-110 transition-transform">
                   <Clock className="h-5 w-5 text-yellow-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{stats?.pending || 0}</p>
+                  <p className="text-2xl font-bold text-yellow-400">{stats?.pending || 0}</p>
                   <p className="text-sm text-slate-400">Ausstehend</p>
                 </div>
               </div>
             </div>
-            <div className="card p-4">
+            <div className="card p-4 bg-gradient-to-br from-green-900/30 to-slate-900/80 hover:border-green-600/50 transition-all group">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-green-500/20">
+                <div className="p-2 rounded-lg bg-green-500/20 group-hover:scale-110 transition-transform">
                   <CheckCircle className="h-5 w-5 text-green-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{stats?.approved || 0}</p>
+                  <p className="text-2xl font-bold text-green-400">{stats?.approved || 0}</p>
                   <p className="text-sm text-slate-400">Genehmigt</p>
                 </div>
               </div>
             </div>
-            <div className="card p-4">
+            <div className="card p-4 bg-gradient-to-br from-red-900/30 to-slate-900/80 hover:border-red-600/50 transition-all group">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-red-500/20">
+                <div className="p-2 rounded-lg bg-red-500/20 group-hover:scale-110 transition-transform">
                   <XCircle className="h-5 w-5 text-red-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{stats?.rejected || 0}</p>
+                  <p className="text-2xl font-bold text-red-400">{stats?.rejected || 0}</p>
                   <p className="text-sm text-slate-400">Abgelehnt</p>
                 </div>
               </div>
@@ -729,8 +739,8 @@ export default function Teamleitung() {
 
       {/* Lock Modal */}
       {showLockModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-md border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-xl font-bold text-white">Uprank-Sperre erstellen</h2>
               <button onClick={closeLockModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
@@ -847,8 +857,8 @@ function CreateRequestModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
         <h2 className="text-xl font-bold text-white mb-4">Neuer Uprank-Antrag</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -942,8 +952,8 @@ function CreateRequestModal({
 // Detail Modal
 function DetailModal({ request, onClose }: { request: UprankRequest; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-white">Antrag-Details</h2>
           {request.status === 'PENDING' && (
@@ -1058,8 +1068,8 @@ function ProcessModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-xl p-6 w-full max-w-lg">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl p-6 w-full max-w-lg border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
         <h2 className="text-xl font-bold text-white mb-4">Antrag bearbeiten</h2>
 
         <div className="p-4 bg-slate-700/50 rounded-lg mb-4">

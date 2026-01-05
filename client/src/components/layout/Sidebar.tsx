@@ -104,14 +104,19 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-64 bg-slate-800 border-r border-slate-700 flex flex-col z-40">
+    <aside className="fixed left-0 top-0 bottom-0 w-64 bg-gradient-to-b from-slate-800 via-slate-800/95 to-slate-900 border-r border-slate-700/50 flex flex-col z-40 backdrop-blur-xl">
       {/* Logo */}
-      <div className="h-16 flex items-center justify-center border-b border-slate-700 bg-lspd-blue">
-        <div className="flex items-center gap-3">
-          <Shield className="h-8 w-8 text-lspd-gold" />
+      <div className="h-16 flex items-center justify-center border-b border-slate-700/50 bg-gradient-to-r from-lspd-blue to-lspd-blue/80 relative overflow-hidden">
+        {/* Subtle shine effect */}
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_3s_infinite]" />
+        <div className="flex items-center gap-3 relative">
+          <div className="relative">
+            <div className="absolute inset-0 bg-lspd-gold/30 blur-lg rounded-full" />
+            <Shield className="h-8 w-8 text-lspd-gold relative drop-shadow-lg" />
+          </div>
           <div>
-            <h1 className="text-lg font-bold text-white">LSPD</h1>
-            <p className="text-xs text-slate-300">Personalsystem</p>
+            <h1 className="text-lg font-bold text-white tracking-wide">LSPD</h1>
+            <p className="text-xs text-slate-300/80">Personalsystem</p>
           </div>
         </div>
       </div>
@@ -166,7 +171,11 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-slate-700">
+      <div className="p-4 border-t border-slate-700/50 bg-slate-900/50">
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-xs text-emerald-400">System Online</span>
+        </div>
         <p className="text-xs text-slate-500 text-center">
           LSPD Personalsystem v1.0
         </p>

@@ -654,16 +654,26 @@ export default function HumanResources() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Human Resources</h1>
-          <p className="text-slate-400 mt-1">Bewerbungen & Blacklist verwalten</p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-green-600/20 via-slate-800 to-red-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-red-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-green-500/20 rounded-2xl backdrop-blur-sm border border-green-500/30 shadow-lg shadow-green-500/20">
+              <UserPlus className="h-8 w-8 text-green-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Human Resources</h1>
+              <p className="text-slate-400 mt-0.5">Bewerbungen & Blacklist verwalten</p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-700">
+      <div className="flex gap-2 border-b border-slate-700 bg-slate-800/50 rounded-t-xl px-2">
         <button
           onClick={() => setActiveTab('applications')}
           className={`px-4 py-2 font-medium transition-colors relative ${
@@ -705,9 +715,9 @@ export default function HumanResources() {
         <div className="space-y-6">
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="card p-4 bg-gradient-to-br from-blue-900/20 to-slate-800/50 border-blue-700/30">
+            <div className="card p-4 bg-gradient-to-br from-blue-900/30 to-slate-800/50 border-blue-700/30 hover:border-blue-600/50 transition-all group">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-600/20 rounded-lg">
+                <div className="p-2 bg-blue-600/20 rounded-xl group-hover:scale-110 transition-transform">
                   <FileCheck className="h-5 w-5 text-blue-400" />
                 </div>
                 <div>
@@ -716,9 +726,9 @@ export default function HumanResources() {
                 </div>
               </div>
             </div>
-            <div className="card p-4 bg-gradient-to-br from-purple-900/20 to-slate-800/50 border-purple-700/30">
+            <div className="card p-4 bg-gradient-to-br from-purple-900/30 to-slate-800/50 border-purple-700/30 hover:border-purple-600/50 transition-all group">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-600/20 rounded-lg">
+                <div className="p-2 bg-purple-600/20 rounded-xl group-hover:scale-110 transition-transform">
                   <MessageSquare className="h-5 w-5 text-purple-400" />
                 </div>
                 <div>
@@ -727,9 +737,9 @@ export default function HumanResources() {
                 </div>
               </div>
             </div>
-            <div className="card p-4 bg-gradient-to-br from-amber-900/20 to-slate-800/50 border-amber-700/30">
+            <div className="card p-4 bg-gradient-to-br from-amber-900/30 to-slate-800/50 border-amber-700/30 hover:border-amber-600/50 transition-all group">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-600/20 rounded-lg">
+                <div className="p-2 bg-amber-600/20 rounded-xl group-hover:scale-110 transition-transform">
                   <ClipboardList className="h-5 w-5 text-amber-400" />
                 </div>
                 <div>
@@ -738,9 +748,9 @@ export default function HumanResources() {
                 </div>
               </div>
             </div>
-            <div className="card p-4 bg-gradient-to-br from-green-900/20 to-slate-800/50 border-green-700/30">
+            <div className="card p-4 bg-gradient-to-br from-green-900/30 to-slate-800/50 border-green-700/30 hover:border-green-600/50 transition-all group">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-600/20 rounded-lg">
+                <div className="p-2 bg-green-600/20 rounded-xl group-hover:scale-110 transition-transform">
                   <CheckCircle className="h-5 w-5 text-green-400" />
                 </div>
                 <div>
@@ -749,9 +759,9 @@ export default function HumanResources() {
                 </div>
               </div>
             </div>
-            <div className="card p-4 bg-gradient-to-br from-red-900/20 to-slate-800/50 border-red-700/30">
+            <div className="card p-4 bg-gradient-to-br from-red-900/30 to-slate-800/50 border-red-700/30 hover:border-red-600/50 transition-all group">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-600/20 rounded-lg">
+                <div className="p-2 bg-red-600/20 rounded-xl group-hover:scale-110 transition-transform">
                   <XCircle className="h-5 w-5 text-red-400" />
                 </div>
                 <div>
@@ -990,8 +1000,8 @@ export default function HumanResources() {
 
       {/* Create Application Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-lg border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-xl font-bold text-white">Neue Bewerbung</h2>
               <button onClick={closeCreateModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
@@ -1093,8 +1103,8 @@ export default function HumanResources() {
 
       {/* Detail Modal */}
       {showDetailModal && selectedApplication && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-3xl border border-slate-700 shadow-2xl my-8">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-3xl border border-slate-700/50 shadow-2xl shadow-black/50 my-8 animate-scale-in">
             <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-white">{selectedApplication.applicantName}</h2>
@@ -1360,7 +1370,7 @@ export default function HumanResources() {
 
       {/* Image Modal */}
       {showImageModal && selectedApplication?.idCardImage && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4" onClick={() => setShowImageModal(false)}>
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] p-4 animate-fade-in" onClick={() => setShowImageModal(false)}>
           <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setShowImageModal(false)}
@@ -1379,8 +1389,8 @@ export default function HumanResources() {
 
       {/* Reject Modal */}
       {showRejectModal && selectedApplication && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-lg border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-xl font-bold text-white">Bewerbung ablehnen</h2>
               <button onClick={closeRejectModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
@@ -1465,8 +1475,8 @@ export default function HumanResources() {
 
       {/* Blacklist Modal */}
       {showBlacklistModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-md border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-xl font-bold text-white">
                 {editingBlacklist ? 'Blacklist bearbeiten' : 'Zur Blacklist hinzufügen'}

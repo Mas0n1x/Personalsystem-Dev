@@ -78,10 +78,20 @@ function getTeamRankLevelRange(team: string): { min: number; max: number } | nul
   }
 }
 
+// Hilfsfunktion zum Parsen der Dienstnummer für Sortierung
+function parseBadgeNumber(badgeNumber: string | null): { prefix: string; num: number } {
+  if (!badgeNumber) return { prefix: 'ZZZ', num: 9999 }; // Ohne Dienstnummer ans Ende
+  const match = badgeNumber.match(/^([A-Z]+)-(\d+)$/);
+  if (match) {
+    return { prefix: match[1], num: parseInt(match[2], 10) };
+  }
+  return { prefix: 'ZZZ', num: 9999 };
+}
+
 // Alle Mitarbeiter abrufen
 router.get('/', authMiddleware, requirePermission('employees.view'), async (req: AuthRequest, res: Response) => {
   try {
-    const { search, department, rank, team, page = '1', limit = '20' } = req.query;
+    const { search, department, rank, team, page = '1', limit = '20', all = 'false', sortBy = 'badgeNumber' } = req.query;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {};
@@ -111,9 +121,12 @@ router.get('/', authMiddleware, requirePermission('employees.view'), async (req:
       ];
     }
 
-    console.log('Employee filter:', { search, department, rank, team, where });
+    console.log('Employee filter:', { search, department, rank, team, all, sortBy, where });
 
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    // Wenn all=true, alle Mitarbeiter ohne Pagination laden
+    const loadAll = all === 'true';
+    const skip = loadAll ? undefined : (parseInt(page as string) - 1) * parseInt(limit as string);
+    const take = loadAll ? undefined : parseInt(limit as string);
 
     const [employees, total] = await Promise.all([
       prisma.employee.findMany({
@@ -126,18 +139,35 @@ router.get('/', authMiddleware, requirePermission('employees.view'), async (req:
           },
         },
         skip,
-        take: parseInt(limit as string),
+        take,
+        // Basis-Sortierung nach rankLevel (wird später im Code nach Dienstnummer sortiert)
         orderBy: { rankLevel: 'desc' },
       }),
       prisma.employee.count({ where }),
     ]);
 
+    // Sortierung nach Dienstnummer wenn gewünscht
+    let sortedEmployees = employees;
+    if (sortBy === 'badgeNumber') {
+      sortedEmployees = [...employees].sort((a, b) => {
+        const badgeA = parseBadgeNumber(a.badgeNumber);
+        const badgeB = parseBadgeNumber(b.badgeNumber);
+
+        // Erst nach Prefix sortieren (A vor B vor C usw.)
+        if (badgeA.prefix !== badgeB.prefix) {
+          return badgeA.prefix.localeCompare(badgeB.prefix);
+        }
+        // Dann nach Nummer sortieren (01, 02, 03...)
+        return badgeA.num - badgeB.num;
+      });
+    }
+
     res.json({
-      data: employees,
+      data: sortedEmployees,
       total,
-      page: parseInt(page as string),
-      limit: parseInt(limit as string),
-      totalPages: Math.ceil(total / parseInt(limit as string)),
+      page: loadAll ? 1 : parseInt(page as string),
+      limit: loadAll ? total : parseInt(limit as string),
+      totalPages: loadAll ? 1 : Math.ceil(total / parseInt(limit as string)),
     });
   } catch (error) {
     console.error('Get employees error:', error);

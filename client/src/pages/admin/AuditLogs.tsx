@@ -99,12 +99,21 @@ export default function AuditLogs() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <FileText className="h-8 w-8 text-primary-400" />
-        <div>
-          <h1 className="text-2xl font-bold text-white">Audit-Logs</h1>
-          <p className="text-slate-400 mt-1">Alle Systemaktivitäten protokolliert</p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-600/20 via-slate-800 to-gray-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-slate-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-gray-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-slate-500/20 rounded-2xl backdrop-blur-sm border border-slate-500/30 shadow-lg shadow-slate-500/20">
+              <FileText className="h-8 w-8 text-slate-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Audit-Logs</h1>
+              <p className="text-slate-400 mt-0.5">Alle Systemaktivitäten protokolliert</p>
+            </div>
+          </div>
         </div>
       </div>
 

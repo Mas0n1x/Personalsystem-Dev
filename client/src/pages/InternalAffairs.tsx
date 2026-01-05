@@ -333,24 +333,31 @@ export default function InternalAffairs() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <ShieldAlert className="h-8 w-8 text-red-400" />
-            Internal Affairs
-          </h1>
-          <p className="text-slate-400 mt-1">Interne Ermittlungen und Disziplinarverfahren</p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-red-600/20 via-slate-800 to-orange-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-orange-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-red-500/20 rounded-2xl backdrop-blur-sm border border-red-500/30 shadow-lg shadow-red-500/20">
+              <ShieldAlert className="h-8 w-8 text-red-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Internal Affairs</h1>
+              <p className="text-slate-400 mt-0.5">Interne Ermittlungen und Disziplinarverfahren</p>
+            </div>
+          </div>
+          {canManage && (
+            <button
+              onClick={() => activeTab === 'investigations' ? setShowCreateModal(true) : setShowCreateTeamChangeModal(true)}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              {activeTab === 'investigations' ? 'Neue Ermittlung' : 'Neuer Teamwechsel'}
+            </button>
+          )}
         </div>
-        {canManage && (
-          <button
-            onClick={() => activeTab === 'investigations' ? setShowCreateModal(true) : setShowCreateTeamChangeModal(true)}
-            className="btn-primary flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            {activeTab === 'investigations' ? 'Neue Ermittlung' : 'Neuer Teamwechsel'}
-          </button>
-        )}
       </div>
 
       {/* Tabs */}
@@ -395,9 +402,9 @@ export default function InternalAffairs() {
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="card p-4">
+          <div className="card p-4 bg-gradient-to-br from-slate-800/80 to-slate-900/80 hover:border-slate-600/50 transition-all group">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-slate-500/20 rounded-lg">
+              <div className="p-2 bg-slate-500/20 rounded-lg group-hover:scale-110 transition-transform">
                 <FileText className="h-5 w-5 text-slate-400" />
               </div>
               <div>
@@ -406,35 +413,35 @@ export default function InternalAffairs() {
               </div>
             </div>
           </div>
-          <div className="card p-4">
+          <div className="card p-4 bg-gradient-to-br from-blue-900/30 to-slate-900/80 hover:border-blue-600/50 transition-all group">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500/20 rounded-lg">
+              <div className="p-2 bg-blue-500/20 rounded-lg group-hover:scale-110 transition-transform">
                 <AlertTriangle className="h-5 w-5 text-blue-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{stats.open}</p>
+                <p className="text-2xl font-bold text-blue-400">{stats.open}</p>
                 <p className="text-sm text-slate-400">Offen</p>
               </div>
             </div>
           </div>
-          <div className="card p-4">
+          <div className="card p-4 bg-gradient-to-br from-yellow-900/30 to-slate-900/80 hover:border-yellow-600/50 transition-all group">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-500/20 rounded-lg">
+              <div className="p-2 bg-yellow-500/20 rounded-lg group-hover:scale-110 transition-transform">
                 <Clock className="h-5 w-5 text-yellow-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{stats.inProgress}</p>
+                <p className="text-2xl font-bold text-yellow-400">{stats.inProgress}</p>
                 <p className="text-sm text-slate-400">In Bearbeitung</p>
               </div>
             </div>
           </div>
-          <div className="card p-4">
+          <div className="card p-4 bg-gradient-to-br from-green-900/30 to-slate-900/80 hover:border-green-600/50 transition-all group">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-500/20 rounded-lg">
+              <div className="p-2 bg-green-500/20 rounded-lg group-hover:scale-110 transition-transform">
                 <CheckCircle className="h-5 w-5 text-green-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{stats.closed}</p>
+                <p className="text-2xl font-bold text-green-400">{stats.closed}</p>
                 <p className="text-sm text-slate-400">Abgeschlossen</p>
               </div>
             </div>
@@ -520,9 +527,9 @@ export default function InternalAffairs() {
           {/* Team Change Stats */}
           {teamChangeStats && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="card p-4">
+              <div className="card p-4 bg-gradient-to-br from-slate-800/80 to-slate-900/80 hover:border-slate-600/50 transition-all group">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-slate-500/20 rounded-lg">
+                  <div className="p-2 bg-slate-500/20 rounded-lg group-hover:scale-110 transition-transform">
                     <ArrowRightLeft className="h-5 w-5 text-slate-400" />
                   </div>
                   <div>
@@ -531,35 +538,35 @@ export default function InternalAffairs() {
                   </div>
                 </div>
               </div>
-              <div className="card p-4">
+              <div className="card p-4 bg-gradient-to-br from-yellow-900/30 to-slate-900/80 hover:border-yellow-600/50 transition-all group">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-yellow-500/20 rounded-lg">
+                  <div className="p-2 bg-yellow-500/20 rounded-lg group-hover:scale-110 transition-transform">
                     <Clock className="h-5 w-5 text-yellow-400" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-white">{teamChangeStats.pending}</p>
+                    <p className="text-2xl font-bold text-yellow-400">{teamChangeStats.pending}</p>
                     <p className="text-sm text-slate-400">Ausstehend</p>
                   </div>
                 </div>
               </div>
-              <div className="card p-4">
+              <div className="card p-4 bg-gradient-to-br from-green-900/30 to-slate-900/80 hover:border-green-600/50 transition-all group">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-500/20 rounded-lg">
+                  <div className="p-2 bg-green-500/20 rounded-lg group-hover:scale-110 transition-transform">
                     <CheckCircle className="h-5 w-5 text-green-400" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-white">{teamChangeStats.reviewed}</p>
+                    <p className="text-2xl font-bold text-green-400">{teamChangeStats.reviewed}</p>
                     <p className="text-sm text-slate-400">Geprüft</p>
                   </div>
                 </div>
               </div>
-              <div className="card p-4">
+              <div className="card p-4 bg-gradient-to-br from-blue-900/30 to-slate-900/80 hover:border-blue-600/50 transition-all group">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                  <div className="p-2 bg-blue-500/20 rounded-lg group-hover:scale-110 transition-transform">
                     <Archive className="h-5 w-5 text-blue-400" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-white">{teamChangeStats.thisMonth}</p>
+                    <p className="text-2xl font-bold text-blue-400">{teamChangeStats.thisMonth}</p>
                     <p className="text-sm text-slate-400">Diesen Monat</p>
                   </div>
                 </div>
@@ -641,8 +648,8 @@ export default function InternalAffairs() {
 
       {/* Create Team Change Modal */}
       {showCreateTeamChangeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white">Neuer Teamwechsel-Bericht</h2>
               <button onClick={() => setShowCreateTeamChangeModal(false)} className="text-slate-400 hover:text-white">
@@ -708,8 +715,8 @@ export default function InternalAffairs() {
 
       {/* Team Change Detail Modal */}
       {selectedTeamChange && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-white">Teamwechsel-Bericht</h2>
@@ -861,8 +868,8 @@ export default function InternalAffairs() {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white">Neue Ermittlung</h2>
               <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-white">
@@ -926,9 +933,9 @@ export default function InternalAffairs() {
 
       {/* Detail Modal */}
       {selectedInvestigation && detail && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-4 border-b border-slate-700 flex items-center justify-between sticky top-0 bg-slate-800">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
+            <div className="p-4 border-b border-slate-700 flex items-center justify-between sticky top-0 bg-slate-800/95 backdrop-blur-xl rounded-t-2xl">
               <div>
                 <p className="text-xs font-mono text-slate-500">{detail.caseNumber}</p>
                 <h2 className="text-lg font-semibold text-white">{detail.title}</h2>
@@ -1182,8 +1189,8 @@ export default function InternalAffairs() {
 
       {/* Add Note Modal */}
       {showAddNote && selectedInvestigation && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-md w-full">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl max-w-md w-full border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white">Notiz hinzufügen</h2>
               <button onClick={() => setShowAddNote(false)} className="text-slate-400 hover:text-white">
@@ -1217,8 +1224,8 @@ export default function InternalAffairs() {
 
       {/* Add Witness Modal */}
       {showAddWitness && selectedInvestigation && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-md w-full">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl max-w-md w-full border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white">Zeuge hinzufügen</h2>
               <button onClick={() => setShowAddWitness(false)} className="text-slate-400 hover:text-white">

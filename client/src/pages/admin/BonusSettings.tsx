@@ -149,31 +149,38 @@ export default function BonusSettings() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <DollarSign className="h-8 w-8 text-yellow-400" />
-          <div>
-            <h1 className="text-2xl font-bold text-white">Sonderzahlungen</h1>
-            <p className="text-slate-400 mt-1">Bonus-Konfiguration für Tätigkeiten</p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-yellow-600/20 via-slate-800 to-amber-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-yellow-500/20 rounded-2xl backdrop-blur-sm border border-yellow-500/30 shadow-lg shadow-yellow-500/20">
+              <DollarSign className="h-8 w-8 text-yellow-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Sonderzahlungen</h1>
+              <p className="text-slate-400 mt-0.5">Bonus-Konfiguration für Tätigkeiten</p>
+            </div>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => initConfigsMutation.mutate()}
-            disabled={initConfigsMutation.isPending}
-            className="btn-secondary"
-          >
-            <RefreshCw className={`h-4 w-4 ${initConfigsMutation.isPending ? 'animate-spin' : ''}`} />
-            Standard-Boni initialisieren
-          </button>
-          <button
-            onClick={() => setShowNewForm(true)}
-            className="btn-primary"
-          >
-            <Plus className="h-4 w-4" />
-            Neue Bonus-Art
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => initConfigsMutation.mutate()}
+              disabled={initConfigsMutation.isPending}
+              className="btn-secondary"
+            >
+              <RefreshCw className={`h-4 w-4 ${initConfigsMutation.isPending ? 'animate-spin' : ''}`} />
+              Standard-Boni initialisieren
+            </button>
+            <button
+              onClick={() => setShowNewForm(true)}
+              className="btn-primary"
+            >
+              <Plus className="h-4 w-4" />
+              Neue Bonus-Art
+            </button>
+          </div>
         </div>
       </div>
 

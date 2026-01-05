@@ -559,6 +559,13 @@ export const notificationsApi = {
   markAllAsRead: () => api.put('/notifications/read-all'),
   delete: (id: string) => api.delete(`/notifications/${id}`),
   deleteAll: () => api.delete('/notifications'),
+
+  // Leadership/Broadcast Features
+  getDiscordRoles: () => api.get('/notifications/discord-roles'),
+  broadcast: (data: { title: string; message: string; roleIds: string[]; type?: string }) =>
+    api.post('/notifications/broadcast', data),
+  broadcastAll: (data: { title: string; message: string; type?: string }) =>
+    api.post('/notifications/broadcast-all', data),
 };
 
 // Discord Announcements API

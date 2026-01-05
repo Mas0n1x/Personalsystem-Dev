@@ -318,105 +318,126 @@ export default function Evidence() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Asservaten</h1>
-          <p className="text-slate-400 mt-1">Verwaltung von beschlagnahmten Gegenständen</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isSelectMode ? (
-            <>
-              <button
-                onClick={toggleSelectAll}
-                className="btn-ghost flex items-center gap-2"
-              >
-                {selectedIds.size === eingelagerteEvidence.length ? (
-                  <CheckSquare className="h-4 w-4" />
-                ) : (
-                  <Square className="h-4 w-4" />
-                )}
-                Alle auswählen
-              </button>
-              <button onClick={cancelSelectMode} className="btn-ghost flex items-center gap-2">
-                <X className="h-4 w-4" />
-                Abbrechen
-              </button>
-              <button
-                onClick={handleDestroySelected}
-                disabled={selectedIds.size === 0 || destroyBulkMutation.isPending}
-                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-              >
-                <Flame className="h-4 w-4" />
-                {destroyBulkMutation.isPending ? 'Wird vernichtet...' : `${selectedIds.size} Vernichten`}
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => setIsSelectMode(true)}
-                className="bg-red-600/20 text-red-400 hover:bg-red-600/30 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-              >
-                <Flame className="h-4 w-4" />
-                Vernichten
-              </button>
-              <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Einlagern
-              </button>
-            </>
-          )}
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-600/20 via-slate-800 to-emerald-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-purple-500/20 rounded-2xl backdrop-blur-sm border border-purple-500/30 shadow-lg shadow-purple-500/20">
+              <Package className="h-8 w-8 text-purple-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Asservaten</h1>
+              <p className="text-slate-400 mt-0.5">Verwaltung von beschlagnahmten Gegenständen</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {isSelectMode ? (
+              <>
+                <button
+                  onClick={toggleSelectAll}
+                  className="btn-ghost flex items-center gap-2 backdrop-blur-sm"
+                >
+                  {selectedIds.size === eingelagerteEvidence.length ? (
+                    <CheckSquare className="h-4 w-4" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                  Alle auswählen
+                </button>
+                <button onClick={cancelSelectMode} className="btn-ghost flex items-center gap-2 backdrop-blur-sm">
+                  <X className="h-4 w-4" />
+                  Abbrechen
+                </button>
+                <button
+                  onClick={handleDestroySelected}
+                  disabled={selectedIds.size === 0 || destroyBulkMutation.isPending}
+                  className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-red-500/20"
+                >
+                  <Flame className="h-4 w-4" />
+                  {destroyBulkMutation.isPending ? 'Wird vernichtet...' : `${selectedIds.size} Vernichten`}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setIsSelectMode(true)}
+                  className="bg-red-600/20 text-red-400 hover:bg-red-600/30 px-4 py-2 rounded-xl flex items-center gap-2 transition-all border border-red-500/30"
+                >
+                  <Flame className="h-4 w-4" />
+                  Vernichten
+                </button>
+                <button onClick={openCreateModal} className="btn-primary flex items-center gap-2 shadow-lg shadow-primary-500/20">
+                  <Plus className="h-4 w-4" />
+                  Einlagern
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card p-5 bg-gradient-to-br from-slate-800 to-slate-800/50 border-slate-700/50">
-          <div className="flex items-center gap-4">
-            <div className="p-4 bg-primary-600/20 rounded-2xl">
-              <Package className="h-8 w-8 text-primary-400" />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="card p-4 bg-gradient-to-br from-purple-900/30 to-slate-800/50 border-purple-700/30 hover:border-purple-600/50 transition-all group">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-purple-500/20 rounded-xl group-hover:scale-110 transition-transform">
+              <Package className="h-5 w-5 text-purple-400" />
             </div>
-            <div className="flex-1">
-              <p className="text-3xl font-bold text-white">{stats?.total || 0}</p>
-              <p className="text-sm text-slate-400 mt-0.5">Gesamt erfasst</p>
-            </div>
-          </div>
-        </div>
-        <div className="card p-5 bg-gradient-to-br from-green-900/20 to-slate-800/50 border-green-700/30">
-          <div className="flex items-center gap-4">
-            <div className="p-4 bg-green-600/20 rounded-2xl">
-              <Archive className="h-8 w-8 text-green-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-3xl font-bold text-green-400">{stats?.eingelagert || 0}</p>
-              <p className="text-sm text-slate-400 mt-0.5">Eingelagert</p>
+            <div>
+              <p className="text-2xl font-bold text-purple-400">{stats?.total || 0}</p>
+              <p className="text-xs text-slate-400">Gesamt erfasst</p>
             </div>
           </div>
         </div>
-        <div className="card p-5 bg-gradient-to-br from-red-900/20 to-slate-800/50 border-red-700/30">
-          <div className="flex items-center gap-4">
-            <div className="p-4 bg-red-600/20 rounded-2xl">
-              <Flame className="h-8 w-8 text-red-400" />
+        <div className="card p-4 bg-gradient-to-br from-green-900/30 to-slate-800/50 border-green-700/30 hover:border-green-600/50 transition-all group">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-green-500/20 rounded-xl group-hover:scale-110 transition-transform">
+              <Archive className="h-5 w-5 text-green-400" />
             </div>
-            <div className="flex-1">
-              <p className="text-3xl font-bold text-red-400">{stats?.vernichtet || 0}</p>
-              <p className="text-sm text-slate-400 mt-0.5">Vernichtet</p>
+            <div>
+              <p className="text-2xl font-bold text-green-400">{stats?.eingelagert || 0}</p>
+              <p className="text-xs text-slate-400">Eingelagert</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 bg-gradient-to-br from-amber-900/30 to-slate-800/50 border-amber-700/30 hover:border-amber-600/50 transition-all group">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-amber-500/20 rounded-xl group-hover:scale-110 transition-transform">
+              <ArchiveX className="h-5 w-5 text-amber-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-amber-400">{stats?.ausgelagert || 0}</p>
+              <p className="text-xs text-slate-400">Ausgelagert</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 bg-gradient-to-br from-red-900/30 to-slate-800/50 border-red-700/30 hover:border-red-600/50 transition-all group">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-red-500/20 rounded-xl group-hover:scale-110 transition-transform">
+              <Flame className="h-5 w-5 text-red-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-red-400">{stats?.vernichtet || 0}</p>
+              <p className="text-xs text-slate-400">Vernichtet</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="card p-4">
+      <div className="card p-4 backdrop-blur-xl bg-slate-800/80">
         <div className="flex flex-wrap gap-4">
           <div className="flex-1 min-w-[250px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-purple-400 transition-colors" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="input pl-10"
+                className="input pl-10 focus:border-purple-500/50 focus:ring-purple-500/20"
                 placeholder="Suchen nach Name oder Tatverdächtiger..."
               />
             </div>
@@ -526,8 +547,8 @@ export default function Evidence() {
 
       {/* Create/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-2xl border border-slate-700 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-2xl border border-slate-700/50 shadow-2xl shadow-black/50 max-h-[90vh] overflow-hidden flex flex-col animate-scale-in">
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
               <div>
@@ -715,8 +736,8 @@ export default function Evidence() {
 
       {/* Release Modal */}
       {showReleaseModal && releasingEvidence && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-md border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-lg font-bold text-white">Asservat auslagern</h2>
               <button onClick={closeReleaseModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">

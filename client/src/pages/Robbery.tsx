@@ -181,25 +181,35 @@ export default function Robbery() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Räube</h1>
-          <p className="text-slate-400 mt-1">Übersicht der Räube dieser Woche</p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-red-600/20 via-slate-800 to-orange-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-orange-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-red-500/20 rounded-2xl backdrop-blur-sm border border-red-500/30 shadow-lg shadow-red-500/20">
+              <Crosshair className="h-8 w-8 text-red-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Räube</h1>
+              <p className="text-slate-400 mt-0.5">Übersicht der Räube dieser Woche</p>
+            </div>
+          </div>
+          {canCreate && (
+            <button onClick={openModal} className="btn-primary flex items-center gap-2 shadow-lg shadow-primary-500/20">
+              <Plus className="h-4 w-4" />
+              Raub eintragen
+            </button>
+          )}
         </div>
-        {canCreate && (
-          <button onClick={openModal} className="btn-primary flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Raub eintragen
-          </button>
-        )}
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="card p-5 bg-gradient-to-br from-red-900/20 to-slate-800/50 border-red-700/30">
+        <div className="card p-5 bg-gradient-to-br from-red-900/30 to-slate-800/50 border-red-700/30 hover:border-red-600/50 transition-all group">
           <div className="flex items-center gap-4">
-            <div className="p-4 bg-red-600/20 rounded-2xl">
+            <div className="p-4 bg-red-600/20 rounded-2xl group-hover:scale-110 transition-transform">
               <Crosshair className="h-8 w-8 text-red-400" />
             </div>
             <div className="flex-1">
@@ -208,9 +218,9 @@ export default function Robbery() {
             </div>
           </div>
         </div>
-        <div className="card p-5 bg-gradient-to-br from-blue-900/20 to-slate-800/50 border-blue-700/30">
+        <div className="card p-5 bg-gradient-to-br from-blue-900/30 to-slate-800/50 border-blue-700/30 hover:border-blue-600/50 transition-all group">
           <div className="flex items-center gap-4">
-            <div className="p-4 bg-blue-600/20 rounded-2xl">
+            <div className="p-4 bg-blue-600/20 rounded-2xl group-hover:scale-110 transition-transform">
               <Calendar className="h-8 w-8 text-blue-400" />
             </div>
             <div className="flex-1">
@@ -327,8 +337,8 @@ export default function Robbery() {
 
       {/* Create Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-md border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-xl font-bold text-white">Raub eintragen</h2>
               <button onClick={closeModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
@@ -438,7 +448,7 @@ export default function Robbery() {
       {/* Image Modal */}
       {showImageModal && (
         <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in"
           onClick={() => setShowImageModal(null)}
         >
           <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>

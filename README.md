@@ -1,21 +1,60 @@
 # LSPD Personalsystem
 
-Ein schlankes Personalmanagementsystem mit Discord-Integration für das LSPD.
+Ein modernes Personalmanagementsystem mit Discord-Integration fuer das LSPD.
 
 ## Features
 
-- **Mitarbeiterverwaltung**: Mitarbeiter anlegen, bearbeiten, Status verwalten
-- **Discord Integration**: OAuth2 Login, Rollensynchronisation
+### Kernfunktionen
+- **Mitarbeiterverwaltung**: Mitarbeiter anlegen, bearbeiten, Befoerderungen, Degradierungen
+- **Discord Integration**: OAuth2 Login, automatische Rollensynchronisation
 - **Live-Sync**: Echtzeit-Updates via WebSockets
-- **Admin-Panel**: Benutzer, Rollen, Berechtigungen, Audit-Logs
+- **Benachrichtigungssystem**: In-App Benachrichtigungen und Discord-Ankuendigungen
+
+### Units & Abteilungen
+- **Units-Uebersicht**: Alle Einheiten mit Mitgliedern und Leitungspositionen
+- **Human Resources (HR)**: Bewerbungsverwaltung mit mehrstufigem Prozess
+- **Police Academy**: Ausbildungsmodule, Pruefungen, Nachschulungen
+- **Internal Affairs (IA)**: Interne Ermittlungen, Teamwechsel-Berichte
+- **Quality Assurance (QA)**: Unit-Reviews und Qualitaetssicherung
+- **Detectives**: Ermittlungsakten und Fallverwaltung
+- **Teamleitung**: Uprank-Antraege an das Management
+
+### Leadership Features
+- **Dashboard**: Umfassende Statistiken und Ueberblick
+- **Kasse (Treasury)**: Normale Kasse und Schwarzgeld-Verwaltung
+- **Sanktionen**: Verwarnungen, Geldstrafen, Massnahmen
+- **Aufgaben & Notizen**: Team-Organisation
+- **Ankuendigungen**: Discord-Kanal und In-App Broadcasts
+
+### Weitere Module
+- **Abmeldungen**: Abmeldungen und Dienstfrei
+- **Asservate**: Beweismittelverwaltung
+- **Tuning-Rechnungen**: Fahrzeugtuning-Abrechnung
+- **Raububerfaelle**: Einsatzdokumentation
+- **Blacklist**: Gesperrte Bewerber
+- **Uprank-Sperren**: Automatische Sperren bei Teamwechseln
+
+### Management
+- **Sonderzahlungen (Bonus)**: Wochenbasierte Bonusabrechnung
+- **Uprank-Antraege**: Bearbeitung von Befoerderungsantraegen
+- **Archiv**: Befoerderungs- und Kuendigungshistorie
+
+### Administration
+- **Benutzer & Rollen**: Berechtigungsverwaltung
+- **Audit-Logs**: Vollstaendige Aktivitaetsprotokollierung
+- **Backups**: Datensicherung und Wiederherstellung
+- **System-Einstellungen**: Discord-Ankuendigungen, Bonus-Konfiguration
+- **Academy-Module**: Ausbildungsmodule verwalten
+- **Units-Verwaltung**: Discord-Rollen zu Units zuweisen
 
 ## Tech Stack
 
-- **Frontend**: React + Vite + TypeScript + Tailwind CSS
+- **Frontend**: React 18 + Vite + TypeScript + Tailwind CSS + TanStack Query
 - **Backend**: Express.js + TypeScript + Prisma ORM
 - **Datenbank**: SQLite
 - **Discord**: discord.js v14
 - **Live-Sync**: Socket.io
+- **UI**: Lucide Icons, React Hot Toast
 
 ## Voraussetzungen
 
@@ -61,8 +100,8 @@ npm run dev
 4. Unter "Bot":
    - Erstelle einen Bot
    - Kopiere den Bot Token
-   - Aktiviere "Server Members Intent"
-5. Lade den Bot auf deinen Server ein
+   - Aktiviere "Server Members Intent" und "Message Content Intent"
+5. Lade den Bot auf deinen Server ein (mit Admin-Rechten)
 
 ### 5. Environment Variablen
 
@@ -113,11 +152,40 @@ npx prisma db push   # Schema pushen
 npx prisma studio    # Prisma Studio oeffnen
 ```
 
+### Seed-Scripts
+
+```bash
+cd server
+node seed-units.mjs      # Standard-Units erstellen
+node seed-academy.mjs    # Academy-Module erstellen
+```
+
 ## Erste Schritte
 
 1. Oeffne http://localhost:5173
 2. Logge dich mit Discord ein
-3. Der erste Benutzer kann ueber `/api/admin/setup` zum Admin gemacht werden
+3. Der erste Benutzer kann ueber die Admin-Oberflaeche zum Admin gemacht werden
+4. Fuehre die Seed-Scripts aus fuer Standard-Daten
+5. Konfiguriere die Discord-Ankuendigungskanaele unter Administration
+
+## Berechtigungen
+
+Das System nutzt ein rollenbasiertes Berechtigungssystem:
+
+| Bereich | View | Manage |
+|---------|------|--------|
+| employees | Mitarbeiter anzeigen | Mitarbeiter bearbeiten |
+| leadership | Leadership-Bereich | Aufgaben/Notizen/Sanktionen |
+| treasury | Kasse anzeigen | Ein-/Auszahlungen |
+| hr | Bewerbungen anzeigen | Bewerbungen bearbeiten |
+| academy | Schulungen anzeigen | Schulungen verwalten |
+| ia | Ermittlungen anzeigen | Ermittlungen verwalten |
+| qa | Reviews anzeigen | Reviews verwalten |
+| detectives | Akten anzeigen | Akten verwalten |
+| teamlead | Antraege anzeigen | Antraege erstellen |
+| management | Management-Bereich | Befoerderungen |
+| bonus | Sonderzahlungen anzeigen | Sonderzahlungen verwalten |
+| admin | - | Vollzugriff (admin.full) |
 
 ## Projektstruktur
 
@@ -126,20 +194,24 @@ Personalsystem/
 ├── client/                 # React Frontend
 │   ├── src/
 │   │   ├── components/     # UI-Komponenten
+│   │   │   └── layout/     # Layout-Komponenten (Sidebar, Header)
 │   │   ├── pages/          # Seiten
+│   │   │   └── admin/      # Admin-Seiten
 │   │   ├── hooks/          # Custom Hooks
-│   │   ├── context/        # React Context
+│   │   ├── context/        # React Context (Auth, Socket)
 │   │   ├── services/       # API Services
 │   │   └── types/          # TypeScript Types
 │   └── ...
 │
 ├── server/                 # Express Backend
 │   ├── src/
-│   │   ├── routes/         # API Routes
-│   │   ├── middleware/     # Express Middleware
-│   │   ├── services/       # Business Logic
+│   │   ├── routes/         # API Routes (~30 Module)
+│   │   ├── middleware/     # Express Middleware (Auth)
+│   │   ├── services/       # Business Logic (Discord Bot, Bonus)
 │   │   └── types/          # TypeScript Types
-│   └── prisma/             # Prisma Schema + SQLite DB
+│   ├── prisma/             # Prisma Schema + SQLite DB
+│   ├── uploads/            # Hochgeladene Dateien
+│   └── backups/            # Datenbank-Backups
 │
 └── .gitignore
 ```
@@ -147,3 +219,7 @@ Personalsystem/
 ## Lizenz
 
 MIT
+
+## Autor
+
+Made by Mas0n1x

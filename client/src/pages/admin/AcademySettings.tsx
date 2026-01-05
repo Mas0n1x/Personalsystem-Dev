@@ -152,12 +152,22 @@ export default function AcademySettings() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Academy Einstellungen</h1>
-        <p className="text-slate-400 mt-1">
-          Verwalte Fragenkatalog und Einstellungskriterien für Bewerbungen
-        </p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-teal-600/20 via-slate-800 to-emerald-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-teal-500/20 rounded-2xl backdrop-blur-sm border border-teal-500/30 shadow-lg shadow-teal-500/20">
+              <HelpCircle className="h-8 w-8 text-teal-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Academy Einstellungen</h1>
+              <p className="text-slate-400 mt-0.5">Verwalte Fragenkatalog und Einstellungskriterien für Bewerbungen</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -446,8 +456,8 @@ export default function AcademySettings() {
 
       {/* Create Question Modal */}
       {showQuestionModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="card w-full max-w-lg mx-4">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-lg mx-4 border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="card-header flex items-center justify-between">
               <h3 className="text-lg font-semibold text-white">Neue Frage erstellen</h3>
               <button
@@ -500,8 +510,8 @@ export default function AcademySettings() {
 
       {/* Create Criterion Modal */}
       {showCriterionModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="card w-full max-w-lg mx-4">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-lg mx-4 border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="card-header flex items-center justify-between">
               <h3 className="text-lg font-semibold text-white">Neues Kriterium erstellen</h3>
               <button

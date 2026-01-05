@@ -136,6 +136,12 @@ router.post('/fix-permissions', authMiddleware, async (req: AuthRequest, res: Re
       { name: 'teamlead.manage', description: 'Uprank-Anträge erstellen', category: 'teamlead' },
       { name: 'management.view', description: 'Management-Bereich anzeigen', category: 'management' },
       { name: 'management.uprank', description: 'Uprank-Anträge bearbeiten', category: 'management' },
+      // Bonus/Sonderzahlungen Permissions
+      { name: 'bonus.view', description: 'Sonderzahlungen anzeigen', category: 'bonus' },
+      { name: 'bonus.manage', description: 'Sonderzahlungen verwalten', category: 'bonus' },
+      { name: 'bonus.pay', description: 'Sonderzahlungen auszahlen', category: 'bonus' },
+      // Admin Settings Permissions
+      { name: 'admin.settings', description: 'System-Einstellungen verwalten', category: 'admin' },
     ];
 
     // Alle Berechtigungen erstellen/aktualisieren
@@ -273,6 +279,12 @@ router.post('/setup', async (req, res: Response) => {
       // Management Permissions
       { name: 'management.view', description: 'Management-Bereich anzeigen', category: 'management' },
       { name: 'management.uprank', description: 'Uprank-Anträge bearbeiten', category: 'management' },
+      // Bonus/Sonderzahlungen Permissions
+      { name: 'bonus.view', description: 'Sonderzahlungen anzeigen', category: 'bonus' },
+      { name: 'bonus.manage', description: 'Sonderzahlungen verwalten', category: 'bonus' },
+      { name: 'bonus.pay', description: 'Sonderzahlungen auszahlen', category: 'bonus' },
+      // Admin Settings Permissions
+      { name: 'admin.settings', description: 'System-Einstellungen verwalten', category: 'admin' },
     ];
 
     for (const perm of defaultPermissions) {
@@ -380,6 +392,12 @@ router.post('/permissions/seed', authMiddleware, requirePermission('admin.full')
       // Management Permissions
       { name: 'management.view', description: 'Management-Bereich anzeigen', category: 'management' },
       { name: 'management.uprank', description: 'Uprank-Anträge bearbeiten', category: 'management' },
+      // Bonus/Sonderzahlungen Permissions
+      { name: 'bonus.view', description: 'Sonderzahlungen anzeigen', category: 'bonus' },
+      { name: 'bonus.manage', description: 'Sonderzahlungen verwalten', category: 'bonus' },
+      { name: 'bonus.pay', description: 'Sonderzahlungen auszahlen', category: 'bonus' },
+      // Admin Settings Permissions
+      { name: 'admin.settings', description: 'System-Einstellungen verwalten', category: 'admin' },
     ];
 
     for (const perm of defaultPermissions) {

@@ -189,22 +189,29 @@ export default function AcademyModules() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <GraduationCap className="h-8 w-8 text-blue-400" />
-            Academy Module verwalten
-          </h1>
-          <p className="text-slate-400 mt-1">Ausbildungsmodule für die Police Academy konfigurieren</p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600/20 via-slate-800 to-cyan-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-500/20 rounded-2xl backdrop-blur-sm border border-blue-500/30 shadow-lg shadow-blue-500/20">
+              <GraduationCap className="h-8 w-8 text-blue-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Academy Module verwalten</h1>
+              <p className="text-slate-400 mt-0.5">Ausbildungsmodule für die Police Academy konfigurieren</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Neues Modul
+          </button>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Neues Modul
-        </button>
       </div>
 
       {/* Loading */}
@@ -224,8 +231,8 @@ export default function AcademyModules() {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-md w-full">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl max-w-md w-full border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white">Neues Ausbildungsmodul</h2>
               <button
@@ -298,8 +305,8 @@ export default function AcademyModules() {
 
       {/* Edit Modal */}
       {editingModule && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-md w-full">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl max-w-md w-full border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white">Modul bearbeiten</h2>
               <button

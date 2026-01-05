@@ -152,32 +152,39 @@ export default function Backups() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Database className="h-8 w-8 text-blue-400" />
-            Backups
-          </h1>
-          <p className="text-slate-400 mt-1">Datenbank-Backups verwalten</p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600/20 via-slate-800 to-emerald-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-500/20 rounded-2xl backdrop-blur-sm border border-blue-500/30 shadow-lg shadow-blue-500/20">
+              <Database className="h-8 w-8 text-blue-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Backups</h1>
+              <p className="text-slate-400 mt-0.5">Datenbank-Backups verwalten</p>
+            </div>
+          </div>
+          <button
+            onClick={() => createBackup.mutate()}
+            disabled={isCreating}
+            className="btn-primary flex items-center gap-2"
+          >
+            {isCreating ? (
+              <>
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                Erstelle Backup...
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4" />
+                Neues Backup
+              </>
+            )}
+          </button>
         </div>
-        <button
-          onClick={() => createBackup.mutate()}
-          disabled={isCreating}
-          className="btn-primary flex items-center gap-2"
-        >
-          {isCreating ? (
-            <>
-              <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-              Erstelle Backup...
-            </>
-          ) : (
-            <>
-              <Plus className="h-4 w-4" />
-              Neues Backup
-            </>
-          )}
-        </button>
       </div>
 
       {/* Stats */}
@@ -318,8 +325,8 @@ export default function Backups() {
 
       {/* Restore Confirmation Modal */}
       {restoreConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl max-w-md w-full p-6 border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="flex items-center gap-4 mb-4">
               <div className="p-3 bg-amber-500/20 rounded-full">
                 <AlertTriangle className="h-6 w-6 text-amber-400" />

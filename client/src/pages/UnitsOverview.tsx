@@ -10,7 +10,56 @@ import {
   RefreshCw,
   Star,
   User,
+  Crosshair,
+  Scale,
+  GraduationCap,
+  Search,
+  UserCheck,
+  Bike,
+  Settings,
+  PartyPopper,
+  Car,
+  BadgeCheck,
+  type LucideIcon,
 } from 'lucide-react';
+
+// Icon Mapping fuer Units basierend auf Name/ShortName
+const unitIconMap: Record<string, LucideIcon> = {
+  'SWAT': Crosshair,
+  'Special Weapons & Tactics': Crosshair,
+  'IA': Scale,
+  'Internal Affairs': Scale,
+  'PA': GraduationCap,
+  'Police Academy': GraduationCap,
+  'DET': Search,
+  'Detectives': Search,
+  'HR': UserCheck,
+  'Human Ressource': UserCheck,
+  'Biker': Bike,
+  'MGMT': Settings,
+  'Management': Settings,
+  'ET': PartyPopper,
+  'Eventteam': PartyPopper,
+  'SHP': Car,
+  'State & Highway Patrol': Car,
+  'QA': BadgeCheck,
+  'Quality Assurance': BadgeCheck,
+  'TL': Crown,
+  'Teamleitung': Crown,
+};
+
+function getUnitIcon(unit: { name: string; shortName: string | null }): LucideIcon {
+  // Zuerst nach ShortName suchen
+  if (unit.shortName && unitIconMap[unit.shortName]) {
+    return unitIconMap[unit.shortName];
+  }
+  // Dann nach Name suchen
+  if (unitIconMap[unit.name]) {
+    return unitIconMap[unit.name];
+  }
+  // Default: Shield
+  return Shield;
+}
 
 interface UnitRole {
   id: string;
@@ -180,12 +229,17 @@ export default function UnitsOverview() {
                   borderLeft: `4px solid ${unit.color}`,
                 }}
               >
-                <div
-                  className="p-3 rounded-xl"
-                  style={{ backgroundColor: `${unit.color}20` }}
-                >
-                  <Shield className="h-6 w-6" style={{ color: unit.color }} />
-                </div>
+                {(() => {
+                  const UnitIcon = getUnitIcon(unit);
+                  return (
+                    <div
+                      className="p-3 rounded-xl"
+                      style={{ backgroundColor: `${unit.color}20` }}
+                    >
+                      <UnitIcon className="h-6 w-6" style={{ color: unit.color }} />
+                    </div>
+                  );
+                })()}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-white">{unit.name}</h3>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { tasksApi, employeesApi, sanctionsApi, treasuryApi, announcementsApi } from '../services/api';
+import { tasksApi, employeesApi, sanctionsApi, treasuryApi, announcementsApi, notificationsApi } from '../services/api';
 import {
   Plus,
   X,
@@ -21,6 +21,9 @@ import {
   Send,
   Hash,
   ChevronRight,
+  Bell,
+  Users,
+  Globe,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -96,10 +99,22 @@ const STATUS_COLUMNS = [
 export default function Leadership() {
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Leadership</h1>
-        <p className="text-slate-400 mt-1">Verwaltungsbereich für das Führungsteam</p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600/20 via-slate-800 to-pink-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-pink-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-indigo-500/20 rounded-2xl backdrop-blur-sm border border-indigo-500/30 shadow-lg shadow-indigo-500/20">
+              <CheckSquare className="h-8 w-8 text-indigo-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Leadership</h1>
+              <p className="text-slate-400 mt-0.5">Verwaltungsbereich für das Führungsteam</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Top Row: Treasury + Announcements */}
@@ -224,8 +239,8 @@ function TreasuryWidget() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-sm mx-4 border border-slate-700">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl p-6 w-full max-w-sm mx-4 border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <h2 className="text-lg font-bold text-white mb-4">
               {transactionType === 'DEPOSIT' ? 'Einzahlung' : 'Auszahlung'} - {moneyType === 'REGULAR' ? 'Normal' : 'Schwarz'}
             </h2>
@@ -260,27 +275,100 @@ const ANNOUNCEMENT_CHANNELS = [
   { id: '1015781213669163008', name: 'OOC Ankündigungen' },
 ];
 
+interface DiscordRole {
+  id: string;
+  name: string;
+  color: number;
+}
+
 function AnnouncementsWidget() {
+  const [activeTab, setActiveTab] = useState<'discord' | 'inapp'>('discord');
+
+  // Discord state
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [channelId, setChannelId] = useState(ANNOUNCEMENT_CHANNELS[0].id);
 
-  const sendMutation = useMutation({
+  // In-App state
+  const [inAppTitle, setInAppTitle] = useState('');
+  const [inAppMessage, setInAppMessage] = useState('');
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [broadcastToAll, setBroadcastToAll] = useState(false);
+
+  // Discord Rollen laden
+  const { data: rolesData, isLoading: rolesLoading } = useQuery({
+    queryKey: ['notification-discord-roles'],
+    queryFn: async () => {
+      const res = await notificationsApi.getDiscordRoles();
+      return res.data as { serverName: string; roles: DiscordRole[] };
+    },
+  });
+
+  const discordRoles = rolesData?.roles || [];
+
+  const sendDiscordMutation = useMutation({
     mutationFn: announcementsApi.sendDirect,
     onSuccess: () => {
       setTitle('');
       setContent('');
-      toast.success('Ankündigung gesendet!');
+      toast.success('Discord-Ankündigung gesendet!');
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const broadcastMutation = useMutation({
+    mutationFn: notificationsApi.broadcast,
+    onSuccess: (res) => {
+      setInAppTitle('');
+      setInAppMessage('');
+      setSelectedRoles([]);
+      toast.success(res.data.message || 'Benachrichtigung gesendet!');
+    },
+  });
+
+  const broadcastAllMutation = useMutation({
+    mutationFn: notificationsApi.broadcastAll,
+    onSuccess: (res) => {
+      setInAppTitle('');
+      setInAppMessage('');
+      setBroadcastToAll(false);
+      toast.success(res.data.message || 'Benachrichtigung an alle gesendet!');
+    },
+  });
+
+  const handleDiscordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim() || !channelId) {
       toast.error('Bitte alle Felder ausfüllen');
       return;
     }
-    sendMutation.mutate({ title: title.trim(), content: content.trim(), channelId });
+    sendDiscordMutation.mutate({ title: title.trim(), content: content.trim(), channelId });
+  };
+
+  const handleInAppSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inAppTitle.trim() || !inAppMessage.trim()) {
+      toast.error('Bitte Titel und Nachricht ausfüllen');
+      return;
+    }
+
+    if (broadcastToAll) {
+      broadcastAllMutation.mutate({ title: inAppTitle.trim(), message: inAppMessage.trim(), type: 'INFO' });
+    } else {
+      if (selectedRoles.length === 0) {
+        toast.error('Bitte mindestens eine Rolle auswählen');
+        return;
+      }
+      broadcastMutation.mutate({ title: inAppTitle.trim(), message: inAppMessage.trim(), roleIds: selectedRoles, type: 'INFO' });
+    }
+  };
+
+  const toggleRole = (roleId: string) => {
+    setSelectedRoles((prev) =>
+      prev.includes(roleId)
+        ? prev.filter((id) => id !== roleId)
+        : [...prev, roleId]
+    );
+    setBroadcastToAll(false);
   };
 
   const selectedChannel = ANNOUNCEMENT_CHANNELS.find(c => c.id === channelId);
@@ -289,78 +377,206 @@ function AnnouncementsWidget() {
     <div className="card">
       <div className="p-4 border-b border-slate-700 flex items-center gap-2">
         <Megaphone className="h-5 w-5 text-primary-400" />
-        <h2 className="font-semibold text-white">Ankündigung senden</h2>
+        <h2 className="font-semibold text-white">Ankündigungen</h2>
       </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-slate-700">
+        <button
+          onClick={() => setActiveTab('discord')}
+          className={`flex-1 py-3 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+            activeTab === 'discord'
+              ? 'text-primary-400 border-b-2 border-primary-400 bg-primary-500/5'
+              : 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/50'
+          }`}
+        >
+          <Hash className="h-4 w-4" />
+          Discord
+        </button>
+        <button
+          onClick={() => setActiveTab('inapp')}
+          className={`flex-1 py-3 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+            activeTab === 'inapp'
+              ? 'text-primary-400 border-b-2 border-primary-400 bg-primary-500/5'
+              : 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/50'
+          }`}
+        >
+          <Bell className="h-4 w-4" />
+          In-App
+        </button>
+      </div>
+
       <div className="p-4">
-        <form onSubmit={handleSubmit} className="space-y-3">
-          {/* Channel Selection */}
-          <div>
-            <label className="label">Kanal</label>
-            <div className="flex gap-2">
-              {ANNOUNCEMENT_CHANNELS.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setChannelId(c.id)}
-                  className={`flex-1 py-2 px-3 rounded text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
-                    channelId === c.id
-                      ? 'bg-primary-600/30 text-primary-400 border border-primary-500'
-                      : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                  }`}
-                >
-                  <Hash className="h-4 w-4" />
-                  {c.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Title */}
-          <div>
-            <label className="label">Titel</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="input"
-              placeholder="Ankündigungstitel..."
-              required
-            />
-          </div>
-
-          {/* Content */}
-          <div>
-            <label className="label">Inhalt</label>
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="input h-24 resize-none"
-              placeholder="Ankündigungstext..."
-              required
-            />
-          </div>
-
-          {/* Preview */}
-          {(title || content) && (
-            <div className="bg-[#36393f] rounded-lg p-3">
-              <p className="text-xs text-slate-400 mb-2">Vorschau:</p>
-              <div className="border-l-4 border-[#5865f2] bg-[#2f3136] rounded p-3">
-                <h4 className="font-semibold text-white text-sm">{title || 'Titel...'}</h4>
-                <p className="text-[#dcddde] text-xs mt-1 whitespace-pre-wrap">{content || 'Inhalt...'}</p>
+        {activeTab === 'discord' ? (
+          // Discord Announcement Form
+          <form onSubmit={handleDiscordSubmit} className="space-y-3">
+            <div>
+              <label className="label">Kanal</label>
+              <div className="flex gap-2">
+                {ANNOUNCEMENT_CHANNELS.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setChannelId(c.id)}
+                    className={`flex-1 py-2 px-3 rounded text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                      channelId === c.id
+                        ? 'bg-primary-600/30 text-primary-400 border border-primary-500'
+                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                    }`}
+                  >
+                    <Hash className="h-4 w-4" />
+                    {c.name}
+                  </button>
+                ))}
               </div>
             </div>
-          )}
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={sendMutation.isPending || !title.trim() || !content.trim()}
-            className="w-full btn-primary flex items-center justify-center gap-2 py-2.5"
-          >
-            <Send className="h-4 w-4" />
-            {sendMutation.isPending ? 'Wird gesendet...' : `An #${selectedChannel?.name} senden`}
-          </button>
-        </form>
+            <div>
+              <label className="label">Titel</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="input"
+                placeholder="Ankündigungstitel..."
+                required
+              />
+            </div>
+
+            <div>
+              <label className="label">Inhalt</label>
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                className="input h-20 resize-none"
+                placeholder="Ankündigungstext..."
+                required
+              />
+            </div>
+
+            {(title || content) && (
+              <div className="bg-[#36393f] rounded-lg p-3">
+                <p className="text-xs text-slate-400 mb-2">Vorschau:</p>
+                <div className="border-l-4 border-[#5865f2] bg-[#2f3136] rounded p-3">
+                  <h4 className="font-semibold text-white text-sm">{title || 'Titel...'}</h4>
+                  <p className="text-[#dcddde] text-xs mt-1 whitespace-pre-wrap">{content || 'Inhalt...'}</p>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={sendDiscordMutation.isPending || !title.trim() || !content.trim()}
+              className="w-full btn-primary flex items-center justify-center gap-2 py-2.5"
+            >
+              <Send className="h-4 w-4" />
+              {sendDiscordMutation.isPending ? 'Wird gesendet...' : `An #${selectedChannel?.name} senden`}
+            </button>
+          </form>
+        ) : (
+          // In-App Notification Form
+          <form onSubmit={handleInAppSubmit} className="space-y-3">
+            <div>
+              <label className="label">Empfänger</label>
+              <button
+                type="button"
+                onClick={() => { setBroadcastToAll(!broadcastToAll); setSelectedRoles([]); }}
+                className={`w-full py-2 px-3 rounded text-sm font-medium flex items-center justify-center gap-2 transition-colors mb-2 ${
+                  broadcastToAll
+                    ? 'bg-amber-600/30 text-amber-400 border border-amber-500'
+                    : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                }`}
+              >
+                <Globe className="h-4 w-4" />
+                An alle Benutzer senden
+              </button>
+
+              {!broadcastToAll && (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500">Oder wähle Discord-Rollen:</p>
+                  {rolesLoading ? (
+                    <p className="text-sm text-slate-400">Lade Rollen...</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                      {discordRoles.map((role) => (
+                        <button
+                          key={role.id}
+                          type="button"
+                          onClick={() => toggleRole(role.id)}
+                          className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
+                            selectedRoles.includes(role.id)
+                              ? 'bg-primary-600/30 text-primary-400 border border-primary-500'
+                              : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                          }`}
+                        >
+                          {selectedRoles.includes(role.id) && <Check className="h-3 w-3" />}
+                          {role.name.replace('»', '').trim()}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {selectedRoles.length > 0 && (
+                    <p className="text-xs text-primary-400">{selectedRoles.length} Rolle(n) ausgewählt</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="label">Titel</label>
+              <input
+                type="text"
+                value={inAppTitle}
+                onChange={(e) => setInAppTitle(e.target.value)}
+                className="input"
+                placeholder="Benachrichtigungstitel..."
+                required
+              />
+            </div>
+
+            <div>
+              <label className="label">Nachricht</label>
+              <textarea
+                value={inAppMessage}
+                onChange={(e) => setInAppMessage(e.target.value)}
+                className="input h-20 resize-none"
+                placeholder="Nachrichtentext..."
+                required
+              />
+            </div>
+
+            {/* Preview */}
+            {(inAppTitle || inAppMessage) && (
+              <div className="bg-slate-700/50 rounded-lg p-3">
+                <p className="text-xs text-slate-400 mb-2">Vorschau:</p>
+                <div className="bg-slate-800 rounded-lg p-3 border border-slate-600">
+                  <div className="flex items-start gap-2">
+                    <div className="p-1.5 rounded-lg bg-primary-500/20">
+                      <Bell className="h-4 w-4 text-primary-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-white text-sm">{inAppTitle || 'Titel...'}</p>
+                      <p className="text-slate-400 text-xs mt-0.5">{inAppMessage || 'Nachricht...'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={broadcastMutation.isPending || broadcastAllMutation.isPending || !inAppTitle.trim() || !inAppMessage.trim() || (!broadcastToAll && selectedRoles.length === 0)}
+              className="w-full btn-primary flex items-center justify-center gap-2 py-2.5"
+            >
+              <Bell className="h-4 w-4" />
+              {broadcastMutation.isPending || broadcastAllMutation.isPending
+                ? 'Wird gesendet...'
+                : broadcastToAll
+                  ? 'An alle senden'
+                  : `An ${selectedRoles.length} Rolle(n) senden`}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -489,8 +705,8 @@ function TasksWidget() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md mx-4 border border-slate-700">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl p-6 w-full max-w-md mx-4 border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-white">{editingTask ? 'Bearbeiten' : 'Neue Aufgabe'}</h2>
               <button onClick={closeModal} className="p-1 hover:bg-slate-700 rounded"><X className="h-5 w-5 text-slate-400" /></button>
@@ -662,8 +878,8 @@ function SanctionsWidget() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md mx-4 border border-slate-700 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl p-6 w-full max-w-md mx-4 border border-slate-700/50 shadow-2xl shadow-black/50 max-h-[90vh] overflow-y-auto animate-scale-in">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-white">Neue Sanktion</h2>
               <button onClick={closeModal} className="p-1 hover:bg-slate-700 rounded"><X className="h-5 w-5 text-slate-400" /></button>

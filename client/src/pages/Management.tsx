@@ -396,14 +396,21 @@ export default function Management() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Building2 className="h-8 w-8 text-purple-400" />
-            Management
-          </h1>
-          <p className="text-slate-400 mt-1">Uprank-Anträge, Tuning-Rechnungen und Mitarbeiterverwaltung</p>
+      {/* Header mit Gradient */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-600/20 via-slate-800 to-indigo-600/20 border border-slate-700/50 p-6">
+        <div className="absolute inset-0 bg-grid-white/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-purple-500/20 rounded-2xl backdrop-blur-sm border border-purple-500/30 shadow-lg shadow-purple-500/20">
+              <Building2 className="h-8 w-8 text-purple-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Management</h1>
+              <p className="text-slate-400 mt-0.5">Uprank-Anträge, Tuning-Rechnungen und Mitarbeiterverwaltung</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -509,9 +516,9 @@ export default function Management() {
           {/* Stats */}
           {uprankStats && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="card p-4">
+              <div className="card p-4 bg-gradient-to-br from-slate-800/80 to-slate-900/80 hover:border-slate-600/50 transition-all group">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-slate-500/20 rounded-lg">
+                  <div className="p-2 bg-slate-500/20 rounded-lg group-hover:scale-110 transition-transform">
                     <TrendingUp className="h-5 w-5 text-slate-400" />
                   </div>
                   <div>
@@ -520,35 +527,35 @@ export default function Management() {
                   </div>
                 </div>
               </div>
-              <div className="card p-4">
+              <div className="card p-4 bg-gradient-to-br from-yellow-900/30 to-slate-900/80 hover:border-yellow-600/50 transition-all group">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-yellow-500/20 rounded-lg">
+                  <div className="p-2 bg-yellow-500/20 rounded-lg group-hover:scale-110 transition-transform">
                     <Clock className="h-5 w-5 text-yellow-400" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-white">{uprankStats.pending}</p>
+                    <p className="text-2xl font-bold text-yellow-400">{uprankStats.pending}</p>
                     <p className="text-sm text-slate-400">Ausstehend</p>
                   </div>
                 </div>
               </div>
-              <div className="card p-4">
+              <div className="card p-4 bg-gradient-to-br from-green-900/30 to-slate-900/80 hover:border-green-600/50 transition-all group">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-500/20 rounded-lg">
+                  <div className="p-2 bg-green-500/20 rounded-lg group-hover:scale-110 transition-transform">
                     <CheckCircle className="h-5 w-5 text-green-400" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-white">{uprankStats.approved}</p>
+                    <p className="text-2xl font-bold text-green-400">{uprankStats.approved}</p>
                     <p className="text-sm text-slate-400">Genehmigt</p>
                   </div>
                 </div>
               </div>
-              <div className="card p-4">
+              <div className="card p-4 bg-gradient-to-br from-red-900/30 to-slate-900/80 hover:border-red-600/50 transition-all group">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-red-500/20 rounded-lg">
+                  <div className="p-2 bg-red-500/20 rounded-lg group-hover:scale-110 transition-transform">
                     <XCircle className="h-5 w-5 text-red-400" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-white">{uprankStats.rejected}</p>
+                    <p className="text-2xl font-bold text-red-400">{uprankStats.rejected}</p>
                     <p className="text-sm text-slate-400">Abgelehnt</p>
                   </div>
                 </div>
@@ -1235,8 +1242,8 @@ export default function Management() {
 
       {/* Uprank Request Detail Modal */}
       {selectedRequest && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-white">Uprank-Antrag</h2>
@@ -1399,8 +1406,8 @@ export default function Management() {
 
       {/* Tuning Invoice Detail Modal */}
       {selectedInvoice && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-white">Tuning-Rechnung</h2>
