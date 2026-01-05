@@ -571,6 +571,32 @@ export const discordAnnouncementsApi = {
   getChannels: () => api.get('/discord-announcements/channels'),
 };
 
+// Units API
+export const unitsApi = {
+  // Öffentliche Routen
+  getAll: () => api.get('/units'),
+  getOverview: () => api.get('/units/overview'),
+  getMembers: (id: string) => api.get(`/units/${id}/members`),
+
+  // Admin Routen
+  getAllAdmin: () => api.get('/units/admin/all'),
+  create: (data: { name: string; shortName?: string; description?: string; color?: string; icon?: string; sortOrder?: number }) =>
+    api.post('/units', data),
+  update: (id: string, data: { name?: string; shortName?: string; description?: string; color?: string; icon?: string; isActive?: boolean; sortOrder?: number }) =>
+    api.put(`/units/${id}`, data),
+  delete: (id: string) => api.delete(`/units/${id}`),
+
+  // Discord Rollen
+  getDiscordRoles: () => api.get('/units/discord-roles'),
+
+  // Unit Rollen
+  addRole: (unitId: string, data: { discordRoleId: string; discordRoleName?: string; position: string; sortOrder?: number; isLeadership?: boolean }) =>
+    api.post(`/units/${unitId}/roles`, data),
+  updateRole: (unitId: string, roleId: string, data: { position?: string; sortOrder?: number; isLeadership?: boolean }) =>
+    api.put(`/units/${unitId}/roles/${roleId}`, data),
+  deleteRole: (unitId: string, roleId: string) => api.delete(`/units/${unitId}/roles/${roleId}`),
+};
+
 // Archiv API
 export const archiveApi = {
   // Beförderungen

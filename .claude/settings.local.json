@@ -50,7 +50,10 @@
       "Bash(cmd //c \"taskkill /PID 42108 /F\")",
       "Bash(cmd //c \"taskkill /PID 7228 /F\")",
       "Bash(cd:*)",
-      "Bash(cmd //c \"taskkill /F /IM node.exe 2>nul\")"
+      "Bash(cmd //c \"taskkill /F /IM node.exe 2>nul\")",
+      "Bash(cmd /c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && npx prisma db push\")",
+      "Bash(cmd /c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && npx prisma db push 2>&1\")",
+      "Bash(cmd /c \"cd /d c:\\\\Users\\\\bleck\\\\Desktop\\\\Projekte\\\\Personalsystem\\\\server && npm run dev\")"
     ]
   }
 }

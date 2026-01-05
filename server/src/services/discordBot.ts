@@ -955,10 +955,38 @@ export async function getMemberRoles(discordId: string): Promise<{ id: string; n
     return Array.from(member.roles.cache.values())
       .filter(r => r.name !== '@everyone')
       .map(r => ({ id: r.id, name: r.name }));
-  } catch (error) {
+  } catch (error: unknown) {
+    // 10007 = Unknown Member - Member ist nicht mehr im Server, still ignorieren
+    if (error && typeof error === 'object' && 'code' in error && error.code === 10007) {
+      return [];
+    }
     console.error(`Fehler beim Abrufen der Rollen für ${discordId}:`, error);
     return [];
   }
+}
+
+// Batch-Funktion: Alle Member-Rollen auf einmal abrufen (performant!)
+export async function getAllMembersWithRoles(): Promise<Map<string, { id: string; name: string }[]>> {
+  const result = new Map<string, { id: string; name: string }[]>();
+
+  if (!guild) return result;
+
+  try {
+    // Alle Members auf einmal laden (nutzt Discord.js Cache)
+    const members = await guild.members.fetch();
+
+    for (const [, member] of members) {
+      const roles = Array.from(member.roles.cache.values())
+        .filter(r => r.name !== '@everyone')
+        .map(r => ({ id: r.id, name: r.name }));
+
+      result.set(member.id, roles);
+    }
+  } catch (error) {
+    console.error('Fehler beim Batch-Abrufen der Member-Rollen:', error);
+  }
+
+  return result;
 }
 
 // Vordefinierte Ankündigungs-Kanäle aus .env abrufen

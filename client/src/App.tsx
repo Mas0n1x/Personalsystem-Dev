@@ -18,8 +18,10 @@ import AcademySettings from './pages/admin/AcademySettings';
 import Backups from './pages/admin/Backups';
 import BonusSettings from './pages/admin/BonusSettings';
 import DiscordAnnouncements from './pages/admin/DiscordAnnouncements';
+import UnitsAdmin from './pages/admin/UnitsAdmin';
 
 // Leadership
+import UnitsOverview from './pages/UnitsOverview';
 import Leadership from './pages/Leadership';
 import Evidence from './pages/Evidence';
 import Tuning from './pages/Tuning';
@@ -81,6 +83,9 @@ function App() {
         <Route path="teamleitung" element={<Teamleitung />} />
         <Route path="management" element={<Management />} />
 
+        {/* Units */}
+        <Route path="units" element={<UnitsOverview />} />
+
         {/* Leadership */}
         <Route path="leadership" element={<Leadership />} />
 
@@ -94,6 +99,7 @@ function App() {
         <Route path="admin/backups" element={<Backups />} />
         <Route path="admin/bonus" element={<BonusSettings />} />
         <Route path="admin/discord-announcements" element={<DiscordAnnouncements />} />
+        <Route path="admin/units" element={<UnitsAdmin />} />
       </Route>
 
       {/* Fallback */}

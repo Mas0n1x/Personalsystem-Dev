@@ -1001,3 +1001,45 @@ model DiscordAnnouncementChannel {
 
   @@map("discord_announcement_channels")
 }
+
+// ==================== UNITS SYSTEM ====================
+
+// Unit Definition (konfigurierbar über Admin)
+model Unit {
+  id            String      @id @default(cuid())
+  name          String      @unique                           // z.B. "Internal Affairs", "S.W.A.T."
+  shortName     String?                                       // z.B. "IA", "SWAT"
+  description   String?                                       // Beschreibung der Unit
+  color         String      @default("#6366f1")               // Hex-Farbe für die Anzeige
+  icon          String?                                       // Lucide Icon Name (optional)
+  isActive      Boolean     @default(true)
+  sortOrder     Int         @default(0)                       // Reihenfolge in der Anzeige
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Beziehungen
+  roles         UnitRole[]                                    // Discord-Rollen die zu dieser Unit gehören
+
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("units")
+}
+
+// Unit-Rollen (Discord-Rollen die zu einer Unit gehören)
+model UnitRole {
+  id              String    @id @default(cuid())
+  unitId          String
+  unit            Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  discordRoleId   String                                      // Discord Role ID
+  discordRoleName String                                      // Discord Role Name (zur Anzeige)
+  position        String                                      // Position/Rang in der Unit (z.B. "Director", "Co-Director", "Member")
+  sortOrder       Int       @default(0)                       // Reihenfolge (höher = wichtiger)
+  isLeadership    Boolean   @default(false)                   // Ist eine Leitungsposition?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([unitId, discordRoleId])
+  @@index([unitId])
+  @@index([discordRoleId])
+  @@map("unit_roles")
+}

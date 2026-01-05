@@ -66,6 +66,7 @@ export default function Sidebar() {
     {
       name: 'Units',
       items: [
+        { name: 'Units-Übersicht', href: '/units', icon: Shield, permission: 'employees.view' },
         { name: 'HR', href: '/hr', icon: UserX, permission: 'blacklist.view' },
         { name: 'Detectives', href: '/detectives', icon: Search, permission: 'detectives.view' },
         { name: 'Academy', href: '/academy', icon: GraduationCap, permission: 'academy.view' },
@@ -84,6 +85,7 @@ export default function Sidebar() {
         { name: 'Fragen & Kriterien', href: '/admin/academy-settings', icon: HelpCircle, permission: 'admin.full' },
         { name: 'Sonderzahlungen', href: '/admin/bonus', icon: DollarSign, permission: 'admin.full' },
         { name: 'Discord Ankündigungen', href: '/admin/discord-announcements', icon: MessageSquare, permission: 'admin.full' },
+        { name: 'Units Verwaltung', href: '/admin/units', icon: Shield, permission: 'admin.full' },
         { name: 'Audit-Logs', href: '/admin/audit-logs', icon: FileText, permission: 'audit.view' },
         { name: 'Backups', href: '/admin/backups', icon: Database, permission: 'admin.full' },
         { name: 'Einstellungen', href: '/admin/settings', icon: Settings, permission: 'admin.full' },
