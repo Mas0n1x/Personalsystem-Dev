@@ -1,42 +1,45 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Datenbank
-  postgres:
-    image: postgres:16-alpine
-    container_name: lspd-postgres
+  # Backend Server
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: personalsystem-server
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: lspd_personalsystem
+      - NODE_ENV=production
+    env_file:
+      - ./server/.env
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - server_data:/app/prisma
+      - server_uploads:/app/uploads
+      - server_backups:/app/backups
     ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - "3001:3001"
+    networks:
+      - personalsystem-network
 
-  # Backend (optional, für lokale Entwicklung ohne Docker)
-  # server:
-  #   build:
-  #     context: ./server
-  #     dockerfile: Dockerfile
-  #   container_name: lspd-server
-  #   restart: unless-stopped
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   environment:
-  #     - DATABASE_URL=postgresql://postgres:password@postgres:5432/lspd_personalsystem?schema=public
-  #     - NODE_ENV=production
-  #   env_file:
-  #     - ./server/.env
-  #   ports:
-  #     - "3001:3001"
+  # Frontend Client
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: personalsystem-client
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+    networks:
+      - personalsystem-network
+
+networks:
+  personalsystem-network:
+    driver: bridge
 
 volumes:
-  postgres_data:
+  server_data:
+  server_uploads:
+  server_backups:
