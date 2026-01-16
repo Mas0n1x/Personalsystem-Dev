@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { absencesApi } from '../services/api';
 import { Calendar, Clock, Trash2, Plus, Coffee, CalendarOff } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 interface Absence {
   id: string;
@@ -40,6 +41,10 @@ export default function Absences() {
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
   const [filterType, setFilterType] = useState<string>('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; absenceId: string | null }>({
+    isOpen: false,
+    absenceId: null,
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['absences', page, filterType],
@@ -287,11 +292,7 @@ export default function Absences() {
                     )}
                   </div>
                   <button
-                    onClick={() => {
-                      if (confirm('Abmeldung wirklich löschen?')) {
-                        deleteMutation.mutate(absence.id);
-                      }
-                    }}
+                    onClick={() => setDeleteConfirm({ isOpen: true, absenceId: absence.id })}
                     className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -424,6 +425,21 @@ export default function Absences() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, absenceId: null })}
+        onConfirm={() => {
+          if (deleteConfirm.absenceId) {
+            deleteMutation.mutate(deleteConfirm.absenceId);
+          }
+        }}
+        title="Abmeldung löschen"
+        message="Möchtest du diese Abmeldung wirklich löschen?"
+        confirmText="Löschen"
+        variant="danger"
+      />
     </div>
   );
 }

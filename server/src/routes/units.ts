@@ -108,14 +108,9 @@ router.get('/:id/members', authMiddleware, requirePermission('employees.view'), 
   try {
     const { id } = req.params;
 
-    // Unit mit Rollen laden
+    // Unit laden
     const unit = await prisma.unit.findUnique({
       where: { id },
-      include: {
-        roles: {
-          orderBy: { sortOrder: 'desc' },
-        },
-      },
     });
 
     if (!unit) {
@@ -123,12 +118,21 @@ router.get('/:id/members', authMiddleware, requirePermission('employees.view'), 
       return;
     }
 
+    // Rollen separat laden (um sicherzustellen dass sie geladen werden)
+    const unitRoles = await prisma.unitRole.findMany({
+      where: { unitId: id },
+      orderBy: { sortOrder: 'desc' },
+    });
+
+    // Unit mit Rollen ergänzen
+    const unitWithRoles = { ...unit, roles: unitRoles };
+
     // Discord Role IDs der Unit sammeln
-    const roleIds = unit.roles.map(r => r.discordRoleId);
+    const roleIds = unitRoles.map(r => r.discordRoleId);
 
     if (roleIds.length === 0) {
       res.json({
-        unit,
+        unit: unitWithRoles,
         members: [],
       });
       return;
@@ -164,7 +168,7 @@ router.get('/:id/members', authMiddleware, requirePermission('employees.view'), 
     // Für jeden Employee prüfen, ob er eine der Unit-Rollen hat
     const membersWithRoles: Array<{
       employee: typeof employees[0];
-      unitRole: typeof unit.roles[0] | null;
+      unitRole: typeof unitRoles[0] | null;
       discordRoles: Array<{ id: string; name: string }>;
     }> = [];
 
@@ -172,9 +176,9 @@ router.get('/:id/members', authMiddleware, requirePermission('employees.view'), 
       const memberRoles = allMemberRoles.get(employee.user.discordId) || [];
 
       // Finde die höchste Unit-Rolle die der Member hat
-      let highestUnitRole: typeof unit.roles[0] | null = null;
+      let highestUnitRole: typeof unitRoles[0] | null = null;
 
-      for (const unitRole of unit.roles) {
+      for (const unitRole of unitRoles) {
         if (memberRoles.some(mr => mr.id === unitRole.discordRoleId)) {
           if (!highestUnitRole || unitRole.sortOrder > highestUnitRole.sortOrder) {
             highestUnitRole = unitRole;
@@ -199,7 +203,7 @@ router.get('/:id/members', authMiddleware, requirePermission('employees.view'), 
     });
 
     res.json({
-      unit,
+      unit: unitWithRoles,
       members: membersWithRoles.map(m => ({
         id: m.employee.id,
         name: m.employee.user.displayName || m.employee.user.username,

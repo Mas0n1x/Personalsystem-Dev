@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { academyApi, employeesApi } from '../services/api';
 import { usePermissions } from '../hooks/usePermissions';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import {
   GraduationCap,
   Check,
@@ -203,6 +204,23 @@ export default function Academy() {
     notes: '',
   });
 
+  // Confirm dialog states
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Bestätigen',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
+
   // Queries
   const { data: trainees = [], isLoading: traineesLoading } = useQuery({
     queryKey: ['academy-trainees'],
@@ -340,9 +358,14 @@ export default function Academy() {
   };
 
   const handleRequestUprank = (employeeId: string, targetRank: string) => {
-    if (confirm(`Uprank-Antrag für ${targetRank} erstellen?`)) {
-      requestUprank.mutate({ employeeId, targetRank });
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Uprank-Antrag erstellen',
+      message: `Möchtest du einen Uprank-Antrag für ${targetRank} erstellen?`,
+      confirmText: 'Antrag erstellen',
+      variant: 'info',
+      onConfirm: () => requestUprank.mutate({ employeeId, targetRank }),
+    });
   };
 
   const formatDate = (date: string) => {
@@ -635,9 +658,14 @@ export default function Academy() {
                     {canManage && (
                       <button
                         onClick={() => {
-                          if (confirm('Wiedereinstellungstest wirklich löschen?')) {
-                            deleteExam.mutate(exam.id);
-                          }
+                          setConfirmDialog({
+                            isOpen: true,
+                            title: 'Wiedereinstellungstest löschen',
+                            message: 'Möchtest du diesen Wiedereinstellungstest wirklich löschen?',
+                            confirmText: 'Löschen',
+                            variant: 'danger',
+                            onConfirm: () => deleteExam.mutate(exam.id),
+                          });
                         }}
                         className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg"
                       >
@@ -789,9 +817,14 @@ export default function Academy() {
                     {canManage && retraining.status === 'PENDING' && (
                       <button
                         onClick={() => {
-                          if (confirm('Nachschulung als abgeschlossen markieren?')) {
-                            updateRetraining.mutate({ id: retraining.id, data: { status: 'COMPLETED' } });
-                          }
+                          setConfirmDialog({
+                            isOpen: true,
+                            title: 'Nachschulung abschließen',
+                            message: 'Möchtest du diese Nachschulung als abgeschlossen markieren?',
+                            confirmText: 'Abschließen',
+                            variant: 'success',
+                            onConfirm: () => updateRetraining.mutate({ id: retraining.id, data: { status: 'COMPLETED' } }),
+                          });
                         }}
                         className="p-2 text-green-400 hover:bg-green-500/20 rounded-lg"
                         title="Als abgeschlossen markieren"
@@ -802,9 +835,14 @@ export default function Academy() {
                     {canManage && (
                       <button
                         onClick={() => {
-                          if (confirm('Nachschulung wirklich löschen?')) {
-                            deleteRetraining.mutate(retraining.id);
-                          }
+                          setConfirmDialog({
+                            isOpen: true,
+                            title: 'Nachschulung löschen',
+                            message: 'Möchtest du diese Nachschulung wirklich löschen?',
+                            confirmText: 'Löschen',
+                            variant: 'danger',
+                            onConfirm: () => deleteRetraining.mutate(retraining.id),
+                          });
                         }}
                         className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg"
                       >
@@ -948,9 +986,14 @@ export default function Academy() {
                       {canManage && (
                         <button
                           onClick={() => {
-                            if (confirm('Notiz wirklich löschen?')) {
-                              deleteNote.mutate(note.id);
-                            }
+                            setConfirmDialog({
+                              isOpen: true,
+                              title: 'Notiz löschen',
+                              message: 'Möchtest du diese Notiz wirklich löschen?',
+                              confirmText: 'Löschen',
+                              variant: 'danger',
+                              onConfirm: () => deleteNote.mutate(note.id),
+                            });
                           }}
                           className="p-1 text-red-400 hover:bg-red-500/20 rounded flex-shrink-0"
                         >
@@ -1274,6 +1317,17 @@ export default function Academy() {
           </div>
         </div>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { evidenceApi } from '../services/api';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import MaterialIcon from '../components/ui/MaterialIcon';
 import {
   Plus,
   X,
@@ -8,12 +10,9 @@ import {
   Package,
   Archive,
   ArchiveX,
-  Trash2,
-  Edit2,
   Filter,
   RefreshCw,
   User,
-  Undo2,
   Flame,
   CheckSquare,
   Square,
@@ -53,10 +52,53 @@ interface EvidenceItem {
 }
 
 const CATEGORIES = [
-  { value: 'WAFFEN', label: 'Waffen', icon: '🔫', color: 'bg-red-600/20 text-red-400 border-red-500/50' },
-  { value: 'DROGEN', label: 'Drogen', icon: '💊', color: 'bg-purple-600/20 text-purple-400 border-purple-500/50' },
-  { value: 'SONSTIGES', label: 'Sonstiges', icon: '📦', color: 'bg-slate-600/20 text-slate-400 border-slate-500/50' },
+  { value: 'WAFFEN', label: 'Waffen', icon: 'local_fire_department', color: 'bg-red-600/20 text-red-400 border-red-500/50' },
+  { value: 'DROGEN', label: 'Drogen', icon: 'medication', color: 'bg-purple-600/20 text-purple-400 border-purple-500/50' },
+  { value: 'SONSTIGES', label: 'Sonstiges', icon: 'inventory_2', color: 'bg-slate-600/20 text-slate-400 border-slate-500/50' },
 ];
+
+// Keywords für automatische Kategorisierung
+const WEAPON_KEYWORDS = [
+  'pistole', 'revolver', 'gewehr', 'rifle', 'shotgun', 'schrotflinte', 'mp', 'smg', 'maschinenpistole',
+  'messer', 'knife', 'machete', 'schwert', 'axt', 'baseballschläger', 'schlagstock', 'knüppel',
+  'munition', 'ammo', 'patronen', 'magazin', 'waffe', 'gun', 'glock', 'ak', 'uzi', 'tec',
+  'sniper', 'rpg', 'granate', 'bombe', 'sprengstoff', 'c4', 'deagle', 'desert eagle',
+  'carbine', 'assault', 'combat', 'micro smg', 'mini smg', 'heavy pistol', 'sns pistol',
+  'vintage pistol', 'marksman', 'bullpup', 'advanced rifle', 'special carbine',
+  'schlagring', 'butterfly', 'balisong', 'stiletto', 'dolch', 'kampfmesser',
+];
+
+const DRUG_KEYWORDS = [
+  'kokain', 'cocaine', 'koks', 'heroin', 'meth', 'crystal', 'amphetamin', 'speed',
+  'marihuana', 'marijuana', 'cannabis', 'weed', 'gras', 'haschisch', 'hash',
+  'ecstasy', 'mdma', 'xtc', 'lsd', 'acid', 'pillen', 'pills', 'tabletten',
+  'crack', 'opium', 'morphin', 'fentanyl', 'oxy', 'oxycodon', 'xanax', 'valium',
+  'ketamin', 'ghb', 'pcp', 'dmt', 'shrooms', 'pilze', 'mushrooms', 'spice',
+  'droge', 'drogen', 'drug', 'drugs', 'stoff', 'substanz', 'betäubungsmittel', 'btm',
+  'joint', 'blunt', 'bong', 'pipe', 'spritze', 'nadel', 'needle', 'syringe',
+];
+
+// Funktion zur automatischen Kategorisierung
+function autoCategorize(itemName: string): string {
+  const lowerName = itemName.toLowerCase().trim();
+
+  // Prüfe auf Waffen-Keywords
+  for (const keyword of WEAPON_KEYWORDS) {
+    if (lowerName.includes(keyword)) {
+      return 'WAFFEN';
+    }
+  }
+
+  // Prüfe auf Drogen-Keywords
+  for (const keyword of DRUG_KEYWORDS) {
+    if (lowerName.includes(keyword)) {
+      return 'DROGEN';
+    }
+  }
+
+  // Standard: Sonstiges
+  return 'SONSTIGES';
+}
 
 const STATUS_OPTIONS = [
   { value: 'EINGELAGERT', label: 'Eingelagert', color: 'bg-green-600/20 text-green-400' },
@@ -91,6 +133,21 @@ export default function Evidence() {
   // Selection state for bulk destroy
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Vernichten',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
 
   const { data: evidenceData, isLoading } = useQuery({
     queryKey: ['evidence', search, filterCategory],
@@ -210,7 +267,18 @@ export default function Evidence() {
   };
 
   const updateItem = (id: string, field: keyof EvidenceItem, value: string | number) => {
-    setItems(items.map(i => i.id === id ? { ...i, [field]: value } : i));
+    setItems(items.map(i => {
+      if (i.id !== id) return i;
+
+      const updated = { ...i, [field]: value };
+
+      // Auto-Kategorisierung wenn Name geändert wird
+      if (field === 'name' && typeof value === 'string') {
+        updated.category = autoCategorize(value);
+      }
+
+      return updated;
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -298,9 +366,14 @@ export default function Evidence() {
       toast.error('Keine Asservate ausgewählt');
       return;
     }
-    if (confirm(`Wirklich ${selectedIds.size} Asservat${selectedIds.size > 1 ? 'en' : ''} vernichten? Diese Aktion kann nicht rückgängig gemacht werden.`)) {
-      destroyBulkMutation.mutate(Array.from(selectedIds));
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Asservate vernichten',
+      message: `Möchtest du wirklich ${selectedIds.size} Asservat${selectedIds.size > 1 ? 'en' : ''} vernichten? Diese Aktion kann nicht rückgängig gemacht werden.`,
+      confirmText: 'Vernichten',
+      variant: 'danger',
+      onConfirm: () => destroyBulkMutation.mutate(Array.from(selectedIds)),
+    });
   };
 
   const cancelSelectMode = () => {
@@ -451,7 +524,7 @@ export default function Evidence() {
             >
               <option value="">Alle Kategorien</option>
               {CATEGORIES.map(c => (
-                <option key={c.value} value={c.value}>{c.icon} {c.label}</option>
+                <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </select>
           </div>
@@ -500,8 +573,8 @@ export default function Evidence() {
                     )}
 
                     {/* Category Icon */}
-                    <div className={`p-3 rounded-xl ${catInfo.color} text-2xl`}>
-                      {catInfo.icon}
+                    <div className={`p-3 rounded-xl ${catInfo.color}`}>
+                      <MaterialIcon name={catInfo.icon} size={24} filled />
                     </div>
 
                     {/* Main Info */}
@@ -575,7 +648,12 @@ export default function Evidence() {
                       <input
                         type="text"
                         value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
+                        onChange={(e) => {
+                          const newName = e.target.value;
+                          setEditName(newName);
+                          // Auto-Kategorisierung
+                          setEditCategory(autoCategorize(newName));
+                        }}
                         className="input"
                         placeholder="z.B. Glock 17"
                         required
@@ -583,7 +661,14 @@ export default function Evidence() {
                     </div>
 
                     <div>
-                      <label className="label">Kategorie</label>
+                      <div className="flex items-center gap-2 mb-2">
+                        <label className="label mb-0">Kategorie</label>
+                        {editName.trim() && autoCategorize(editName) !== 'SONSTIGES' && (
+                          <span className="text-[10px] bg-green-600/80 text-white px-1.5 py-0.5 rounded">
+                            Auto erkannt
+                          </span>
+                        )}
+                      </div>
                       <div className="grid grid-cols-3 gap-3">
                         {CATEGORIES.map(c => (
                           <button
@@ -596,7 +681,7 @@ export default function Evidence() {
                                 : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700 border-2 border-transparent'
                             }`}
                           >
-                            <span className="text-lg">{c.icon}</span>
+                            <MaterialIcon name={c.icon} size={20} filled />
                             {c.label}
                           </button>
                         ))}
@@ -668,15 +753,22 @@ export default function Evidence() {
                               />
                             </div>
                             <div className="col-span-5">
-                              <select
-                                value={item.category}
-                                onChange={(e) => updateItem(item.id, 'category', e.target.value)}
-                                className="input"
-                              >
-                                {CATEGORIES.map(c => (
-                                  <option key={c.value} value={c.value}>{c.icon} {c.label}</option>
-                                ))}
-                              </select>
+                              <div className="relative">
+                                <select
+                                  value={item.category}
+                                  onChange={(e) => updateItem(item.id, 'category', e.target.value)}
+                                  className={`input ${item.name.trim() && autoCategorize(item.name) !== 'SONSTIGES' ? 'border-green-500/50' : ''}`}
+                                >
+                                  {CATEGORIES.map(c => (
+                                    <option key={c.value} value={c.value}>{c.label}</option>
+                                  ))}
+                                </select>
+                                {item.name.trim() && autoCategorize(item.name) !== 'SONSTIGES' && (
+                                  <span className="absolute -top-2 right-2 text-[10px] bg-green-600/80 text-white px-1.5 py-0.5 rounded">
+                                    Auto
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <div className="col-span-2">
                               <input
@@ -748,7 +840,9 @@ export default function Evidence() {
             <div className="p-6">
               {/* Item Info */}
               <div className="bg-slate-700/30 rounded-xl p-4 mb-5 flex items-center gap-3">
-                <span className="text-2xl">{getCategoryInfo(releasingEvidence.category).icon}</span>
+                <div className={`p-2 rounded-lg ${getCategoryInfo(releasingEvidence.category).color}`}>
+                  <MaterialIcon name={getCategoryInfo(releasingEvidence.category).icon} size={24} filled />
+                </div>
                 <div>
                   <p className="font-semibold text-white">{releasingEvidence.name}</p>
                   <p className="text-sm text-slate-400">{releasingEvidence.quantity}x • {getCategoryInfo(releasingEvidence.category).label}</p>
@@ -804,6 +898,16 @@ export default function Evidence() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

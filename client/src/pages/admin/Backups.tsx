@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../services/api';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import {
   Database,
   Download,
@@ -87,6 +88,21 @@ export default function Backups() {
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
   const [restoreConfirm, setRestoreConfirm] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Löschen',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
 
   // Queries
   const { data: backupsData, isLoading } = useQuery({
@@ -304,11 +320,14 @@ export default function Backups() {
                         <RotateCcw className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm('Backup wirklich löschen?')) {
-                            deleteBackup.mutate(backup.id);
-                          }
-                        }}
+                        onClick={() => setConfirmDialog({
+                          isOpen: true,
+                          title: 'Backup löschen',
+                          message: 'Möchtest du dieses Backup wirklich löschen?',
+                          confirmText: 'Löschen',
+                          variant: 'danger',
+                          onConfirm: () => deleteBackup.mutate(backup.id),
+                        })}
                         className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
                         title="Löschen"
                       >
@@ -362,6 +381,16 @@ export default function Backups() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

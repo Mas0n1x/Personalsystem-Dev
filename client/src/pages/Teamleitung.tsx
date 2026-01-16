@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { uprankRequestsApi, uprankLockApi, employeesApi } from '../services/api';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { usePermissions } from '../hooks/usePermissions';
 import {
   TrendingUp,
@@ -126,6 +127,21 @@ export default function Teamleitung() {
   const [lockReason, setLockReason] = useState('');
   const [lockedUntil, setLockedUntil] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Löschen',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
 
   const canManage = permissions.hasAnyPermission('teamlead.manage', 'admin.full');
   const canProcess = permissions.hasAnyPermission('management.uprank', 'admin.full');
@@ -550,11 +566,14 @@ export default function Teamleitung() {
                             )}
                             {request.status === 'PENDING' && (
                               <button
-                                onClick={() => {
-                                  if (confirm('Antrag wirklich löschen?')) {
-                                    deleteMutation.mutate(request.id);
-                                  }
-                                }}
+                                onClick={() => setConfirmDialog({
+                                  isOpen: true,
+                                  title: 'Antrag löschen',
+                                  message: 'Möchtest du diesen Uprank-Antrag wirklich löschen?',
+                                  confirmText: 'Löschen',
+                                  variant: 'danger',
+                                  onConfirm: () => deleteMutation.mutate(request.id),
+                                })}
                                 className="p-2 hover:bg-slate-600 rounded-lg transition-colors"
                                 title="Löschen"
                               >
@@ -686,11 +705,14 @@ export default function Teamleitung() {
                           <div className="flex items-center gap-2">
                             {!expired && lock.isActive && (
                               <button
-                                onClick={() => {
-                                  if (confirm('Sperre wirklich aufheben?')) {
-                                    revokeLockMutation.mutate(lock.id);
-                                  }
-                                }}
+                                onClick={() => setConfirmDialog({
+                                  isOpen: true,
+                                  title: 'Sperre aufheben',
+                                  message: 'Möchtest du diese Uprank-Sperre wirklich aufheben?',
+                                  confirmText: 'Aufheben',
+                                  variant: 'warning',
+                                  onConfirm: () => revokeLockMutation.mutate(lock.id),
+                                })}
                                 className="p-2 text-green-400 hover:bg-green-600/20 rounded-lg transition-colors"
                                 title="Sperre aufheben"
                               >
@@ -698,11 +720,14 @@ export default function Teamleitung() {
                               </button>
                             )}
                             <button
-                              onClick={() => {
-                                if (confirm('Sperre wirklich löschen?')) {
-                                  deleteLockMutation.mutate(lock.id);
-                                }
-                              }}
+                              onClick={() => setConfirmDialog({
+                                isOpen: true,
+                                title: 'Sperre löschen',
+                                message: 'Möchtest du diese Uprank-Sperre wirklich löschen?',
+                                confirmText: 'Löschen',
+                                variant: 'danger',
+                                onConfirm: () => deleteLockMutation.mutate(lock.id),
+                              })}
                               className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -819,6 +844,16 @@ export default function Teamleitung() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

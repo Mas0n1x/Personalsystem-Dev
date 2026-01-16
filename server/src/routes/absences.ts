@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 
 const router = Router();
 
@@ -188,6 +189,9 @@ router.post('/', authMiddleware, requirePermission('employees.view'), async (req
       },
     });
 
+    // WebSocket Broadcast für Live-Updates
+    broadcastCreate('absence', absence);
+
     res.status(201).json(absence);
   } catch (error) {
     console.error('Create absence error:', error);
@@ -225,6 +229,9 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
     }
 
     await prisma.absence.delete({ where: { id } });
+
+    // WebSocket Broadcast für Live-Updates
+    broadcastDelete('absence', id);
 
     res.json({ success: true });
   } catch (error) {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { academyApi } from '../../services/api';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import {
   GraduationCap,
   Plus,
@@ -31,6 +32,21 @@ export default function AcademyModules() {
     name: '',
     description: '',
     category: 'JUNIOR_OFFICER' as 'JUNIOR_OFFICER' | 'OFFICER',
+  });
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Löschen',
+    variant: 'danger',
+    onConfirm: () => {},
   });
 
   // Query
@@ -104,9 +120,14 @@ export default function AcademyModules() {
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (confirm(`Modul "${name}" wirklich löschen? Dies entfernt auch alle Fortschrittsdaten.`)) {
-      deleteModule.mutate(id);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Modul löschen',
+      message: `Möchtest du das Modul "${name}" wirklich löschen? Dies entfernt auch alle Fortschrittsdaten.`,
+      confirmText: 'Löschen',
+      variant: 'danger',
+      onConfirm: () => deleteModule.mutate(id),
+    });
   };
 
   const handleToggleActive = (module: AcademyModule) => {
@@ -374,6 +395,16 @@ export default function AcademyModules() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

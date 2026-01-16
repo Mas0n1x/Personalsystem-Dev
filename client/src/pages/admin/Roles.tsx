@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../services/api';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Modal from '../../components/ui/Modal';
 import { Plus, Edit, Trash2, Shield, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -21,6 +22,21 @@ export default function Roles() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState<RoleWithCount | null>(null);
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Löschen',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
 
   const { data: rolesData, isLoading } = useQuery({
     queryKey: ['roles'],
@@ -182,11 +198,14 @@ export default function Roles() {
                     <Edit className="h-4 w-4" />
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm('Rolle wirklich löschen?')) {
-                        deleteMutation.mutate(role.id);
-                      }
-                    }}
+                    onClick={() => setConfirmDialog({
+                      isOpen: true,
+                      title: 'Rolle löschen',
+                      message: 'Möchtest du diese Rolle wirklich löschen?',
+                      confirmText: 'Löschen',
+                      variant: 'danger',
+                      onConfirm: () => deleteMutation.mutate(role.id),
+                    })}
                     className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -449,6 +468,16 @@ export default function Roles() {
           </form>
         )}
       </Modal>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

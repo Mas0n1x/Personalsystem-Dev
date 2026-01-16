@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../services/api';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import {
   HelpCircle,
   CheckSquare,
@@ -47,6 +48,21 @@ export default function AcademySettings() {
   const [showCriterionModal, setShowCriterionModal] = useState(false);
   const [editingCriterion, setEditingCriterion] = useState<AcademyCriterion | null>(null);
   const [newCriterion, setNewCriterion] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Löschen',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
 
   // Questions Query
   const { data: questions = [], isLoading: questionsLoading } = useQuery<AcademyQuestion[]>({
@@ -311,11 +327,14 @@ export default function AcademySettings() {
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => {
-                              if (confirm('Frage wirklich löschen?')) {
-                                deleteQuestion.mutate(question.id);
-                              }
-                            }}
+                            onClick={() => setConfirmDialog({
+                              isOpen: true,
+                              title: 'Frage löschen',
+                              message: 'Möchtest du diese Frage wirklich löschen?',
+                              confirmText: 'Löschen',
+                              variant: 'danger',
+                              onConfirm: () => deleteQuestion.mutate(question.id),
+                            })}
                             className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-colors"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -434,11 +453,14 @@ export default function AcademySettings() {
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => {
-                              if (confirm('Kriterium wirklich löschen?')) {
-                                deleteCriterion.mutate(criterion.id);
-                              }
-                            }}
+                            onClick={() => setConfirmDialog({
+                              isOpen: true,
+                              title: 'Kriterium löschen',
+                              message: 'Möchtest du dieses Kriterium wirklich löschen?',
+                              confirmText: 'Löschen',
+                              variant: 'danger',
+                              onConfirm: () => deleteCriterion.mutate(criterion.id),
+                            })}
                             className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-colors"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -561,6 +583,16 @@ export default function AcademySettings() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

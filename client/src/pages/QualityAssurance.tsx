@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { unitReviewsApi } from '../services/api';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { usePermissions } from '../hooks/usePermissions';
 import {
   ClipboardCheck,
@@ -50,6 +51,21 @@ export default function QualityAssurance() {
   const [filter, setFilter] = useState<string>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedReview, setSelectedReview] = useState<UnitReview | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Löschen',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
 
   // Queries
   const { data: stats } = useQuery({
@@ -427,11 +443,14 @@ export default function QualityAssurance() {
               {canManage && (
                 <div className="pt-4 border-t border-slate-700">
                   <button
-                    onClick={() => {
-                      if (confirm('Überprüfung wirklich löschen?')) {
-                        deleteReview.mutate(selectedReview.id);
-                      }
-                    }}
+                    onClick={() => setConfirmDialog({
+                      isOpen: true,
+                      title: 'Überprüfung löschen',
+                      message: 'Möchtest du diese Überprüfung wirklich löschen?',
+                      confirmText: 'Löschen',
+                      variant: 'danger',
+                      onConfirm: () => deleteReview.mutate(selectedReview.id),
+                    })}
                     className="text-red-400 hover:text-red-300 text-sm flex items-center gap-1"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -443,6 +462,16 @@ export default function QualityAssurance() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { unitsApi } from '../../services/api';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import {
@@ -112,6 +113,21 @@ export default function UnitsAdmin() {
   const [rolePosition, setRolePosition] = useState('');
   const [roleSortOrder, setRoleSortOrder] = useState(0);
   const [roleIsLeadership, setRoleIsLeadership] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Löschen',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
 
   // Queries
   const { data: unitsData, isLoading: unitsLoading } = useQuery({
@@ -456,11 +472,14 @@ export default function UnitsAdmin() {
                     <Edit2 className="h-4 w-4" />
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm(`Unit "${unit.name}" wirklich löschen?`)) {
-                        deleteUnitMutation.mutate(unit.id);
-                      }
-                    }}
+                    onClick={() => setConfirmDialog({
+                      isOpen: true,
+                      title: 'Unit löschen',
+                      message: `Möchtest du die Unit "${unit.name}" wirklich löschen?`,
+                      confirmText: 'Löschen',
+                      variant: 'danger',
+                      onConfirm: () => deleteUnitMutation.mutate(unit.id),
+                    })}
                     className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -522,11 +541,14 @@ export default function UnitsAdmin() {
                                 <Edit2 className="h-3.5 w-3.5" />
                               </button>
                               <button
-                                onClick={() => {
-                                  if (confirm('Rolle wirklich entfernen?')) {
-                                    deleteRoleMutation.mutate({ unitId: unit.id, roleId: role.id });
-                                  }
-                                }}
+                                onClick={() => setConfirmDialog({
+                                  isOpen: true,
+                                  title: 'Rolle entfernen',
+                                  message: 'Möchtest du diese Rolle wirklich entfernen?',
+                                  confirmText: 'Entfernen',
+                                  variant: 'danger',
+                                  onConfirm: () => deleteRoleMutation.mutate({ unitId: unit.id, roleId: role.id }),
+                                })}
                                 className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-600/20 rounded transition-colors"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -744,6 +766,16 @@ export default function UnitsAdmin() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

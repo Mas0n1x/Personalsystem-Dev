@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tasksApi, employeesApi, sanctionsApi, treasuryApi, announcementsApi, notificationsApi } from '../services/api';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import {
   Plus,
   X,
@@ -594,6 +595,21 @@ function TasksWidget() {
   const [priority, setPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM');
   const [assigneeId, setAssigneeId] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Löschen',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
 
   const { data: tasksData } = useQuery({ queryKey: ['tasks'], queryFn: () => tasksApi.getAll() });
   const { data: employeesData } = useQuery({ queryKey: ['employees-list'], queryFn: () => employeesApi.getAll({ limit: '100' }) });
@@ -681,7 +697,14 @@ function TasksWidget() {
                           <span className="text-xs font-medium text-white truncate">{task.title}</span>
                           <div className="flex items-center gap-0.5 flex-shrink-0">
                             <button onClick={() => openEditModal(task)} className="p-0.5 text-slate-400 hover:text-white"><Edit2 className="h-3 w-3" /></button>
-                            <button onClick={() => { if (confirm('Löschen?')) deleteMutation.mutate(task.id); }} className="p-0.5 text-slate-400 hover:text-red-400"><Trash2 className="h-3 w-3" /></button>
+                            <button onClick={() => setConfirmDialog({
+                              isOpen: true,
+                              title: 'Aufgabe löschen',
+                              message: 'Möchtest du diese Aufgabe wirklich löschen?',
+                              confirmText: 'Löschen',
+                              variant: 'danger',
+                              onConfirm: () => deleteMutation.mutate(task.id),
+                            })} className="p-0.5 text-slate-400 hover:text-red-400"><Trash2 className="h-3 w-3" /></button>
                           </div>
                         </div>
                         <div className="flex items-center gap-1 mt-1">
@@ -753,6 +776,16 @@ function TasksWidget() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }
@@ -770,6 +803,21 @@ function SanctionsWidget() {
   const [measure, setMeasure] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [search, setSearch] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Widerrufen',
+    variant: 'warning',
+    onConfirm: () => {},
+  });
 
   const { data: sanctionsData } = useQuery({
     queryKey: ['sanctions'],
@@ -867,7 +915,14 @@ function SanctionsWidget() {
                       <span>{s.issuedBy.displayName || s.issuedBy.username}</span>
                     </div>
                   </div>
-                  <button onClick={() => { if (confirm('Widerrufen?')) revokeMutation.mutate(s.id); }} className="text-xs bg-slate-600 hover:bg-slate-500 text-slate-300 px-2 py-1 rounded ml-2">
+                  <button onClick={() => setConfirmDialog({
+                    isOpen: true,
+                    title: 'Sanktion widerrufen',
+                    message: 'Möchtest du diese Sanktion wirklich widerrufen?',
+                    confirmText: 'Widerrufen',
+                    variant: 'warning',
+                    onConfirm: () => revokeMutation.mutate(s.id),
+                  })} className="text-xs bg-slate-600 hover:bg-slate-500 text-slate-300 px-2 py-1 rounded ml-2">
                     Widerrufen
                   </button>
                 </div>
@@ -954,6 +1009,16 @@ function SanctionsWidget() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

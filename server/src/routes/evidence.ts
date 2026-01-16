@@ -73,17 +73,26 @@ router.get('/', authMiddleware, requirePermission('evidence.view'), async (req: 
 // GET Statistiken
 router.get('/stats', authMiddleware, requirePermission('evidence.view'), async (_req: AuthRequest, res: Response) => {
   try {
-    // Summiere die Mengen (quantity) statt nur Einträge zu zählen
-    const [totalAgg, eingelagertAgg, vernichtetAgg] = await Promise.all([
+    // Optimiert: Eine groupBy Query statt 3 separate Queries
+    const [totalAgg, statusGroups] = await Promise.all([
       prisma.evidence.aggregate({ _sum: { quantity: true } }),
-      prisma.evidence.aggregate({ where: { status: 'EINGELAGERT' }, _sum: { quantity: true } }),
-      prisma.evidence.aggregate({ where: { status: 'VERNICHTET' }, _sum: { quantity: true } }),
+      prisma.evidence.groupBy({
+        by: ['status'],
+        _sum: { quantity: true },
+      }),
     ]);
+
+    const statsByStatus = statusGroups.reduce((acc, group) => {
+      acc[group.status] = group._sum.quantity || 0;
+      return acc;
+    }, {} as Record<string, number>);
 
     res.json({
       total: totalAgg._sum.quantity || 0,
-      eingelagert: eingelagertAgg._sum.quantity || 0,
-      vernichtet: vernichtetAgg._sum.quantity || 0,
+      eingelagert: statsByStatus['EINGELAGERT'] || 0,
+      vernichtet: statsByStatus['VERNICHTET'] || 0,
+      ausgelagert: statsByStatus['AUSGELAGERT'] || 0,
+      freigegeben: statsByStatus['FREIGEGEBEN'] || 0,
     });
   } catch (error) {
     console.error('Get evidence stats error:', error);
@@ -261,23 +270,37 @@ router.put('/destroy-bulk', authMiddleware, requirePermission('evidence.manage')
       return;
     }
 
-    await prisma.evidence.updateMany({
-      where: { id: { in: ids }, status: 'EINGELAGERT' },
-      data: {
-        status: 'VERNICHTET',
-        releasedAt: new Date(),
+    // Prüfe ob alle IDs existieren und eingelagert sind
+    const existingEvidence = await prisma.evidence.findMany({
+      where: {
+        id: { in: ids },
+        status: 'EINGELAGERT',
       },
+      select: { id: true },
     });
 
-    // Update releasedById for each (updateMany doesn't support relations)
-    for (const id of ids) {
-      await prisma.evidence.update({
-        where: { id },
-        data: { releasedById: req.user!.id },
-      });
+    const validIds = existingEvidence.map(e => e.id);
+
+    if (validIds.length === 0) {
+      res.status(400).json({ error: 'Keine gültigen Asservate zum Vernichten gefunden' });
+      return;
     }
 
-    res.json({ success: true, count: ids.length });
+    // Verwende $transaction für Batch-Update (vermeidet N+1 Problem)
+    await prisma.$transaction(
+      validIds.map((id) =>
+        prisma.evidence.update({
+          where: { id },
+          data: {
+            status: 'VERNICHTET',
+            releasedAt: new Date(),
+            releasedById: req.user!.id,
+          },
+        })
+      )
+    );
+
+    res.json({ success: true, count: validIds.length });
   } catch (error) {
     console.error('Destroy bulk evidence error:', error);
     res.status(500).json({ error: 'Fehler beim Vernichten der Asservate' });

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tuningApi } from '../services/api';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useAuth } from '../context/AuthContext';
 import {
   Plus,
@@ -43,6 +44,21 @@ export default function Tuning() {
   const [amount, setAmount] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Löschen',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
 
   const { data: invoicesData, isLoading } = useQuery({
     queryKey: ['tuning-invoices'],
@@ -265,11 +281,14 @@ export default function Tuning() {
                       {/* Complete Button (only for managers) */}
                       {canManage && (
                         <button
-                          onClick={() => {
-                            if (confirm('Rechnung als erledigt markieren? Dies löscht die Rechnung und das Bild.')) {
-                              completeMutation.mutate(invoice.id);
-                            }
-                          }}
+                          onClick={() => setConfirmDialog({
+                            isOpen: true,
+                            title: 'Rechnung erledigen',
+                            message: 'Möchtest du diese Rechnung als erledigt markieren? Dies löscht die Rechnung und das Bild.',
+                            confirmText: 'Erledigen',
+                            variant: 'success',
+                            onConfirm: () => completeMutation.mutate(invoice.id),
+                          })}
                           disabled={completeMutation.isPending}
                           className="p-2 text-green-400 hover:bg-green-600/20 rounded-lg transition-colors"
                           title="Als erledigt markieren"
@@ -281,11 +300,14 @@ export default function Tuning() {
                       {/* Delete Button (owner or manager) */}
                       {(isOwner || canManage) && (
                         <button
-                          onClick={() => {
-                            if (confirm('Rechnung wirklich löschen?')) {
-                              deleteMutation.mutate(invoice.id);
-                            }
-                          }}
+                          onClick={() => setConfirmDialog({
+                            isOpen: true,
+                            title: 'Rechnung löschen',
+                            message: 'Möchtest du diese Rechnung wirklich löschen?',
+                            confirmText: 'Löschen',
+                            variant: 'danger',
+                            onConfirm: () => deleteMutation.mutate(invoice.id),
+                          })}
                           disabled={deleteMutation.isPending}
                           className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
                           title="Löschen"
@@ -408,6 +430,16 @@ export default function Tuning() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { uprankRequestsApi, tuningApi, employeesApi, bonusApi, archiveApi } from '../services/api';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { usePermissions } from '../hooks/usePermissions';
 import {
   Building2,
@@ -239,6 +240,21 @@ export default function Management() {
   const [bonusFilter, setBonusFilter] = useState<'PENDING' | 'PAID' | 'all'>('PENDING');
   const [archiveTab, setArchiveTab] = useState<'promotions' | 'terminations' | 'applications'>('promotions');
   const [archiveAppFilter, setArchiveAppFilter] = useState<'ALL' | 'COMPLETED' | 'REJECTED'>('ALL');
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Bestätigen',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
 
   // Uprank Requests Queries
   const { data: uprankStats } = useQuery({
@@ -820,11 +836,14 @@ export default function Management() {
                 <div className="card p-4 flex items-center justify-center">
                   {bonusSummary.totals.pendingAmount > 0 && (
                     <button
-                      onClick={() => {
-                        if (confirm(`Alle offenen Boni (${formatCurrency(bonusSummary.totals.pendingAmount)}) bezahlen?`)) {
-                          payAllBonuses.mutate();
-                        }
-                      }}
+                      onClick={() => setConfirmDialog({
+                        isOpen: true,
+                        title: 'Alle Boni bezahlen',
+                        message: `Möchtest du wirklich alle offenen Boni (${formatCurrency(bonusSummary.totals.pendingAmount)}) bezahlen?`,
+                        confirmText: 'Alle bezahlen',
+                        variant: 'success',
+                        onConfirm: () => payAllBonuses.mutate(),
+                      })}
                       className="btn-primary bg-green-600 hover:bg-green-700 flex items-center gap-2"
                       disabled={payAllBonuses.isPending}
                     >
@@ -1450,11 +1469,14 @@ export default function Management() {
                     Als bezahlt markieren
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm('Rechnung wirklich löschen?')) {
-                        deleteTuning.mutate(selectedInvoice.id);
-                      }
-                    }}
+                    onClick={() => setConfirmDialog({
+                      isOpen: true,
+                      title: 'Rechnung löschen',
+                      message: 'Möchtest du diese Rechnung wirklich löschen?',
+                      confirmText: 'Löschen',
+                      variant: 'danger',
+                      onConfirm: () => deleteTuning.mutate(selectedInvoice.id),
+                    })}
                     className="btn-secondary text-red-400 flex items-center gap-2"
                     disabled={deleteTuning.isPending}
                   >
@@ -1467,6 +1489,16 @@ export default function Management() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

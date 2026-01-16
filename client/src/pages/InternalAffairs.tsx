@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { investigationsApi, teamChangeReportsApi, employeesApi } from '../services/api';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { usePermissions } from '../hooks/usePermissions';
 import {
   ShieldAlert,
@@ -142,6 +143,21 @@ export default function InternalAffairs() {
   const [selectedTeamChange, setSelectedTeamChange] = useState<TeamChangeReport | null>(null);
   const [showAddNote, setShowAddNote] = useState(false);
   const [showAddWitness, setShowAddWitness] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Löschen',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
 
   // Queries
   const { data: stats } = useQuery({
@@ -849,11 +865,14 @@ export default function InternalAffairs() {
               {canManage && (
                 <div className="pt-4 border-t border-slate-700">
                   <button
-                    onClick={() => {
-                      if (confirm('Bericht wirklich löschen?')) {
-                        deleteTeamChangeReport.mutate(selectedTeamChange.id);
-                      }
-                    }}
+                    onClick={() => setConfirmDialog({
+                      isOpen: true,
+                      title: 'Bericht löschen',
+                      message: 'Möchtest du diesen Teamwechsel-Bericht wirklich löschen?',
+                      confirmText: 'Löschen',
+                      variant: 'danger',
+                      onConfirm: () => deleteTeamChangeReport.mutate(selectedTeamChange.id),
+                    })}
                     className="text-red-400 hover:text-red-300 text-sm flex items-center gap-1"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -1170,11 +1189,14 @@ export default function InternalAffairs() {
               {canManage && (
                 <div className="pt-4 border-t border-slate-700">
                   <button
-                    onClick={() => {
-                      if (confirm('Ermittlung wirklich löschen? Dies kann nicht rückgängig gemacht werden.')) {
-                        deleteInvestigation.mutate(detail.id);
-                      }
-                    }}
+                    onClick={() => setConfirmDialog({
+                      isOpen: true,
+                      title: 'Ermittlung löschen',
+                      message: 'Möchtest du diese Ermittlung wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
+                      confirmText: 'Löschen',
+                      variant: 'danger',
+                      onConfirm: () => deleteInvestigation.mutate(detail.id),
+                    })}
                     className="text-red-400 hover:text-red-300 text-sm flex items-center gap-1"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -1264,6 +1286,16 @@ export default function InternalAffairs() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

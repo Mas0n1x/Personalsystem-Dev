@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { blacklistApi, applicationApi, adminApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import {
   Plus,
   X,
@@ -21,6 +22,9 @@ import {
   ClipboardList,
   Image as ImageIcon,
   Link,
+  Search,
+  ShieldAlert,
+  Check,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -129,6 +133,13 @@ export default function HumanResources() {
   const [idCardFile, setIdCardFile] = useState<File | null>(null);
   const [checkDiscordId, setCheckDiscordId] = useState('');
   const [checkUsername, setCheckUsername] = useState('');
+  const [blacklistCheckResult, setBlacklistCheckResult] = useState<{
+    checked: boolean;
+    isBlacklisted: boolean;
+    matchedBy?: 'discordId' | 'username' | 'both';
+    entry?: { reason: string; expiresAt?: string };
+  } | null>(null);
+  const [isCheckingBlacklist, setIsCheckingBlacklist] = useState(false);
 
   // Detail Form State
   const [criteria, setCriteria] = useState<Record<string, boolean>>({});
@@ -136,6 +147,23 @@ export default function HumanResources() {
   const [onboardingCompleted, setOnboardingCompleted] = useState<string[]>([]);
   const [detailDiscordId, setDetailDiscordId] = useState('');
   const [detailDiscordUsername, setDetailDiscordUsername] = useState('');
+
+  // Confirm Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Löschen',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
   const [discordInviteLink, setDiscordInviteLink] = useState('');
   const [discordRolesAssigned, setDiscordRolesAssigned] = useState(false);
 
@@ -424,6 +452,63 @@ export default function HumanResources() {
     setIdCardFile(null);
     setCheckDiscordId('');
     setCheckUsername('');
+    setBlacklistCheckResult(null);
+    setIsCheckingBlacklist(false);
+  };
+
+  // Blacklist Check Funktion
+  const checkBlacklist = async () => {
+    if (!checkDiscordId && !checkUsername) {
+      toast.error('Bitte Discord ID oder Username eingeben');
+      return;
+    }
+
+    setIsCheckingBlacklist(true);
+    setBlacklistCheckResult(null);
+
+    try {
+      // Prüfe gegen alle Blacklist-Einträge
+      const blacklistData = await blacklistApi.getAll();
+      const entries = blacklistData.data || [];
+
+      let matchedEntry = null;
+      let matchedBy: 'discordId' | 'username' | 'both' | undefined;
+
+      for (const entry of entries) {
+        const matchesDiscordId = checkDiscordId && entry.discordId === checkDiscordId;
+        const matchesUsername = checkUsername && entry.username.toLowerCase() === checkUsername.toLowerCase();
+
+        if (matchesDiscordId && matchesUsername) {
+          matchedEntry = entry;
+          matchedBy = 'both';
+          break;
+        } else if (matchesDiscordId) {
+          matchedEntry = entry;
+          matchedBy = 'discordId';
+        } else if (matchesUsername && !matchedEntry) {
+          matchedEntry = entry;
+          matchedBy = 'username';
+        }
+      }
+
+      if (matchedEntry) {
+        setBlacklistCheckResult({
+          checked: true,
+          isBlacklisted: true,
+          matchedBy,
+          entry: { reason: matchedEntry.reason, expiresAt: matchedEntry.expiresAt },
+        });
+      } else {
+        setBlacklistCheckResult({
+          checked: true,
+          isBlacklisted: false,
+        });
+      }
+    } catch {
+      toast.error('Fehler beim Prüfen der Blacklist');
+    } finally {
+      setIsCheckingBlacklist(false);
+    }
   };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -855,9 +940,14 @@ export default function HumanResources() {
                         {canManageHR && (
                           <button
                             onClick={() => {
-                              if (confirm('Bewerbung wirklich löschen?')) {
-                                deleteApplicationMutation.mutate(app.id);
-                              }
+                              setConfirmDialog({
+                                isOpen: true,
+                                title: 'Bewerbung löschen',
+                                message: 'Möchtest du diese Bewerbung wirklich löschen?',
+                                confirmText: 'Löschen',
+                                variant: 'danger',
+                                onConfirm: () => deleteApplicationMutation.mutate(app.id),
+                              });
                             }}
                             className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
                           >
@@ -979,9 +1069,14 @@ export default function HumanResources() {
                           </button>
                           <button
                             onClick={() => {
-                              if (confirm('Eintrag wirklich löschen?')) {
-                                deleteBlacklistMutation.mutate(entry.id);
-                              }
+                              setConfirmDialog({
+                                isOpen: true,
+                                title: 'Blacklist-Eintrag löschen',
+                                message: 'Möchtest du diesen Blacklist-Eintrag wirklich löschen?',
+                                confirmText: 'Löschen',
+                                variant: 'danger',
+                                onConfirm: () => deleteBlacklistMutation.mutate(entry.id),
+                              });
                             }}
                             className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
                           >
@@ -1070,7 +1165,10 @@ export default function HumanResources() {
                     <input
                       type="text"
                       value={checkDiscordId}
-                      onChange={(e) => setCheckDiscordId(e.target.value)}
+                      onChange={(e) => {
+                        setCheckDiscordId(e.target.value);
+                        setBlacklistCheckResult(null);
+                      }}
                       className="input"
                       placeholder="123456789..."
                     />
@@ -1080,12 +1178,73 @@ export default function HumanResources() {
                     <input
                       type="text"
                       value={checkUsername}
-                      onChange={(e) => setCheckUsername(e.target.value)}
+                      onChange={(e) => {
+                        setCheckUsername(e.target.value);
+                        setBlacklistCheckResult(null);
+                      }}
                       className="input"
                       placeholder="username"
                     />
                   </div>
                 </div>
+
+                {/* Check Button */}
+                <button
+                  type="button"
+                  onClick={checkBlacklist}
+                  disabled={isCheckingBlacklist || (!checkDiscordId && !checkUsername)}
+                  className="mt-3 w-full btn-secondary flex items-center justify-center gap-2"
+                >
+                  {isCheckingBlacklist ? (
+                    <>
+                      <div className="h-4 w-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                      Prüfe Blacklist...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4" />
+                      Blacklist prüfen
+                    </>
+                  )}
+                </button>
+
+                {/* Check Result */}
+                {blacklistCheckResult && (
+                  <div className={`mt-3 p-3 rounded-lg ${
+                    blacklistCheckResult.isBlacklisted
+                      ? 'bg-red-500/20 border border-red-500/50'
+                      : 'bg-green-500/20 border border-green-500/50'
+                  }`}>
+                    {blacklistCheckResult.isBlacklisted ? (
+                      <div>
+                        <div className="flex items-center gap-2 text-red-400 font-medium">
+                          <ShieldAlert className="h-5 w-5" />
+                          Auf Blacklist gefunden!
+                        </div>
+                        <p className="text-sm text-red-300 mt-1">
+                          Gefunden über: {blacklistCheckResult.matchedBy === 'both'
+                            ? 'Discord ID & Username'
+                            : blacklistCheckResult.matchedBy === 'discordId'
+                              ? 'Discord ID'
+                              : 'Username'}
+                        </p>
+                        <p className="text-sm text-slate-300 mt-1">
+                          Grund: {blacklistCheckResult.entry?.reason}
+                        </p>
+                        {blacklistCheckResult.entry?.expiresAt && (
+                          <p className="text-sm text-slate-400 mt-1">
+                            Ablauf: {new Date(blacklistCheckResult.entry.expiresAt).toLocaleDateString('de-DE')}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-green-400 font-medium">
+                        <Check className="h-5 w-5" />
+                        Nicht auf Blacklist - Bewerber ist sauber
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
@@ -1550,6 +1709,17 @@ export default function HumanResources() {
           </div>
         </div>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

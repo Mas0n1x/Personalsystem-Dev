@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { notifyBonus } from '../services/notificationService.js';
+import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 
 const router = Router();
 
@@ -410,6 +411,9 @@ router.post('/payments', authMiddleware, requirePermission('bonus.manage'), asyn
       },
     });
 
+    // WebSocket Broadcast für Live-Updates
+    broadcastCreate('bonus', payment);
+
     res.json(payment);
   } catch (error) {
     console.error('Create bonus payment error:', error);
@@ -431,6 +435,9 @@ router.put('/payments/:id/pay', authMiddleware, requirePermission('bonus.pay'), 
         paidById: userId,
       },
     });
+
+    // WebSocket Broadcast für Live-Updates
+    broadcastUpdate('bonus', payment);
 
     res.json(payment);
   } catch (error) {
@@ -502,6 +509,9 @@ router.put('/payments/pay-employee/:employeeId', authMiddleware, requirePermissi
         reasons,
         paidByName
       );
+
+      // WebSocket Broadcast für Live-Updates
+      broadcastUpdate('bonus', { employeeId, status: 'PAID', count: result.count });
     }
 
     res.json({ success: true, updated: result.count });
@@ -542,6 +552,11 @@ router.put('/payments/pay-all', authMiddleware, requirePermission('bonus.pay'), 
       },
     });
 
+    // WebSocket Broadcast für Live-Updates
+    if (result.count > 0) {
+      broadcastUpdate('bonus', { type: 'pay-all', status: 'PAID', count: result.count });
+    }
+
     res.json({ success: true, updated: result.count });
   } catch (error) {
     console.error('Pay all bonuses error:', error);
@@ -572,6 +587,9 @@ router.delete('/payments/:id', authMiddleware, requirePermission('bonus.manage')
       where: { id },
       data: { status: 'CANCELLED' },
     });
+
+    // WebSocket Broadcast für Live-Updates
+    broadcastDelete('bonus', id);
 
     res.json({ success: true });
   } catch (error) {

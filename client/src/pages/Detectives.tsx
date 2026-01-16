@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { casesApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import {
   Plus,
   X,
@@ -119,6 +120,23 @@ export default function Detectives() {
   // Upload State
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageDescription, setImageDescription] = useState('');
+
+  // Confirm Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Löschen',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
 
   // Queries
   const { data: foldersData, isLoading: foldersLoading } = useQuery({
@@ -404,9 +422,14 @@ export default function Detectives() {
               </button>
               <button
                 onClick={() => {
-                  if (confirm('Ordner und alle Akten darin wirklich löschen?')) {
-                    deleteFolderMutation.mutate(selectedFolder.id);
-                  }
+                  setConfirmDialog({
+                    isOpen: true,
+                    title: 'Ordner löschen',
+                    message: 'Möchtest du diesen Ordner und alle Akten darin wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+                    confirmText: 'Löschen',
+                    variant: 'danger',
+                    onConfirm: () => deleteFolderMutation.mutate(selectedFolder.id),
+                  });
                 }}
                 className="btn-ghost text-red-400 hover:text-red-300 hover:bg-red-600/20"
               >
@@ -508,9 +531,14 @@ export default function Detectives() {
                       {canManage && (
                         <button
                           onClick={() => {
-                            if (confirm('Akte wirklich löschen?')) {
-                              deleteCaseMutation.mutate(caseItem.id);
-                            }
+                            setConfirmDialog({
+                              isOpen: true,
+                              title: 'Akte löschen',
+                              message: 'Möchtest du diese Akte wirklich löschen?',
+                              confirmText: 'Löschen',
+                              variant: 'danger',
+                              onConfirm: () => deleteCaseMutation.mutate(caseItem.id),
+                            });
                           }}
                           className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
                         >
@@ -748,9 +776,14 @@ export default function Detectives() {
                             {canManage && (
                               <button
                                 onClick={() => {
-                                  if (confirm('Bild wirklich löschen?')) {
-                                    deleteImageMutation.mutate(image.id);
-                                  }
+                                  setConfirmDialog({
+                                    isOpen: true,
+                                    title: 'Bild löschen',
+                                    message: 'Möchtest du dieses Bild wirklich löschen?',
+                                    confirmText: 'Löschen',
+                                    variant: 'danger',
+                                    onConfirm: () => deleteImageMutation.mutate(image.id),
+                                  });
                                 }}
                                 className="p-1 bg-red-600/50 rounded"
                               >
@@ -990,6 +1023,17 @@ export default function Detectives() {
           </div>
         </div>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

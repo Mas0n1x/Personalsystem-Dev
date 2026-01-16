@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { robberyApi } from '../services/api';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useAuth } from '../context/AuthContext';
 import {
   Plus,
@@ -68,6 +69,21 @@ export default function Robbery() {
   const [negotiatorId, setNegotiatorId] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Löschen',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
 
   const { data: robberiesData, isLoading } = useQuery({
     queryKey: ['robberies'],
@@ -315,11 +331,14 @@ export default function Robbery() {
                     {/* Delete Button (only for managers) */}
                     {canManage && (
                       <button
-                        onClick={() => {
-                          if (confirm('Raub wirklich löschen?')) {
-                            deleteMutation.mutate(robbery.id);
-                          }
-                        }}
+                        onClick={() => setConfirmDialog({
+                          isOpen: true,
+                          title: 'Raub löschen',
+                          message: 'Möchtest du diesen Raub wirklich löschen?',
+                          confirmText: 'Löschen',
+                          variant: 'danger',
+                          onConfirm: () => deleteMutation.mutate(robbery.id),
+                        })}
                         disabled={deleteMutation.isPending}
                         className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
                         title="Löschen"
@@ -466,6 +485,16 @@ export default function Robbery() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

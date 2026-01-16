@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bonusApi } from '../../services/api';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import {
   DollarSign,
   RefreshCw,
@@ -43,6 +44,21 @@ export default function BonusSettings() {
     description: '',
     amount: 0,
     category: 'GENERAL',
+  });
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Löschen',
+    variant: 'danger',
+    onConfirm: () => {},
   });
 
   const { data: configsData, isLoading } = useQuery({
@@ -390,11 +406,14 @@ export default function BonusSettings() {
 
                         {/* Delete (only for custom configs) */}
                         <button
-                          onClick={() => {
-                            if (confirm(`Möchtest du "${config.displayName}" wirklich löschen?`)) {
-                              deleteConfigMutation.mutate(config.id);
-                            }
-                          }}
+                          onClick={() => setConfirmDialog({
+                            isOpen: true,
+                            title: 'Bonus-Art löschen',
+                            message: `Möchtest du "${config.displayName}" wirklich löschen?`,
+                            confirmText: 'Löschen',
+                            variant: 'danger',
+                            onConfirm: () => deleteConfigMutation.mutate(config.id),
+                          })}
                           className="text-slate-500 hover:text-red-400 transition-colors"
                           title="Löschen"
                         >
@@ -409,6 +428,16 @@ export default function BonusSettings() {
           )}
         </div>
       ))}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

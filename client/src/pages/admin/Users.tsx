@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi, adminApi } from '../../services/api';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Table from '../../components/ui/Table';
 import Pagination from '../../components/ui/Pagination';
 import Modal from '../../components/ui/Modal';
@@ -15,6 +16,21 @@ export default function Users() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Deaktivieren',
+    variant: 'danger',
+    onConfirm: () => {},
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['users', page, search],
@@ -126,9 +142,14 @@ export default function Users() {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (confirm('Benutzer wirklich deaktivieren?')) {
-                  deleteMutation.mutate(user.id);
-                }
+                setConfirmDialog({
+                  isOpen: true,
+                  title: 'Benutzer deaktivieren',
+                  message: 'Möchtest du diesen Benutzer wirklich deaktivieren?',
+                  confirmText: 'Deaktivieren',
+                  variant: 'danger',
+                  onConfirm: () => deleteMutation.mutate(user.id),
+                });
               }}
               className="btn-sm btn-ghost text-red-400"
             >
@@ -260,6 +281,16 @@ export default function Users() {
           </form>
         )}
       </Modal>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

@@ -15,6 +15,7 @@ import {
 } from '../services/discordBot.js';
 import { notifyPromotion, notifyDemotion, notifyUnitChange } from '../services/notificationService.js';
 import { announcePromotion, announceDemotion, announceUnitChange, announceTermination } from '../services/discordAnnouncements.js';
+import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 
 const router = Router();
 
@@ -231,6 +232,9 @@ router.post('/', authMiddleware, requirePermission('employees.edit'), async (req
         },
       },
     });
+
+    // WebSocket Broadcast für Live-Updates
+    broadcastCreate('employee', employee);
 
     res.status(201).json(employee);
   } catch (error) {
@@ -669,6 +673,9 @@ router.post('/:id/uprank', authMiddleware, requirePermission('employees.edit'), 
       badgeNumber: updatedEmployee.badgeNumber,
     });
 
+    // WebSocket Broadcast für Live-Updates
+    broadcastUpdate('employee', { ...updatedEmployee, promoted: true, oldRank, newRank: result.newRank });
+
     res.json({
       success: true,
       employee: updatedEmployee,
@@ -769,6 +776,9 @@ router.post('/:id/downrank', authMiddleware, requirePermission('employees.edit')
       badgeNumber: updatedEmployee.badgeNumber,
     });
 
+    // WebSocket Broadcast für Live-Updates
+    broadcastUpdate('employee', { ...updatedEmployee, demoted: true, oldRank, newRank: result.newRank });
+
     res.json({
       success: true,
       employee: updatedEmployee,
@@ -852,6 +862,9 @@ router.post('/:id/terminate', authMiddleware, requirePermission('employees.delet
       badgeNumber: employee.badgeNumber,
       hireDate: employee.hireDate,
     });
+
+    // WebSocket Broadcast für Live-Updates
+    broadcastDelete('employee', employee.id);
 
     res.json({
       success: true,
@@ -994,6 +1007,11 @@ router.put('/:id', authMiddleware, requirePermission('employees.edit'), async (r
       },
     });
 
+    // WebSocket Broadcast für Live-Updates
+    if (updatedEmployee) {
+      broadcastUpdate('employee', updatedEmployee);
+    }
+
     res.json(updatedEmployee);
   } catch (error) {
     console.error('Update employee error:', error);
@@ -1008,6 +1026,9 @@ router.delete('/:id', authMiddleware, requirePermission('employees.delete'), asy
       where: { id: req.params.id },
       data: { status: 'TERMINATED' },
     });
+
+    // WebSocket Broadcast für Live-Updates
+    broadcastDelete('employee', req.params.id);
 
     res.json({ success: true });
   } catch (error) {

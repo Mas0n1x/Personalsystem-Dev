@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dashboardApi, absencesApi, bonusApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -240,10 +241,64 @@ function QuickAction({
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { onlineUsers } = useSocket();
+  const { socket, onlineUsers } = useSocket();
+  const queryClient = useQueryClient();
   const permissions = usePermissions();
   const canViewAllBonuses = permissions.hasAnyPermission('bonus.view', 'bonus.pay', 'admin.full');
   const canViewPending = permissions.hasAnyPermission('hr.view', 'admin.full');
+
+  // WebSocket Live-Updates für Dashboard
+  useEffect(() => {
+    if (!socket) return;
+
+    // Dashboard Stats aktualisieren
+    const handleDashboardUpdate = () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    };
+
+    // Abwesenheiten aktualisieren
+    const handleAbsenceUpdate = () => {
+      queryClient.invalidateQueries({ queryKey: ['active-absences'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    };
+
+    // Bonus Updates
+    const handleBonusUpdate = () => {
+      queryClient.invalidateQueries({ queryKey: ['my-bonuses'] });
+      queryClient.invalidateQueries({ queryKey: ['weekly-bonus-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    };
+
+    // Mitarbeiter Updates (Beförderungen, neue Mitarbeiter etc.)
+    const handleEmployeeUpdate = () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    };
+
+    // Socket Events registrieren
+    socket.on('dashboard:update', handleDashboardUpdate);
+    socket.on('absence:created', handleAbsenceUpdate);
+    socket.on('absence:updated', handleAbsenceUpdate);
+    socket.on('absence:deleted', handleAbsenceUpdate);
+    socket.on('bonus:created', handleBonusUpdate);
+    socket.on('bonus:updated', handleBonusUpdate);
+    socket.on('bonus:paid', handleBonusUpdate);
+    socket.on('employee:promoted', handleEmployeeUpdate);
+    socket.on('employee:created', handleEmployeeUpdate);
+    socket.on('employee:updated', handleEmployeeUpdate);
+
+    return () => {
+      socket.off('dashboard:update', handleDashboardUpdate);
+      socket.off('absence:created', handleAbsenceUpdate);
+      socket.off('absence:updated', handleAbsenceUpdate);
+      socket.off('absence:deleted', handleAbsenceUpdate);
+      socket.off('bonus:created', handleBonusUpdate);
+      socket.off('bonus:updated', handleBonusUpdate);
+      socket.off('bonus:paid', handleBonusUpdate);
+      socket.off('employee:promoted', handleEmployeeUpdate);
+      socket.off('employee:created', handleEmployeeUpdate);
+      socket.off('employee:updated', handleEmployeeUpdate);
+    };
+  }, [socket, queryClient]);
 
   const { data: statsData, isLoading } = useQuery({
     queryKey: ['dashboard-stats'],
