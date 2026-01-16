@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { useLiveUpdates } from './hooks/useLiveUpdates';
 import Layout from './components/layout/Layout';
 
 // Kritische Seiten - sofort laden
@@ -38,6 +39,7 @@ const InternalAffairs = lazy(() => import('./pages/InternalAffairs'));
 const QualityAssurance = lazy(() => import('./pages/QualityAssurance'));
 const Teamleitung = lazy(() => import('./pages/Teamleitung'));
 const Management = lazy(() => import('./pages/Management'));
+const Calendar = lazy(() => import('./pages/Calendar'));
 
 // Suspense Fallback Komponente
 function PageLoader() {
@@ -70,6 +72,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  // Live-Updates aktivieren - invalidiert Caches wenn andere Benutzer Daten ändern
+  useLiveUpdates();
+
   return (
     <Routes>
       {/* Public Routes */}
@@ -99,6 +104,7 @@ function App() {
         <Route path="quality-assurance" element={<Suspense fallback={<PageLoader />}><QualityAssurance /></Suspense>} />
         <Route path="teamleitung" element={<Suspense fallback={<PageLoader />}><Teamleitung /></Suspense>} />
         <Route path="management" element={<Suspense fallback={<PageLoader />}><Management /></Suspense>} />
+        <Route path="calendar" element={<Suspense fallback={<PageLoader />}><Calendar /></Suspense>} />
 
         {/* Units */}
         <Route path="units" element={<Suspense fallback={<PageLoader />}><UnitsOverview /></Suspense>} />

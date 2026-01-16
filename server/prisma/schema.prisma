@@ -59,6 +59,7 @@ model User {
   promotedEmployees    PromotionArchive[] @relation("PromotionArchivePromotedBy")
   terminatedEmployees  TerminationArchive[] @relation("TerminationArchiveTerminatedBy")
   notifications        Notification[] @relation("NotificationUser")
+  calendarEvents       CalendarEvent[] @relation("CalendarEventCreatedBy")
 
   @@map("users")
 }
@@ -1003,6 +1004,37 @@ model DiscordAnnouncementChannel {
   updatedAt   DateTime  @updatedAt
 
   @@map("discord_announcement_channels")
+}
+
+// ==================== KALENDER SYSTEM ====================
+
+// Kalender Events mit Discord-Rollen-Benachrichtigungen
+model CalendarEvent {
+  id              String    @id @default(cuid())
+  title           String                              // Titel des Termins
+  description     String?                             // Beschreibung
+  location        String?                             // Ort
+  startDate       DateTime                            // Startdatum/-zeit
+  endDate         DateTime?                           // Enddatum/-zeit (optional für ganztägige Events)
+  isAllDay        Boolean   @default(false)           // Ganztägiger Termin
+  color           String    @default("#3b82f6")       // Farbe für die Anzeige
+  category        String    @default("GENERAL")       // GENERAL, TRAINING, MEETING, EVENT, DEADLINE
+
+  // Discord Benachrichtigungen
+  discordRoleIds  String?                             // JSON Array: Discord Role IDs für Benachrichtigung
+  reminderMinutes Int?                                // Minuten vor Event für Erinnerung (null = keine)
+  reminderSent    Boolean   @default(false)           // Wurde Erinnerung gesendet?
+
+  // Ersteller
+  createdById     String
+  createdBy       User      @relation("CalendarEventCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([startDate])
+  @@index([category])
+  @@index([createdById])
+  @@map("calendar_events")
 }
 
 // ==================== UNITS SYSTEM ====================

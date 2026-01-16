@@ -707,6 +707,9 @@ function TasksWidget() {
                             })} className="p-0.5 text-slate-400 hover:text-red-400"><Trash2 className="h-3 w-3" /></button>
                           </div>
                         </div>
+                        {task.description && (
+                          <p className="text-[10px] text-slate-400 mt-1 line-clamp-2">{task.description}</p>
+                        )}
                         <div className="flex items-center gap-1 mt-1">
                           <span className={`px-1 py-0.5 rounded text-[10px] font-medium ${PRIORITY_COLORS[task.priority]}`}>{PRIORITY_LABELS[task.priority]}</span>
                           {task.dueDate && <span className="text-[10px] text-slate-400 flex items-center gap-0.5"><Calendar className="h-2.5 w-2.5" />{formatDate(task.dueDate)}</span>}

@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { broadcastCreate, broadcastDelete } from '../services/socketService.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -139,6 +140,9 @@ router.post('/', authMiddleware, upload.single('image'), async (req: AuthRequest
       },
     });
 
+    // Live-Update broadcast
+    broadcastCreate('tuning', invoice);
+
     res.status(201).json(invoice);
   } catch (error) {
     console.error('Create tuning invoice error:', error);
@@ -186,6 +190,9 @@ router.put('/:id/complete', authMiddleware, requirePermission('tuning.manage'), 
     // Lösche die Rechnung aus der Datenbank
     await prisma.tuningInvoice.delete({ where: { id } });
 
+    // Live-Update broadcast
+    broadcastDelete('tuning', id);
+
     res.json({ success: true });
   } catch (error) {
     console.error('Complete tuning invoice error:', error);
@@ -224,6 +231,9 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
 
     // Lösche die Rechnung
     await prisma.tuningInvoice.delete({ where: { id } });
+
+    // Live-Update broadcast
+    broadcastDelete('tuning', id);
 
     res.json({ success: true });
   } catch (error) {

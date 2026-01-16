@@ -584,9 +584,9 @@ export const unitsApi = {
 
   // Admin Routen
   getAllAdmin: () => api.get('/units/admin/all'),
-  create: (data: { name: string; shortName?: string; description?: string; color?: string; icon?: string; sortOrder?: number }) =>
+  create: (data: { name: string; shortName?: string | null; description?: string | null; color?: string; icon?: string; sortOrder?: number }) =>
     api.post('/units', data),
-  update: (id: string, data: { name?: string; shortName?: string; description?: string; color?: string; icon?: string; isActive?: boolean; sortOrder?: number }) =>
+  update: (id: string, data: { name?: string; shortName?: string | null; description?: string | null; color?: string; icon?: string; isActive?: boolean; sortOrder?: number }) =>
     api.put(`/units/${id}`, data),
   delete: (id: string) => api.delete(`/units/${id}`),
 
@@ -599,6 +599,28 @@ export const unitsApi = {
   updateRole: (unitId: string, roleId: string, data: { position?: string; sortOrder?: number; isLeadership?: boolean }) =>
     api.put(`/units/${unitId}/roles/${roleId}`, data),
   deleteRole: (unitId: string, roleId: string) => api.delete(`/units/${unitId}/roles/${roleId}`),
+};
+
+// Kalender API
+export const calendarApi = {
+  getAll: (params?: Record<string, string>) => api.get('/calendar', { params }),
+  getUpcoming: () => api.get('/calendar/upcoming'),
+  getById: (id: string) => api.get(`/calendar/${id}`),
+  create: (data: {
+    title: string;
+    description?: string;
+    location?: string;
+    startDate: string;
+    endDate?: string;
+    isAllDay?: boolean;
+    color?: string;
+    category?: string;
+    discordRoleIds?: string[];
+    reminderMinutes?: number;
+  }) => api.post('/calendar', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/calendar/${id}`, data),
+  delete: (id: string) => api.delete(`/calendar/${id}`),
+  sendReminder: (id: string) => api.post(`/calendar/${id}/remind`),
 };
 
 // Archiv API

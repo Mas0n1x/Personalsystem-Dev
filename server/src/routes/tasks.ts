@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 
 const router = Router();
 
@@ -101,6 +102,9 @@ router.post('/', authMiddleware, requirePermission('leadership.manage'), async (
       },
     });
 
+    // Live-Update broadcast
+    broadcastCreate('task', task);
+
     res.status(201).json(task);
   } catch (error) {
     console.error('Create task error:', error);
@@ -143,6 +147,9 @@ router.put('/:id/status', authMiddleware, requirePermission('leadership.manage')
         },
       },
     });
+
+    // Live-Update broadcast
+    broadcastUpdate('task', task);
 
     res.json(task);
   } catch (error) {
@@ -189,6 +196,9 @@ router.put('/:id', authMiddleware, requirePermission('leadership.manage'), async
       },
     });
 
+    // Live-Update broadcast
+    broadcastUpdate('task', task);
+
     res.json(task);
   } catch (error) {
     console.error('Update task error:', error);
@@ -202,6 +212,9 @@ router.delete('/:id', authMiddleware, requirePermission('leadership.manage'), as
     const { id } = req.params;
 
     await prisma.task.delete({ where: { id } });
+
+    // Live-Update broadcast
+    broadcastDelete('task', id);
 
     res.json({ success: true });
   } catch (error) {

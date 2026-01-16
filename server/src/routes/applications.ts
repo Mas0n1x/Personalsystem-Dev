@@ -4,6 +4,7 @@ import { authMiddleware, AuthRequest, requirePermission } from '../middleware/au
 import { createInviteLink } from '../services/discordBot.js';
 import { triggerApplicationCompleted, triggerApplicationOnboarding, getEmployeeIdFromUserId } from '../services/bonusService.js';
 import { announceHire } from '../services/discordAnnouncements.js';
+import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -313,6 +314,9 @@ router.post('/', authMiddleware, requirePermission('hr.manage'), upload.single('
       },
     });
 
+    // Live-Update broadcast
+    broadcastCreate('application', application);
+
     res.status(201).json(application);
   } catch (error) {
     console.error('Create application error:', error);
@@ -353,6 +357,9 @@ router.put('/:id/criteria', authMiddleware, requirePermission('hr.manage'), asyn
       },
     });
 
+    // Live-Update broadcast
+    broadcastUpdate('application', application);
+
     res.json(application);
   } catch (error) {
     console.error('Update criteria error:', error);
@@ -389,6 +396,9 @@ router.put('/:id/questions', authMiddleware, requirePermission('hr.manage'), asy
         },
       },
     });
+
+    // Live-Update broadcast
+    broadcastUpdate('application', application);
 
     res.json(application);
   } catch (error) {
@@ -427,6 +437,9 @@ router.put('/:id/onboarding', authMiddleware, requirePermission('hr.manage'), as
         },
       },
     });
+
+    // Live-Update broadcast
+    broadcastUpdate('application', application);
 
     res.json({ application, allComplete: allOnboardingCompleted });
   } catch (error) {
@@ -545,6 +558,10 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
       hiredBy: hiredByName,
     });
 
+    // Live-Update broadcast
+    broadcastUpdate('application', updatedApplication);
+    broadcastCreate('employee', employee);
+
     res.json({
       application: updatedApplication,
       employee,
@@ -619,6 +636,9 @@ router.put('/:id/reject', authMiddleware, requirePermission('hr.manage'), async 
       },
     });
 
+    // Live-Update broadcast
+    broadcastUpdate('application', updatedApplication);
+
     res.json(updatedApplication);
   } catch (error) {
     console.error('Reject application error:', error);
@@ -645,6 +665,9 @@ router.delete('/:id', authMiddleware, requirePermission('hr.manage'), async (req
     }
 
     await prisma.application.delete({ where: { id } });
+
+    // Live-Update broadcast
+    broadcastDelete('application', id);
 
     res.json({ success: true });
   } catch (error) {

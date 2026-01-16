@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { triggerInvestigationOpened, triggerInvestigationClosed, getEmployeeIdFromUserId } from '../services/bonusService.js';
+import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 
 const router = Router();
 
@@ -183,6 +184,9 @@ router.post('/', requirePermission('ia.manage'), async (req: AuthRequest, res: R
       await triggerInvestigationOpened(leadEmployeeId, caseNumber, investigation.id);
     }
 
+    // Live-Update broadcast
+    broadcastCreate('investigation', investigation);
+
     res.status(201).json(investigation);
   } catch (error) {
     console.error('Error creating investigation:', error);
@@ -241,6 +245,9 @@ router.put('/:id', requirePermission('ia.manage'), async (req: AuthRequest, res:
       }
     }
 
+    // Live-Update broadcast
+    broadcastUpdate('investigation', investigation);
+
     res.json(investigation);
   } catch (error) {
     console.error('Error updating investigation:', error);
@@ -253,6 +260,10 @@ router.delete('/:id', requirePermission('ia.manage'), async (req: AuthRequest, r
   try {
     const { id } = req.params;
     await prisma.investigation.delete({ where: { id } });
+
+    // Live-Update broadcast
+    broadcastDelete('investigation', id);
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting investigation:', error);

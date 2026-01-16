@@ -295,8 +295,8 @@ export default function UnitsAdmin() {
     e.preventDefault();
     const data = {
       name: unitName,
-      shortName: unitShortName || undefined,
-      description: unitDescription || undefined,
+      shortName: unitShortName || null,
+      description: unitDescription || null,
       color: unitColor,
       sortOrder: unitSortOrder,
       isActive: unitIsActive,

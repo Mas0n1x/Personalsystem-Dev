@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { sendAnnouncementToChannel, getAnnouncementChannels } from '../services/discordBot.js';
+import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 
 const router = Router();
 
@@ -67,6 +68,9 @@ router.post('/', authMiddleware, requirePermission('leadership.manage'), async (
       },
     });
 
+    // Live-Update broadcast
+    broadcastCreate('announcement', announcement);
+
     res.status(201).json(announcement);
   } catch (error) {
     console.error('Create announcement error:', error);
@@ -127,6 +131,9 @@ router.post('/:id/send', authMiddleware, requirePermission('leadership.manage'),
       },
     });
 
+    // Live-Update broadcast
+    broadcastUpdate('announcement', updatedAnnouncement);
+
     res.json(updatedAnnouncement);
   } catch (error) {
     console.error('Send announcement error:', error);
@@ -170,6 +177,9 @@ router.put('/:id', authMiddleware, requirePermission('leadership.manage'), async
       },
     });
 
+    // Live-Update broadcast
+    broadcastUpdate('announcement', announcement);
+
     res.json(announcement);
   } catch (error) {
     console.error('Update announcement error:', error);
@@ -183,6 +193,9 @@ router.delete('/:id', authMiddleware, requirePermission('leadership.manage'), as
     const { id } = req.params;
 
     await prisma.announcement.delete({ where: { id } });
+
+    // Live-Update broadcast
+    broadcastDelete('announcement', id);
 
     res.json({ success: true });
   } catch (error) {

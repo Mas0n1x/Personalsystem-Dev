@@ -23,6 +23,7 @@ import {
   DollarSign,
   HelpCircle,
   MessageSquare,
+  Calendar,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -61,6 +62,7 @@ export default function Sidebar() {
         { name: 'Tuning', href: '/tuning', icon: Car, permission: 'tuning.view' },
         { name: 'Räube', href: '/robbery', icon: Crosshair, permission: 'robbery.view' },
         { name: 'Leadership', href: '/leadership', icon: Briefcase, permission: 'leadership.view' },
+        { name: 'Kalender', href: '/calendar', icon: Calendar, permission: 'calendar.view' },
       ],
     },
     {

@@ -118,6 +118,8 @@ router.post('/fix-permissions', authMiddleware, async (req: AuthRequest, res: Re
       { name: 'robbery.view', description: 'Räube anzeigen', category: 'robbery' },
       { name: 'robbery.create', description: 'Räube erstellen', category: 'robbery' },
       { name: 'robbery.manage', description: 'Räube verwalten', category: 'robbery' },
+      { name: 'calendar.view', description: 'Kalender anzeigen', category: 'calendar' },
+      { name: 'calendar.manage', description: 'Termine verwalten', category: 'calendar' },
       { name: 'blacklist.view', description: 'Blacklist anzeigen', category: 'blacklist' },
       { name: 'blacklist.manage', description: 'Blacklist verwalten', category: 'blacklist' },
       { name: 'uprank.view', description: 'Uprank-Sperren anzeigen', category: 'uprank' },
@@ -252,6 +254,9 @@ router.post('/setup', async (req, res: Response) => {
       { name: 'robbery.view', description: 'Räube anzeigen', category: 'robbery' },
       { name: 'robbery.create', description: 'Räube erstellen', category: 'robbery' },
       { name: 'robbery.manage', description: 'Räube verwalten', category: 'robbery' },
+      // Calendar Permissions
+      { name: 'calendar.view', description: 'Kalender anzeigen', category: 'calendar' },
+      { name: 'calendar.manage', description: 'Termine verwalten', category: 'calendar' },
       // Blacklist Permissions
       { name: 'blacklist.view', description: 'Blacklist anzeigen', category: 'blacklist' },
       { name: 'blacklist.manage', description: 'Blacklist verwalten', category: 'blacklist' },
@@ -365,6 +370,9 @@ router.post('/permissions/seed', authMiddleware, requirePermission('admin.full')
       { name: 'robbery.view', description: 'Räube anzeigen', category: 'robbery' },
       { name: 'robbery.create', description: 'Räube erstellen', category: 'robbery' },
       { name: 'robbery.manage', description: 'Räube verwalten', category: 'robbery' },
+      // Calendar Permissions
+      { name: 'calendar.view', description: 'Kalender anzeigen', category: 'calendar' },
+      { name: 'calendar.manage', description: 'Termine verwalten', category: 'calendar' },
       // Blacklist Permissions
       { name: 'blacklist.view', description: 'Blacklist anzeigen', category: 'blacklist' },
       { name: 'blacklist.manage', description: 'Blacklist verwalten', category: 'blacklist' },

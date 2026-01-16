@@ -585,6 +585,14 @@ export default function EmployeeDetail() {
                     <span className="text-white">{unitStats.stats.academy.examsGiven}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-slate-400">Module abgeschlossen</span>
+                    <span className="text-white">{unitStats.stats.academy.modulesCompleted || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Nachschulungen</span>
+                    <span className="text-white">{unitStats.stats.academy.retrainingsCompleted || 0}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-600 pt-2 mt-2">
                     <span className="text-slate-400">Schulungen besucht</span>
                     <span className="text-white">{unitStats.stats.academy.trainingsParticipated}</span>
                   </div>

@@ -4,6 +4,7 @@ import { authMiddleware, AuthRequest, requirePermission } from '../middleware/au
 import { triggerSanctionIssued, getEmployeeIdFromUserId } from '../services/bonusService.js';
 import { notifySanction } from '../services/notificationService.js';
 import { announceSanction } from '../services/discordAnnouncements.js';
+import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 
 const router = Router();
 
@@ -195,6 +196,9 @@ router.post('/', authMiddleware, requirePermission('sanctions.manage'), async (r
       expiresAt: expiresAt ? new Date(expiresAt) : null,
     });
 
+    // Live-Update broadcast
+    broadcastCreate('sanction', sanction);
+
     res.status(201).json(sanction);
   } catch (error) {
     console.error('Create sanction error:', error);
@@ -232,6 +236,9 @@ router.put('/:id/complete', authMiddleware, requirePermission('sanctions.manage'
       },
     });
 
+    // Live-Update broadcast
+    broadcastUpdate('sanction', sanction);
+
     res.json(sanction);
   } catch (error) {
     console.error('Complete sanction error:', error);
@@ -268,6 +275,9 @@ router.put('/:id/revoke', authMiddleware, requirePermission('sanctions.manage'),
         },
       },
     });
+
+    // Live-Update broadcast
+    broadcastUpdate('sanction', sanction);
 
     res.json(sanction);
   } catch (error) {
@@ -315,6 +325,9 @@ router.put('/:id', authMiddleware, requirePermission('sanctions.manage'), async 
       },
     });
 
+    // Live-Update broadcast
+    broadcastUpdate('sanction', sanction);
+
     res.json(sanction);
   } catch (error) {
     console.error('Update sanction error:', error);
@@ -328,6 +341,9 @@ router.delete('/:id', authMiddleware, requirePermission('sanctions.manage'), asy
     const { id } = req.params;
 
     await prisma.sanction.delete({ where: { id } });
+
+    // Live-Update broadcast
+    broadcastDelete('sanction', id);
 
     res.json({ success: true });
   } catch (error) {

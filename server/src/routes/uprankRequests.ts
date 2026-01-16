@@ -3,6 +3,7 @@ import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { notifyPromotion } from '../services/notificationService.js';
 import { announcePromotion, announceAcademyGraduation } from '../services/discordAnnouncements.js';
+import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 
 const router = Router();
 
@@ -196,6 +197,9 @@ router.post('/', requirePermission('teamlead.manage'), async (req: AuthRequest, 
       }
     });
 
+    // Live-Update broadcast
+    broadcastCreate('uprankRequest', request);
+
     res.status(201).json(request);
   } catch (error) {
     console.error('Error creating uprank request:', error);
@@ -319,6 +323,9 @@ router.put('/:id/process', requirePermission('management.uprank'), async (req: A
       }
     }
 
+    // Live-Update broadcast
+    broadcastUpdate('uprankRequest', updatedRequest);
+
     res.json(updatedRequest);
   } catch (error) {
     console.error('Error processing uprank request:', error);
@@ -360,6 +367,10 @@ router.delete('/:id', requirePermission('teamlead.manage'), async (req: AuthRequ
     }
 
     await prisma.uprankRequest.delete({ where: { id } });
+
+    // Live-Update broadcast
+    broadcastDelete('uprankRequest', id);
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting uprank request:', error);

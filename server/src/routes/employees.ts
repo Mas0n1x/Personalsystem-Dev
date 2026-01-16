@@ -471,6 +471,8 @@ router.get('/:id/unit-stats', authMiddleware, requirePermission('employees.view'
       unitReviews,
       applicationsProcessed,
       examsGiven,
+      modulesCompleted,
+      retrainingsCompleted,
     ] = await Promise.all([
       // Academy: Durchgeführte Trainings (als Instructor)
       prisma.training.count({
@@ -540,6 +542,22 @@ router.get('/:id/unit-stats', authMiddleware, requirePermission('employees.view'
           ...(dateFilter && { createdAt: dateFilter }),
         },
       }),
+      // Academy: Module als abgeschlossen markiert (für Trainees)
+      prisma.academyProgress.count({
+        where: {
+          completedById: userId,
+          completed: true,
+          ...(dateFilter && { completedAt: dateFilter }),
+        },
+      }),
+      // Academy: Nachschulungen abgeschlossen
+      prisma.academyRetraining.count({
+        where: {
+          completedById: userId,
+          status: 'COMPLETED',
+          ...(dateFilter && { completedAt: dateFilter }),
+        },
+      }),
     ]);
 
     res.json({
@@ -549,7 +567,9 @@ router.get('/:id/unit-stats', authMiddleware, requirePermission('employees.view'
           trainingsCompleted,
           trainingsParticipated,
           examsGiven,
-          total: trainingsCompleted + examsGiven,
+          modulesCompleted,
+          retrainingsCompleted,
+          total: trainingsCompleted + examsGiven + modulesCompleted + retrainingsCompleted,
         },
         internalAffairs: {
           investigationsOpened,
@@ -623,7 +643,7 @@ router.post('/:id/uprank', authMiddleware, requirePermission('employees.edit'), 
         oldRankLevel: oldRankLevel,
         newRank: result.newRank!,
         newRankLevel: result.newLevel!,
-        promotedById: req.userId!,
+        promotedById: req.user!.id,
         reason: req.body.reason || null,
       },
     });
@@ -650,7 +670,7 @@ router.post('/:id/uprank', authMiddleware, requirePermission('employees.edit'), 
 
     // Benachrichtigung an den beförderten Mitarbeiter senden
     const promotedByUser = await prisma.user.findUnique({
-      where: { id: req.userId! },
+      where: { id: req.user!.id },
       select: { displayName: true, username: true },
     });
     const promotedByName = promotedByUser?.displayName || promotedByUser?.username || 'Unbekannt';
@@ -752,7 +772,7 @@ router.post('/:id/downrank', authMiddleware, requirePermission('employees.edit')
 
     // Benachrichtigung an den degradierten Mitarbeiter senden
     const demotedByUser = await prisma.user.findUnique({
-      where: { id: req.userId! },
+      where: { id: req.user!.id },
       select: { displayName: true, username: true },
     });
     const demotedByName = demotedByUser?.displayName || demotedByUser?.username || 'Unbekannt';
@@ -819,7 +839,7 @@ router.post('/:id/terminate', authMiddleware, requirePermission('employees.delet
         hireDate: employee.hireDate,
         terminationType: terminationType,
         reason: reason || null,
-        terminatedById: req.userId!,
+        terminatedById: req.user!.id,
       },
     });
 
@@ -840,7 +860,7 @@ router.post('/:id/terminate', authMiddleware, requirePermission('employees.delet
 
     // Discord Announcement senden
     const terminatedByUser = await prisma.user.findUnique({
-      where: { id: req.userId! },
+      where: { id: req.user!.id },
       select: { displayName: true, username: true },
     });
     const terminatedByName = terminatedByUser?.displayName || terminatedByUser?.username || 'Unbekannt';

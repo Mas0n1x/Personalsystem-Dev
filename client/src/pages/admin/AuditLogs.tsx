@@ -3,15 +3,191 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '../../services/api';
 import Table from '../../components/ui/Table';
 import Pagination from '../../components/ui/Pagination';
-import { Search, FileText, Filter } from 'lucide-react';
+import { Search, FileText, Filter, Eye, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import type { AuditLog, PaginatedResponse } from '../../types';
+
+// Übersetze Aktionen in lesbare Beschreibungen
+function getActionDescription(action: string, entity: string, details: string | null): string {
+  const method = action.split(' ')[0];
+  const path = action.split(' ').slice(1).join(' ');
+
+  // Parse details wenn vorhanden
+  let parsedDetails: { body?: Record<string, unknown>; path?: string } = {};
+  try {
+    if (details) {
+      parsedDetails = JSON.parse(details);
+    }
+  } catch {
+    // Ignoriere Parse-Fehler
+  }
+
+  const body = parsedDetails.body || {};
+
+  // Spezifische Beschreibungen basierend auf Pfad und Methode
+  if (path.includes('/employees') && method === 'POST' && !path.includes('/')) {
+    return `Neuer Mitarbeiter erstellt: ${body.badgeNumber || 'Unbekannt'}`;
+  }
+  if (path.includes('/terminate')) {
+    return `Mitarbeiter gekündigt`;
+  }
+  if (path.includes('/promote')) {
+    return `Mitarbeiter befördert zu ${body.newRank || 'Unbekannt'}`;
+  }
+  if (path.includes('/employees') && method === 'PUT') {
+    return `Mitarbeiter bearbeitet`;
+  }
+  if (path.includes('/absences') && method === 'POST') {
+    return `Abmeldung erstellt (${body.type === 'DAY_OFF' ? 'Dienstfrei' : 'Abwesenheit'})`;
+  }
+  if (path.includes('/absences') && method === 'DELETE') {
+    return `Abmeldung gelöscht`;
+  }
+  if (path.includes('/sanctions') && method === 'POST') {
+    return `Sanktion erstellt: ${body.reason ? String(body.reason).substring(0, 30) + '...' : 'Ohne Grund'}`;
+  }
+  if (path.includes('/revoke')) {
+    return `Sanktion widerrufen`;
+  }
+  if (path.includes('/tasks') && method === 'POST') {
+    return `Aufgabe erstellt: ${body.title || 'Unbekannt'}`;
+  }
+  if (path.includes('/tasks') && method === 'PUT') {
+    return `Aufgabe aktualisiert`;
+  }
+  if (path.includes('/tasks') && method === 'DELETE') {
+    return `Aufgabe gelöscht`;
+  }
+  if (path.includes('/treasury/deposit')) {
+    return `Einzahlung: $${body.amount || 0} (${body.moneyType === 'BLACK' ? 'Schwarz' : 'Normal'}) - ${body.reason || 'Kein Grund'}`;
+  }
+  if (path.includes('/treasury/withdraw')) {
+    return `Auszahlung: $${body.amount || 0} (${body.moneyType === 'BLACK' ? 'Schwarz' : 'Normal'}) - ${body.reason || 'Kein Grund'}`;
+  }
+  if (path.includes('/accept')) {
+    return `Bewerbung angenommen`;
+  }
+  if (path.includes('/reject')) {
+    return `Bewerbung abgelehnt`;
+  }
+  if (path.includes('/applications') && method === 'POST') {
+    return `Neue Bewerbung eingereicht`;
+  }
+  if (path.includes('/approve')) {
+    return `Anfrage genehmigt`;
+  }
+  if (path.includes('/cases') && method === 'POST') {
+    return `Fall erstellt: ${body.title || 'Unbekannt'}`;
+  }
+  if (path.includes('/investigations') && method === 'POST') {
+    return `Ermittlung erstellt`;
+  }
+  if (path.includes('/trainings') && method === 'POST') {
+    return `Training erstellt: ${body.topic || 'Unbekannt'}`;
+  }
+  if (path.includes('/evidence') && method === 'POST') {
+    return `Asservat eingelagert: ${body.name || 'Unbekannt'}`;
+  }
+  if (path.includes('/robbery') && method === 'POST') {
+    return `Raub eingetragen`;
+  }
+  if (path.includes('/tuning') && method === 'POST') {
+    return `Tuning-Rechnung eingereicht: $${body.amount || 0}`;
+  }
+  if (path.includes('/calendar') && method === 'POST') {
+    return `Termin erstellt: ${body.title || 'Unbekannt'}`;
+  }
+  if (path.includes('/calendar') && method === 'PUT') {
+    return `Termin aktualisiert`;
+  }
+  if (path.includes('/calendar') && method === 'DELETE') {
+    return `Termin gelöscht`;
+  }
+  if (path.includes('/bonus') && path.includes('/pay')) {
+    return `Sonderzahlung ausgezahlt`;
+  }
+  if (path.includes('/units') && method === 'POST') {
+    return `Unit erstellt: ${body.name || 'Unbekannt'}`;
+  }
+  if (path.includes('/units') && method === 'PUT') {
+    return `Unit aktualisiert`;
+  }
+  if (path.includes('/team-change-reports') && method === 'POST') {
+    return `Teamwechsel: ${body.previousTeam || '?'} → ${body.newTeam || '?'}`;
+  }
+  if (path.includes('/login')) {
+    return `Benutzer eingeloggt`;
+  }
+
+  // Fallback
+  const actionMap: Record<string, string> = {
+    'POST': 'Erstellt',
+    'PUT': 'Aktualisiert',
+    'PATCH': 'Aktualisiert',
+    'DELETE': 'Gelöscht',
+  };
+
+  const entityMap: Record<string, string> = {
+    'employees': 'Mitarbeiter',
+    'users': 'Benutzer',
+    'absences': 'Abmeldung',
+    'sanctions': 'Sanktion',
+    'tasks': 'Aufgabe',
+    'treasury': 'Kasse',
+    'applications': 'Bewerbung',
+    'cases': 'Fall',
+    'investigations': 'Ermittlung',
+    'trainings': 'Training',
+    'evidence': 'Asservat',
+    'robbery': 'Raub',
+    'tuning': 'Tuning',
+    'calendar': 'Termin',
+    'bonus': 'Bonus',
+    'units': 'Unit',
+    'auth': 'Authentifizierung',
+    'uprank-requests': 'Uprank-Anfrage',
+    'uprank-locks': 'Uprank-Sperre',
+    'team-change-reports': 'Teamwechsel',
+    'announcements': 'Ankündigung',
+    'notifications': 'Benachrichtigung',
+  };
+
+  return `${actionMap[method] || method} - ${entityMap[entity] || entity}`;
+}
+
+// Übersetze Entity-Namen
+const entityLabels: Record<string, string> = {
+  'employees': 'Mitarbeiter',
+  'users': 'Benutzer',
+  'absences': 'Abmeldungen',
+  'sanctions': 'Sanktionen',
+  'tasks': 'Aufgaben',
+  'treasury': 'Kasse',
+  'applications': 'Bewerbungen',
+  'cases': 'Fälle',
+  'investigations': 'Ermittlungen',
+  'trainings': 'Trainings',
+  'evidence': 'Asservate',
+  'robbery': 'Räube',
+  'tuning': 'Tuning',
+  'calendar': 'Kalender',
+  'bonus': 'Bonus',
+  'units': 'Units',
+  'auth': 'Auth',
+  'uprank-requests': 'Uprank-Anfragen',
+  'uprank-locks': 'Uprank-Sperren',
+  'team-change-reports': 'Teamwechsel',
+  'announcements': 'Ankündigungen',
+  'notifications': 'Benachrichtigungen',
+  'admin': 'Admin',
+};
 
 export default function AuditLogs() {
   const [page, setPage] = useState(1);
   const [entity, setEntity] = useState('');
   const [action, setAction] = useState('');
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['audit-logs', page, entity, action],
@@ -35,11 +211,11 @@ export default function AuditLogs() {
 
   const columns = [
     {
-      key: 'action',
-      header: 'Aktion',
+      key: 'description',
+      header: 'Beschreibung',
       render: (log: AuditLog) => (
-        <span className={`font-mono text-sm ${getActionColor(log.action)}`}>
-          {log.action}
+        <span className="text-white text-sm">
+          {getActionDescription(log.action, log.entity, log.details)}
         </span>
       ),
     },
@@ -47,7 +223,7 @@ export default function AuditLogs() {
       key: 'entity',
       header: 'Bereich',
       render: (log: AuditLog) => (
-        <span className="badge-gray">{log.entity}</span>
+        <span className="badge-gray">{entityLabels[log.entity] || log.entity}</span>
       ),
     },
     {
@@ -71,28 +247,25 @@ export default function AuditLogs() {
         ),
     },
     {
-      key: 'details',
-      header: 'Details',
-      render: (log: AuditLog) => (
-        <span className="text-slate-400 text-sm line-clamp-1">
-          {log.details ? JSON.stringify(log.details).substring(0, 50) + '...' : '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'ipAddress',
-      header: 'IP',
-      render: (log: AuditLog) => (
-        <span className="text-slate-400 font-mono text-sm">{log.ipAddress || '-'}</span>
-      ),
-    },
-    {
       key: 'createdAt',
       header: 'Zeit',
       render: (log: AuditLog) => (
         <span className="text-slate-400 text-sm">
-          {format(new Date(log.createdAt), 'dd.MM.yyyy HH:mm:ss', { locale: de })}
+          {format(new Date(log.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })}
         </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (log: AuditLog) => (
+        <button
+          onClick={() => setSelectedLog(log)}
+          className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-600 rounded transition-colors"
+          title="Details anzeigen"
+        >
+          <Eye className="h-4 w-4" />
+        </button>
       ),
     },
   ];
@@ -136,29 +309,30 @@ export default function AuditLogs() {
             className="input w-auto"
           >
             <option value="">Alle Bereiche</option>
-            <option value="auth">Auth</option>
-            <option value="users">Users</option>
-            <option value="employees">Employees</option>
-            <option value="hr">HR</option>
-            <option value="ia">IA</option>
-            <option value="academy">Academy</option>
-            <option value="qa">QA</option>
-            <option value="finance">Finance</option>
-            <option value="admin">Admin</option>
+            <option value="auth">Authentifizierung</option>
+            <option value="employees">Mitarbeiter</option>
+            <option value="absences">Abmeldungen</option>
+            <option value="sanctions">Sanktionen</option>
+            <option value="tasks">Aufgaben</option>
+            <option value="treasury">Kasse</option>
+            <option value="applications">Bewerbungen</option>
+            <option value="uprank-requests">Uprank-Anfragen</option>
+            <option value="cases">Fälle</option>
+            <option value="investigations">Ermittlungen</option>
+            <option value="trainings">Trainings</option>
+            <option value="evidence">Asservate</option>
+            <option value="robbery">Räube</option>
+            <option value="tuning">Tuning</option>
+            <option value="calendar">Kalender</option>
+            <option value="bonus">Bonus</option>
+            <option value="units">Units</option>
+            <option value="team-change-reports">Teamwechsel</option>
           </select>
           <button className="btn-ghost">
             <Filter className="h-4 w-4" />
             Mehr Filter
           </button>
         </div>
-      </div>
-
-      {/* Info */}
-      <div className="card p-4 bg-slate-800/50">
-        <p className="text-sm text-slate-400">
-          Alle Änderungen im System werden automatisch protokolliert. Die Logs werden
-          für 90 Tage aufbewahrt.
-        </p>
       </div>
 
       {/* Tabelle */}
@@ -179,6 +353,74 @@ export default function AuditLogs() {
           total={response.total}
           limit={response.limit}
         />
+      )}
+
+      {/* Details Modal */}
+      {selectedLog && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-2xl border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">Log Details</h2>
+              <button
+                onClick={() => setSelectedLog(null)}
+                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[calc(90vh-80px)]">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-slate-500 uppercase">Aktion</label>
+                  <p className={`font-mono text-sm ${getActionColor(selectedLog.action)}`}>
+                    {selectedLog.action}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 uppercase">Bereich</label>
+                  <p className="text-white">{entityLabels[selectedLog.entity] || selectedLog.entity}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 uppercase">Benutzer</label>
+                  <p className="text-white">
+                    {selectedLog.user?.displayName || selectedLog.user?.username || 'System'}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 uppercase">Zeit</label>
+                  <p className="text-white">
+                    {format(new Date(selectedLog.createdAt), 'dd.MM.yyyy HH:mm:ss', { locale: de })}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 uppercase">IP-Adresse</label>
+                  <p className="text-slate-400 font-mono text-sm">{selectedLog.ipAddress || '-'}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 uppercase">Entity ID</label>
+                  <p className="text-slate-400 font-mono text-sm">{selectedLog.entityId || '-'}</p>
+                </div>
+              </div>
+
+              {selectedLog.details && (
+                <div>
+                  <label className="text-xs text-slate-500 uppercase">Details</label>
+                  <pre className="mt-1 p-4 bg-slate-900/50 rounded-lg text-sm text-slate-300 overflow-x-auto whitespace-pre-wrap">
+                    {JSON.stringify(JSON.parse(selectedLog.details), null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {selectedLog.userAgent && (
+                <div>
+                  <label className="text-xs text-slate-500 uppercase">User Agent</label>
+                  <p className="text-slate-400 text-sm break-all">{selectedLog.userAgent}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

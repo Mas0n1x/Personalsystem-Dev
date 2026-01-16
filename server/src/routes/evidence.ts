@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { triggerEvidenceStored, getEmployeeIdFromUserId } from '../services/bonusService.js';
+import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 
 const router = Router();
 
@@ -137,6 +138,9 @@ router.post('/', authMiddleware, requirePermission('evidence.manage'), async (re
       await triggerEvidenceStored(storedByEmployeeId, name, evidence.id);
     }
 
+    // Live-Update broadcast
+    broadcastCreate('evidence', evidence);
+
     res.status(201).json(evidence);
   } catch (error) {
     console.error('Create evidence error:', error);
@@ -177,6 +181,9 @@ router.put('/:id', authMiddleware, requirePermission('evidence.manage'), async (
         },
       },
     });
+
+    // Live-Update broadcast
+    broadcastUpdate('evidence', evidence);
 
     res.json(evidence);
   } catch (error) {
@@ -222,6 +229,9 @@ router.put('/:id/release', authMiddleware, requirePermission('evidence.manage'),
       },
     });
 
+    // Live-Update broadcast
+    broadcastUpdate('evidence', evidence);
+
     res.json(evidence);
   } catch (error) {
     console.error('Release evidence error:', error);
@@ -252,6 +262,9 @@ router.put('/:id/restore', authMiddleware, requirePermission('evidence.manage'),
         },
       },
     });
+
+    // Live-Update broadcast
+    broadcastUpdate('evidence', evidence);
 
     res.json(evidence);
   } catch (error) {
@@ -313,6 +326,9 @@ router.delete('/:id', authMiddleware, requirePermission('evidence.manage'), asyn
     const { id } = req.params;
 
     await prisma.evidence.delete({ where: { id } });
+
+    // Live-Update broadcast
+    broadcastDelete('evidence', id);
 
     res.json({ success: true });
   } catch (error) {

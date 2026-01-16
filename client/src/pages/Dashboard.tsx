@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { dashboardApi, absencesApi, bonusApi } from '../services/api';
+import { dashboardApi, absencesApi, bonusApi, calendarApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { usePermissions } from '../hooks/usePermissions';
@@ -24,6 +24,9 @@ import {
   Ban,
   FileText,
   Sparkles,
+  Calendar,
+  Clock,
+  MapPin,
 } from 'lucide-react';
 
 interface ActiveAbsence {
@@ -92,6 +95,18 @@ interface WeeklyBonusData {
 interface TeamDistribution {
   team: string;
   count: number;
+}
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  startDate: string;
+  endDate: string | null;
+  isAllDay: boolean;
+  color: string;
+  category: string;
 }
 
 interface DashboardStats {
@@ -334,10 +349,20 @@ export default function Dashboard() {
     enabled: canViewAllBonuses,
   });
 
+  const { data: upcomingEventsData } = useQuery({
+    queryKey: ['calendarUpcoming'],
+    queryFn: async () => {
+      const res = await calendarApi.getUpcoming();
+      return res.data as CalendarEvent[];
+    },
+    refetchInterval: 60000,
+  });
+
   const stats = statsData?.stats;
   const teamDistribution = statsData?.teamDistribution || [];
   const activeAbsences = activeAbsencesData?.data as ActiveAbsence[] | undefined;
   const myBonus = myBonusData;
+  const upcomingEvents = upcomingEventsData || [];
 
   // Berechne Team-Farben
   const teamColors: Record<string, string> = {
@@ -596,6 +621,75 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Nächste Termine */}
+      {upcomingEvents.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="card-header flex items-center justify-between border-b border-slate-700/50">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-blue-400" />
+              Nächste Termine
+            </h2>
+            <Link
+              to="/calendar"
+              className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
+            >
+              Kalender öffnen
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+              {upcomingEvents.slice(0, 5).map((event) => {
+                const eventDate = new Date(event.startDate);
+                const isToday = new Date().toDateString() === eventDate.toDateString();
+                const isTomorrow = new Date(Date.now() + 86400000).toDateString() === eventDate.toDateString();
+
+                return (
+                  <Link
+                    key={event.id}
+                    to="/calendar"
+                    className="group p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800 transition-all duration-200"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="w-1 h-full min-h-[60px] rounded-full flex-shrink-0"
+                        style={{ backgroundColor: event.color }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-white text-sm truncate group-hover:text-blue-400 transition-colors">
+                          {event.title}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-1.5 text-xs text-slate-400">
+                          <Clock className="h-3 w-3" />
+                          {isToday ? (
+                            <span className="text-emerald-400 font-medium">Heute</span>
+                          ) : isTomorrow ? (
+                            <span className="text-amber-400 font-medium">Morgen</span>
+                          ) : (
+                            eventDate.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })
+                          )}
+                          {!event.isAllDay && (
+                            <span>
+                              , {eventDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                        {event.location && (
+                          <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-500">
+                            <MapPin className="h-3 w-3" />
+                            <span className="truncate">{event.location}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Unterer Bereich: Sonderzahlungen & Abmeldungen */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { triggerTrainingConducted, triggerTrainingParticipated, getEmployeeIdFromUserId } from '../services/bonusService.js';
+import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 
 const router = Router();
 
@@ -262,6 +263,9 @@ router.post('/', requirePermission('academy.manage'), async (req: AuthRequest, r
       }
     });
 
+    // Live-Update broadcast
+    broadcastCreate('training', training);
+
     res.status(201).json(training);
   } catch (error) {
     console.error('Error creating training:', error);
@@ -331,6 +335,9 @@ router.put('/:id', requirePermission('academy.manage'), async (req: AuthRequest,
       }
     }
 
+    // Live-Update broadcast
+    broadcastUpdate('training', training);
+
     res.json(training);
   } catch (error) {
     console.error('Error updating training:', error);
@@ -344,6 +351,10 @@ router.delete('/:id', requirePermission('academy.manage'), async (req: AuthReque
     const { id } = req.params;
 
     await prisma.training.delete({ where: { id } });
+
+    // Live-Update broadcast
+    broadcastDelete('training', id);
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting training:', error);

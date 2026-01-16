@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { triggerCaseOpened, triggerCaseClosed, getEmployeeIdFromUserId } from '../services/bonusService.js';
+import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -539,6 +540,9 @@ router.post('/', authMiddleware, requirePermission('detectives.manage'), async (
       await triggerCaseOpened(newCase.folder.detectiveId, caseNumber, newCase.id);
     }
 
+    // Live-Update broadcast
+    broadcastCreate('case', newCase);
+
     res.status(201).json(newCase);
   } catch (error) {
     console.error('Create case error:', error);
@@ -639,6 +643,9 @@ router.put('/:id', authMiddleware, requirePermission('detectives.manage'), async
       }
     }
 
+    // Live-Update broadcast
+    broadcastUpdate('case', updatedCase);
+
     res.json(updatedCase);
   } catch (error) {
     console.error('Update case error:', error);
@@ -691,6 +698,9 @@ router.delete('/:id', authMiddleware, requirePermission('detectives.manage'), as
     }
 
     await prisma.case.delete({ where: { id: req.params.id } });
+
+    // Live-Update broadcast
+    broadcastDelete('case', req.params.id);
 
     res.json({ success: true });
   } catch (error) {

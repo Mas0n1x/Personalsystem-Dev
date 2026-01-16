@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { triggerRobberyLeader, triggerRobberyNegotiator } from '../services/bonusService.js';
+import { broadcastCreate, broadcastDelete } from '../services/socketService.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -272,6 +273,9 @@ router.post('/', authMiddleware, requirePermission('robbery.create'), upload.sin
     await triggerRobberyLeader(leaderId, robbery.id);
     await triggerRobberyNegotiator(negotiatorId, robbery.id);
 
+    // Live-Update broadcast
+    broadcastCreate('robbery', robbery);
+
     res.status(201).json(robbery);
   } catch (error) {
     console.error('Create robbery error:', error);
@@ -299,6 +303,9 @@ router.delete('/:id', authMiddleware, requirePermission('robbery.manage'), async
 
     // Lösche den Raub
     await prisma.robbery.delete({ where: { id } });
+
+    // Live-Update broadcast
+    broadcastDelete('robbery', id);
 
     res.json({ success: true });
   } catch (error) {
