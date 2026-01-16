@@ -23,7 +23,19 @@ export function initializeSocket(socketIo: Server): void {
   // Authentifizierung Middleware
   io.use(async (socket: AuthenticatedSocket, next) => {
     try {
-      const token = socket.handshake.auth.token || socket.handshake.headers.cookie?.split('token=')[1]?.split(';')[0];
+      // Token aus auth oder Cookie extrahieren
+      let token = socket.handshake.auth.token;
+
+      if (!token && socket.handshake.headers.cookie) {
+        const cookies = socket.handshake.headers.cookie.split(';');
+        for (const cookie of cookies) {
+          const [name, value] = cookie.trim().split('=');
+          if (name === 'token') {
+            token = value;
+            break;
+          }
+        }
+      }
 
       if (!token) {
         return next(new Error('Nicht authentifiziert'));

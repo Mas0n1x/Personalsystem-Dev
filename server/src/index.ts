@@ -47,9 +47,17 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
+// Erlaubte Origins für CORS
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://192.168.2.103:5173',
+  'http://test.mas0n1x.online',
+  'https://test.mas0n1x.online',
+];
+
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true,
   },
 });
@@ -58,7 +66,14 @@ export const prisma = new PrismaClient();
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Erlaube Requests ohne Origin (z.B. von curl oder Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('CORS nicht erlaubt'), false);
+  },
   credentials: true,
 }));
 app.use(express.json());
