@@ -448,6 +448,7 @@ router.post('/discord/sync-members', authMiddleware, requirePermission('admin.fu
       data: {
         created: result.created,
         updated: result.updated,
+        removed: result.removed,
         total: result.total,
         errors: result.errors,
       },

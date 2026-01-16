@@ -233,10 +233,19 @@ export default function EmployeeDetail() {
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-white">Mitarbeiter Details</h1>
         </div>
-        <button onClick={openEditModal} className="btn-secondary">
-          <Edit className="h-4 w-4" />
-          Bearbeiten
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate(`/uprank-request?employeeId=${employee.id}`)}
+            className="btn-primary"
+          >
+            <TrendingUp className="h-4 w-4" />
+            Uprank Antrag einreichen
+          </button>
+          <button onClick={openEditModal} className="btn-secondary">
+            <Edit className="h-4 w-4" />
+            Bearbeiten
+          </button>
+        </div>
       </div>
 
       {/* Profil-Karte */}

@@ -9,6 +9,7 @@ let guild: Guild | null = null;
 interface SyncResult {
   created: number;
   updated: number;
+  removed: number;
   total: number;
   errors: string[];
 }
@@ -136,14 +137,6 @@ const UNIT_ROLES: Record<string, { unit: string; isBase: boolean; order: number 
   '» Instructor of Quality Assurance': { unit: 'Quality Assurance', isBase: false, order: 1 },
   '» Co. Director of Quality Assurance': { unit: 'Quality Assurance', isBase: false, order: 2 },
   '» Director of Quality Assurance': { unit: 'Quality Assurance', isBase: false, order: 3 },
-
-  // Flugschein (Lizenzen)
-  '» Flugschein (★)': { unit: 'Flugschein', isBase: false, order: 1 },
-  '» Flugschein (★★)': { unit: 'Flugschein', isBase: false, order: 2 },
-  '» Flugschein (★★★)': { unit: 'Flugschein', isBase: false, order: 3 },
-  '» Flugschein (★★★★)': { unit: 'Flugschein', isBase: false, order: 4 },
-  '» Flugschein (★★★★★)': { unit: 'Flugschein', isBase: false, order: 5 },
-  '» LSPD | Flugausbilder': { unit: 'Flugschein', isBase: false, order: 6 },
 
   // Management & Leadership
   '» Management': { unit: 'Management', isBase: true, order: 0 },
@@ -497,20 +490,29 @@ export async function findDiscordUser(query: string): Promise<{
 
 // Discord Mitglieder mit Rollen 1-17 als Mitarbeiter synchronisieren
 export async function syncDiscordMembers(): Promise<SyncResult> {
-  const result: SyncResult = { created: 0, updated: 0, total: 0, errors: [] };
+  const result: SyncResult = { created: 0, updated: 0, removed: 0, total: 0, errors: [] };
+
+  console.log('[Discord-Sync] Starte Sync...');
 
   if (!guild) {
+    console.log('[Discord-Sync] Guild nicht verfügbar!');
     result.errors.push('Guild nicht verfügbar');
     return result;
   }
 
+  console.log(`[Discord-Sync] Guild gefunden: ${guild.name}`);
+
   try {
     // Members aus Cache verwenden (wurde beim Startup geladen)
-    // Nur neu fetchen wenn Cache leer ist
+    // Falls Cache leer, neu fetchen
     let members = guild.members.cache;
+    console.log(`[Discord-Sync] Cache hat ${members.size} Mitglieder`);
+
     if (members.size === 0) {
+      console.log('[Discord-Sync] Cache leer, fetche Members...');
       members = await guild.members.fetch();
     }
+    console.log(`[Discord-Sync] ${members.size} Mitglieder zur Verarbeitung`);
 
     for (const [, member] of members) {
       // Bots überspringen
@@ -634,6 +636,54 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
     }
   } catch (error) {
     result.errors.push(`Fetch Fehler: ${error}`);
+  }
+
+  // Mitarbeiter entfernen, die nicht mehr auf dem Discord sind
+  try {
+    // Alle Discord-IDs der aktuellen Server-Mitglieder sammeln
+    const currentDiscordIds = new Set<string>();
+    const members = guild.members.cache;
+    for (const [, member] of members) {
+      if (!member.user.bot) {
+        currentDiscordIds.add(member.id);
+      }
+    }
+
+    // Alle User/Employees aus der Datenbank holen (auch inaktive, um sie zu löschen)
+    const allUsers = await prisma.user.findMany({
+      include: { employee: true },
+    });
+
+    let removed = 0;
+    for (const user of allUsers) {
+      // Wenn der User nicht mehr auf dem Discord ist
+      if (!currentDiscordIds.has(user.discordId)) {
+        const username = user.username;
+
+        // Employee komplett löschen falls vorhanden
+        if (user.employee) {
+          await prisma.employee.delete({
+            where: { id: user.employee.id },
+          });
+        }
+
+        // User komplett löschen
+        await prisma.user.delete({
+          where: { id: user.id },
+        });
+
+        removed++;
+        console.log(`[Discord-Sync] Gelöscht: ${username} (nicht mehr auf Discord)`);
+      }
+    }
+
+    if (removed > 0) {
+      console.log(`Discord-Sync: ${removed} Mitarbeiter entfernt (nicht mehr auf Discord)`);
+    }
+
+    result.removed = removed;
+  } catch (error) {
+    result.errors.push(`Cleanup Fehler: ${error}`);
   }
 
   return result;

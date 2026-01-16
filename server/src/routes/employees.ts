@@ -94,7 +94,10 @@ router.get('/', authMiddleware, requirePermission('employees.view'), async (req:
     const { search, department, rank, team, page = '1', limit = '20', all = 'false', sortBy = 'badgeNumber' } = req.query;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = {};
+    const where: any = {
+      // Standardmäßig nur aktive Mitarbeiter anzeigen
+      status: 'ACTIVE',
+    };
 
     // Department-Filter (mit contains, da Departments als "Patrol, S.W.A.T." gespeichert sind)
     if (department) {
@@ -128,6 +131,7 @@ router.get('/', authMiddleware, requirePermission('employees.view'), async (req:
 
     console.log('Employee filter:', { search, department, rank, team, all, sortBy, loadAll, skip, take, where });
 
+    const now = new Date();
     const [employees, total] = await Promise.all([
       prisma.employee.findMany({
         where,
@@ -137,6 +141,14 @@ router.get('/', authMiddleware, requirePermission('employees.view'), async (req:
               role: true,
             },
           },
+          // Aktuelle Abwesenheiten einschließen
+          absences: {
+            where: {
+              startDate: { lte: now },
+              endDate: { gte: now },
+            },
+            take: 1,
+          },
         },
         skip,
         take,
@@ -145,6 +157,17 @@ router.get('/', authMiddleware, requirePermission('employees.view'), async (req:
       }),
       prisma.employee.count({ where }),
     ]);
+
+    // Debug: Absences loggen
+    const employeesWithAbsences = employees.filter(e => e.absences && e.absences.length > 0);
+    if (employeesWithAbsences.length > 0) {
+      console.log('Employees with active absences:', employeesWithAbsences.map(e => ({
+        badge: e.badgeNumber,
+        absences: e.absences,
+      })));
+    } else {
+      console.log('No employees with active absences found. Current time:', now.toISOString());
+    }
 
     // Sortierung nach Dienstnummer wenn gewünscht
     let sortedEmployees = employees;

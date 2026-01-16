@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { employeesApi } from '../services/api';
 import { usePermissions } from '../hooks/usePermissions';
 import Table from '../components/ui/Table';
-import { Search, Filter, ChevronUp, ChevronDown, Users, UserX, X, Check, TrendingUp, Shield, Star } from 'lucide-react';
+import { Search, Filter, ChevronUp, ChevronDown, Users, UserX, X, Check, TrendingUp, Shield, Star, Moon, CalendarOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Employee, PaginatedResponse } from '../types';
 
@@ -202,21 +202,42 @@ export default function Employees() {
     {
       key: 'user',
       header: 'Mitarbeiter',
-      render: (employee: Employee) => (
-        <div className="flex items-center gap-3">
-          <img
-            src={
-              employee.user?.avatar ||
-              `https://ui-avatars.com/api/?name=${employee.user?.displayName || employee.user?.username}&background=random`
-            }
-            alt={employee.user?.displayName || employee.user?.username}
-            className="h-10 w-10 rounded-full"
-          />
-          <p className="font-medium text-white">
-            {employee.user?.displayName || employee.user?.username}
-          </p>
-        </div>
-      ),
+      render: (employee: Employee) => {
+        const currentAbsence = employee.absences?.[0];
+        return (
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <img
+                src={
+                  employee.user?.avatar ||
+                  `https://ui-avatars.com/api/?name=${employee.user?.displayName || employee.user?.username}&background=random`
+                }
+                alt={employee.user?.displayName || employee.user?.username}
+                className="h-10 w-10 rounded-full"
+              />
+              {currentAbsence && (
+                <div
+                  className={`absolute -bottom-1 -right-1 p-1 rounded-full ${
+                    currentAbsence.type === 'DAY_OFF'
+                      ? 'bg-blue-500'
+                      : 'bg-orange-500'
+                  }`}
+                  title={currentAbsence.type === 'DAY_OFF' ? 'Dienstfrei' : 'Abgemeldet'}
+                >
+                  {currentAbsence.type === 'DAY_OFF' ? (
+                    <Moon className="h-3 w-3 text-white" />
+                  ) : (
+                    <CalendarOff className="h-3 w-3 text-white" />
+                  )}
+                </div>
+              )}
+            </div>
+            <p className="font-medium text-white">
+              {employee.user?.displayName || employee.user?.username}
+            </p>
+          </div>
+        );
+      },
     },
     {
       key: 'badgeNumber',

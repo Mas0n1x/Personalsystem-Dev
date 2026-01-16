@@ -30,6 +30,14 @@ export interface Permission {
   category: string;
 }
 
+export interface Absence {
+  id: string;
+  type: 'ABSENCE' | 'DAY_OFF';
+  reason?: string;
+  startDate: string;
+  endDate: string;
+}
+
 export interface Employee {
   id: string;
   userId: string;
@@ -43,6 +51,7 @@ export interface Employee {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  absences?: Absence[];
 }
 
 export type EmployeeStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'ON_LEAVE' | 'TERMINATED';
