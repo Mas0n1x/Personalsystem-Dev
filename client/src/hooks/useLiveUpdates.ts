@@ -11,7 +11,7 @@ import { useSocket } from '../context/SocketContext';
 export function useLiveUpdates() {
   const { socket } = useSocket();
   const queryClient = useQueryClient();
-  const dashboardDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const dashboardDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingInvalidationsRef = useRef<Set<string>>(new Set());
 
   // Debounced Dashboard-Invalidierung (sammelt Updates für 500ms)

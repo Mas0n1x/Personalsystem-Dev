@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeesApi } from '../services/api';
 import { StatusBadge } from '../components/ui/Badge';
+import DutyTimeCard from '../components/DutyTimeCard';
 import {
   ArrowLeft,
   Edit,
@@ -363,6 +364,9 @@ export default function EmployeeDetail() {
           </div>
         </div>
       </div>
+
+      {/* Dienstzeiten (Leitstelle) */}
+      <DutyTimeCard employeeId={employee.id} />
 
       {/* Zwei-Spalten-Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

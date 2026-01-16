@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { Link } from 'react-router-dom';
+import DutyTimeCard from '../components/DutyTimeCard';
 import {
   Users,
   UserCheck,
@@ -446,6 +447,11 @@ export default function Dashboard() {
             <p className="text-3xl font-bold text-amber-400">${myBonus.summary.total.toLocaleString()}</p>
           </div>
         )}
+
+        {/* Meine Dienstzeiten (Leitstelle) */}
+        <div className="relative mt-6">
+          <DutyTimeCard compact />
+        </div>
       </div>
 
       {/* Haupt-Statistiken */}

@@ -43,6 +43,7 @@ import notificationRoutes from './routes/notifications.js';
 import discordAnnouncementRoutes from './routes/discordAnnouncements.js';
 import unitRoutes from './routes/units.js';
 import calendarRoutes from './routes/calendar.js';
+import dutyTimeRoutes from './routes/dutyTime.js';
 
 // Services
 import { initializeDiscordBot } from './services/discordBot.js';
@@ -125,6 +126,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/discord-announcements', discordAnnouncementRoutes);
 app.use('/api/units', unitRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/duty-time', dutyTimeRoutes);
 
 // Error handling
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

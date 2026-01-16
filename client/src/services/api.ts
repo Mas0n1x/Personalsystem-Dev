@@ -639,3 +639,28 @@ export const archiveApi = {
   // Statistiken
   getStats: () => api.get('/archive/stats'),
 };
+
+// Dienstzeiten API (Leitstelle)
+export const dutyTimeApi = {
+  // Status prüfen
+  getStatus: () => api.get('/duty-time/status'),
+
+  // Eigene Dienstzeiten
+  getMyDutyTime: (rangeStart?: string) =>
+    api.get('/duty-time/me', { params: rangeStart ? { rangeStart } : undefined }),
+
+  // Dienstzeit eines Mitarbeiters
+  getEmployeeDutyTime: (employeeId: string, rangeStart?: string) =>
+    api.get(`/duty-time/employee/${employeeId}`, { params: rangeStart ? { rangeStart } : undefined }),
+
+  // Mehrere Mitarbeiter (Bulk)
+  getBulkDutyTimes: (employeeIds: string[], rangeStart?: string) =>
+    api.post('/duty-time/bulk', { employeeIds, rangeStart }),
+
+  // Alle Dienstzeiten (Leadership)
+  getAll: (rangeStart?: string) =>
+    api.get('/duty-time/all', { params: rangeStart ? { rangeStart } : undefined }),
+
+  // Cache leeren (Admin)
+  clearCache: () => api.post('/duty-time/clear-cache'),
+};
