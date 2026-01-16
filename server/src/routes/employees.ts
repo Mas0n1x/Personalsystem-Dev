@@ -373,51 +373,71 @@ router.get('/:id/promotions', authMiddleware, requirePermission('employees.view'
 router.get('/:id/bonuses', authMiddleware, requirePermission('employees.view'), async (req: AuthRequest, res: Response) => {
   try {
     const { limit = '20' } = req.query;
+    const employeeId = req.params.id;
 
-    const payments = await prisma.bonusPayment.findMany({
-      where: { employeeId: req.params.id },
-      include: {
-        config: {
-          select: {
-            displayName: true,
-            category: true,
-            activityType: true,
+    // Optimiert: Eine Abfrage für Statistiken via Aggregation + eine für paginierte Daten
+    const [payments, aggregates, categoryStats] = await Promise.all([
+      // Paginierte Payments für Anzeige
+      prisma.bonusPayment.findMany({
+        where: { employeeId },
+        include: {
+          config: {
+            select: {
+              displayName: true,
+              category: true,
+              activityType: true,
+            },
+          },
+          paidBy: {
+            select: {
+              displayName: true,
+              username: true,
+            },
           },
         },
-        paidBy: {
-          select: {
-            displayName: true,
-            username: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: parseInt(limit as string),
-    });
+        orderBy: { createdAt: 'desc' },
+        take: parseInt(limit as string),
+      }),
+      // Aggregierte Statistiken
+      prisma.bonusPayment.groupBy({
+        by: ['status'],
+        where: { employeeId },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      // Statistiken nach Kategorie
+      prisma.$queryRaw<Array<{ category: string; count: bigint; paidAmount: bigint }>>`
+        SELECT bc.category, COUNT(*) as count,
+               COALESCE(SUM(CASE WHEN bp.status = 'PAID' THEN bp.amount ELSE 0 END), 0) as paidAmount
+        FROM BonusPayment bp
+        JOIN BonusConfig bc ON bp.configId = bc.id
+        WHERE bp.employeeId = ${employeeId}
+        GROUP BY bc.category
+      `,
+    ]);
 
-    // Statistiken berechnen
-    const allPayments = await prisma.bonusPayment.findMany({
-      where: { employeeId: req.params.id },
-      include: { config: true },
-    });
-
+    // Statistiken aus Aggregation zusammenbauen
     const stats = {
-      totalEarned: allPayments.filter(p => p.status === 'PAID').reduce((sum, p) => sum + p.amount, 0),
-      totalPending: allPayments.filter(p => p.status === 'PENDING').reduce((sum, p) => sum + p.amount, 0),
-      paymentCount: allPayments.length,
+      totalEarned: 0,
+      totalPending: 0,
+      paymentCount: 0,
       byCategory: {} as Record<string, { count: number; amount: number }>,
     };
 
-    // Nach Kategorie gruppieren
-    for (const payment of allPayments) {
-      const category = payment.config.category;
-      if (!stats.byCategory[category]) {
-        stats.byCategory[category] = { count: 0, amount: 0 };
+    for (const agg of aggregates) {
+      stats.paymentCount += agg._count;
+      if (agg.status === 'PAID') {
+        stats.totalEarned = agg._sum.amount || 0;
+      } else if (agg.status === 'PENDING') {
+        stats.totalPending = agg._sum.amount || 0;
       }
-      stats.byCategory[category].count++;
-      if (payment.status === 'PAID') {
-        stats.byCategory[category].amount += payment.amount;
-      }
+    }
+
+    for (const cat of categoryStats) {
+      stats.byCategory[cat.category] = {
+        count: Number(cat.count),
+        amount: Number(cat.paidAmount),
+      };
     }
 
     res.json({ payments, stats });

@@ -19,6 +19,7 @@ import {
   Users,
   X,
   RefreshCw,
+  History,
 } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
@@ -124,6 +125,7 @@ export default function Teamleitung() {
 
   // Lock State
   const [showLockModal, setShowLockModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [lockReason, setLockReason] = useState('');
   const [lockedUntil, setLockedUntil] = useState('');
@@ -177,6 +179,12 @@ export default function Teamleitung() {
   const { data: locks = [], isLoading: locksLoading } = useQuery({
     queryKey: ['uprank-locks'],
     queryFn: () => uprankLockApi.getAll().then((r) => r.data),
+  });
+
+  const { data: lockHistory = [], isLoading: historyLoading } = useQuery({
+    queryKey: ['uprank-lock-history'],
+    queryFn: () => uprankLockApi.getHistory({ limit: '100' }).then((r) => r.data),
+    enabled: showHistoryModal,
   });
 
   const { data: allEmployeesData } = useQuery({
@@ -652,6 +660,13 @@ export default function Teamleitung() {
           <div className="card">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="font-semibold text-white">Aktive Uprank-Sperren</h2>
+              <button
+                onClick={() => setShowHistoryModal(true)}
+                className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
+              >
+                <History className="h-3.5 w-3.5" />
+                Verlauf
+              </button>
             </div>
             <div className="divide-y divide-slate-700">
               {locksLoading ? (
@@ -842,6 +857,97 @@ export default function Teamleitung() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
+            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between flex-shrink-0">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <History className="h-5 w-5 text-amber-400" />
+                Sperren-Verlauf
+              </h2>
+              <button onClick={() => setShowHistoryModal(false)} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {historyLoading ? (
+                <div className="p-12 text-center">
+                  <RefreshCw className="h-8 w-8 text-slate-400 animate-spin mx-auto" />
+                </div>
+              ) : lockHistory.length === 0 ? (
+                <div className="p-12 text-center">
+                  <History className="h-16 w-16 text-slate-600 mx-auto mb-4" />
+                  <p className="text-slate-400">Keine Sperren im Verlauf</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {lockHistory.map((lock: UprankLock) => {
+                    const now = new Date();
+                    const lockedUntilDate = new Date(lock.lockedUntil);
+                    const isExpired = lockedUntilDate < now;
+                    const isRevoked = !lock.isActive && !isExpired;
+
+                    return (
+                      <div key={lock.id} className="bg-slate-700/30 rounded-lg p-4">
+                        <div className="flex items-start gap-4">
+                          <img
+                            src={
+                              lock.employee.user.avatar ||
+                              `https://ui-avatars.com/api/?name=${getEmployeeName(lock.employee)}&size=40&background=334155&color=fff`
+                            }
+                            className="h-10 w-10 rounded-full flex-shrink-0"
+                            alt=""
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="font-medium text-white">
+                                {getEmployeeName(lock.employee)}
+                              </span>
+                              <span className="text-xs text-slate-500">({lock.employee.rank})</span>
+                              <span className={`px-2 py-0.5 text-xs rounded-full ${
+                                lock.team === 'Team Green' ? 'bg-green-600/20 text-green-400' :
+                                lock.team === 'Team Silver' ? 'bg-slate-600/20 text-slate-300' :
+                                lock.team === 'Team Gold' ? 'bg-amber-600/20 text-amber-400' :
+                                'bg-blue-600/20 text-blue-400'
+                              }`}>
+                                {lock.team}
+                              </span>
+                              {lock.isActive && !isExpired && (
+                                <span className="px-2 py-0.5 text-xs bg-amber-600/20 text-amber-400 rounded-full">
+                                  Aktiv
+                                </span>
+                              )}
+                              {isExpired && (
+                                <span className="px-2 py-0.5 text-xs bg-slate-600/20 text-slate-400 rounded-full">
+                                  Abgelaufen
+                                </span>
+                              )}
+                              {isRevoked && (
+                                <span className="px-2 py-0.5 text-xs bg-green-600/20 text-green-400 rounded-full">
+                                  Aufgehoben
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-slate-300">{lock.reason}</p>
+                            <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
+                              <span>Erstellt: {formatDate(lock.createdAt)}</span>
+                              <span>Bis: {formatDate(lock.lockedUntil)}</span>
+                              <span>Von: {lock.createdBy.displayName || lock.createdBy.username}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

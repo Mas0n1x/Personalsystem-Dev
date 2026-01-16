@@ -126,6 +126,9 @@ model Employee {
   bonusPayments          BonusPayment[] @relation("BonusPaymentEmployee")
   promotionArchive       PromotionArchive[] @relation("PromotionArchiveEmployee")
 
+  @@index([status])
+  @@index([rankLevel])
+  @@index([department])
   @@map("employees")
 }
 

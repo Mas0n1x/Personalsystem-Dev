@@ -67,32 +67,60 @@ router.get('/overview', authMiddleware, requirePermission('employees.view'), asy
     // PERFORMANT: Alle Member-Rollen auf einmal laden statt einzeln
     const allMemberRoles = await getAllMembersWithRoles();
 
-    // Für jede Unit die Mitglieder zählen
+    // OPTIMIERT: Erstelle eine Map von RoleId -> Employee-Counts
+    // Dies reduziert O(units * employees) zu O(employees + units)
+    const roleCountMap = new Map<string, { members: Set<string>; leadership: Set<string> }>();
+
+    // Sammle alle Role-IDs die wir brauchen
+    const allRoleIds = new Set<string>();
+    const leadershipRoleSet = new Set<string>();
+    for (const unit of units) {
+      for (const role of unit.roles) {
+        allRoleIds.add(role.discordRoleId);
+        if (role.isLeadership) {
+          leadershipRoleSet.add(role.discordRoleId);
+        }
+      }
+    }
+
+    // Initialisiere die Map für alle relevanten Rollen
+    for (const roleId of allRoleIds) {
+      roleCountMap.set(roleId, { members: new Set(), leadership: new Set() });
+    }
+
+    // Ein Durchlauf durch alle Employees
+    for (const employee of employees) {
+      const memberRoles = allMemberRoles.get(employee.user.discordId) || [];
+      for (const role of memberRoles) {
+        const roleData = roleCountMap.get(role.id);
+        if (roleData) {
+          roleData.members.add(employee.id);
+          if (leadershipRoleSet.has(role.id)) {
+            roleData.leadership.add(employee.id);
+          }
+        }
+      }
+    }
+
+    // Für jede Unit die Mitglieder zählen (jetzt O(unit.roles) statt O(employees))
     const unitsWithCounts = units.map((unit) => {
-      let memberCount = 0;
-      let leadershipCount = 0;
-      const roleIds = unit.roles.map(r => r.discordRoleId);
-      const leadershipRoleIds = unit.roles.filter(r => r.isLeadership).map(r => r.discordRoleId);
+      const memberIds = new Set<string>();
+      const leadershipIds = new Set<string>();
 
-      for (const employee of employees) {
-        const memberRoles = allMemberRoles.get(employee.user.discordId) || [];
-        const memberRoleIds = memberRoles.map(r => r.id);
-
-        // Prüfen ob der Employee eine der Unit-Rollen hat
-        if (roleIds.some(rid => memberRoleIds.includes(rid))) {
-          memberCount++;
-
-          // Prüfen ob der Employee eine Leadership-Rolle hat
-          if (leadershipRoleIds.some(rid => memberRoleIds.includes(rid))) {
-            leadershipCount++;
+      for (const role of unit.roles) {
+        const roleData = roleCountMap.get(role.discordRoleId);
+        if (roleData) {
+          roleData.members.forEach(id => memberIds.add(id));
+          if (role.isLeadership) {
+            roleData.leadership.forEach(id => leadershipIds.add(id));
           }
         }
       }
 
       return {
         ...unit,
-        memberCount,
-        leadershipCount,
+        memberCount: memberIds.size,
+        leadershipCount: leadershipIds.size,
       };
     });
 

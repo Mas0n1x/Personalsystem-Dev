@@ -102,6 +102,16 @@ const categoryLabels: Record<string, string> = {
   SONSTIGES: 'Sonstiges',
 };
 
+// Teams für Dropdown
+const AVAILABLE_TEAMS = [
+  { value: 'White', label: 'Team White' },
+  { value: 'Red', label: 'Team Red' },
+  { value: 'Gold', label: 'Team Gold' },
+  { value: 'Silver', label: 'Team Silver' },
+  { value: 'Green', label: 'Team Green' },
+  { value: 'Kein Team', label: 'Kein Team' },
+];
+
 interface TeamChangeReport {
   id: string;
   employeeId: string;
@@ -705,11 +715,21 @@ export default function InternalAffairs() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">Vorheriges Team *</label>
-                  <input type="text" name="previousTeam" required className="input w-full" placeholder="z.B. Team Green" />
+                  <select name="previousTeam" required className="input w-full">
+                    <option value="">Auswählen...</option>
+                    {AVAILABLE_TEAMS.map((team) => (
+                      <option key={team.value} value={team.value}>{team.label}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">Neues Team *</label>
-                  <input type="text" name="newTeam" required className="input w-full" placeholder="z.B. Team Red" />
+                  <select name="newTeam" required className="input w-full">
+                    <option value="">Auswählen...</option>
+                    {AVAILABLE_TEAMS.map((team) => (
+                      <option key={team.value} value={team.value}>{team.label}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div>

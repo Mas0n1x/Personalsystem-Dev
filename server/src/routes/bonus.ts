@@ -99,10 +99,20 @@ router.put('/config/:id', authMiddleware, requirePermission('admin.full'), async
     const { id } = req.params;
     const { amount, isActive, displayName, description } = req.body;
 
+    // Betrag validieren wenn angegeben
+    let parsedAmount: number | undefined;
+    if (amount !== undefined) {
+      parsedAmount = parseInt(amount);
+      if (isNaN(parsedAmount) || parsedAmount < 0) {
+        res.status(400).json({ error: 'Ungültiger Betrag' });
+        return;
+      }
+    }
+
     const config = await prisma.bonusConfig.update({
       where: { id },
       data: {
-        ...(amount !== undefined && { amount: parseInt(amount) }),
+        ...(parsedAmount !== undefined && { amount: parsedAmount }),
         ...(isActive !== undefined && { isActive }),
         ...(displayName && { displayName }),
         ...(description !== undefined && { description }),
@@ -126,12 +136,19 @@ router.post('/config', authMiddleware, requirePermission('admin.full'), async (r
       return;
     }
 
+    // Betrag validieren
+    const parsedAmount = parseInt(amount);
+    if (amount !== undefined && (isNaN(parsedAmount) || parsedAmount < 0)) {
+      res.status(400).json({ error: 'Ungültiger Betrag' });
+      return;
+    }
+
     const config = await prisma.bonusConfig.create({
       data: {
         activityType,
         displayName,
         description: description || null,
-        amount: parseInt(amount) || 0,
+        amount: parsedAmount || 0,
         category: category || 'GENERAL',
         isActive: isActive !== false,
       },

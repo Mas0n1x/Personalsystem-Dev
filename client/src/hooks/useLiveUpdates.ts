@@ -1,67 +1,84 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSocket } from '../context/SocketContext';
 
 /**
  * Hook für Live-Updates über Socket.io
  * Invalidiert automatisch React Query Caches wenn Daten auf dem Server geändert werden
+ *
+ * OPTIMIERT: Dashboard-Invalidierung wird gedebounced um zu viele Reloads zu vermeiden
  */
 export function useLiveUpdates() {
   const { socket } = useSocket();
   const queryClient = useQueryClient();
+  const dashboardDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingInvalidationsRef = useRef<Set<string>>(new Set());
+
+  // Debounced Dashboard-Invalidierung (sammelt Updates für 500ms)
+  const debouncedDashboardInvalidate = useCallback(() => {
+    if (dashboardDebounceRef.current) {
+      clearTimeout(dashboardDebounceRef.current);
+    }
+    dashboardDebounceRef.current = setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      pendingInvalidationsRef.current.clear();
+      dashboardDebounceRef.current = null;
+    }, 500);
+  }, [queryClient]);
 
   useEffect(() => {
     if (!socket) return;
 
-    // Entity zu Query-Key Mapping
+    // Entity zu Query-Key Mapping (ohne Dashboard - wird separat gehandled)
     const entityQueryKeys: Record<string, string[][]> = {
-      employee: [['employees'], ['employee'], ['dashboard']],
-      absence: [['absences'], ['dashboard']],
-      bonus: [['bonus'], ['bonusPayments'], ['dashboard']],
-      sanction: [['sanctions'], ['dashboard']],
-      task: [['tasks'], ['dashboard']],
-      investigation: [['investigations'], ['dashboard']],
-      case: [['cases'], ['dashboard']],
-      application: [['applications'], ['dashboard']],
-      training: [['trainings'], ['dashboard']],
-      uprankRequest: [['uprankRequests'], ['dashboard']],
-      announcement: [['announcements'], ['dashboard']],
+      employee: [['employees'], ['employee']],
+      absence: [['absences']],
+      bonus: [['bonus'], ['bonusPayments']],
+      sanction: [['sanctions']],
+      task: [['tasks']],
+      investigation: [['investigations']],
+      case: [['cases']],
+      application: [['applications']],
+      training: [['trainings']],
+      uprankRequest: [['uprankRequests']],
+      announcement: [['announcements']],
       notification: [['notifications']],
-      evidence: [['evidence'], ['dashboard']],
-      robbery: [['robberies'], ['dashboard']],
-      tuning: [['tuning'], ['dashboard']],
-      calendar: [['calendar'], ['calendarUpcoming'], ['dashboard']],
+      evidence: [['evidence']],
+      robbery: [['robberies']],
+      tuning: [['tuning']],
+      calendar: [['calendar'], ['calendarUpcoming']],
     };
 
-    // Generische Handler für CRUD-Events
-    const handleCreated = (entity: string) => {
+    // Entities die Dashboard-Updates auslösen
+    const dashboardEntities = new Set([
+      'employee', 'absence', 'bonus', 'sanction', 'task',
+      'investigation', 'case', 'application', 'training',
+      'uprankRequest', 'announcement', 'evidence', 'robbery',
+      'tuning', 'calendar'
+    ]);
+
+    // Generischer Handler für Entity-Updates
+    const handleEntityChange = (entity: string) => {
+      // Sofort die spezifischen Queries invalidieren
       const keys = entityQueryKeys[entity] || [[entity]];
       keys.forEach(key => {
         queryClient.invalidateQueries({ queryKey: key });
       });
-    };
 
-    const handleUpdated = (entity: string) => {
-      const keys = entityQueryKeys[entity] || [[entity]];
-      keys.forEach(key => {
-        queryClient.invalidateQueries({ queryKey: key });
-      });
-    };
-
-    const handleDeleted = (entity: string) => {
-      const keys = entityQueryKeys[entity] || [[entity]];
-      keys.forEach(key => {
-        queryClient.invalidateQueries({ queryKey: key });
-      });
+      // Dashboard-Update debounced
+      if (dashboardEntities.has(entity)) {
+        pendingInvalidationsRef.current.add(entity);
+        debouncedDashboardInvalidate();
+      }
     };
 
     // Event Listener registrieren
     const entities = Object.keys(entityQueryKeys);
 
     entities.forEach(entity => {
-      socket.on(`${entity}:created`, () => handleCreated(entity));
-      socket.on(`${entity}:updated`, () => handleUpdated(entity));
-      socket.on(`${entity}:deleted`, () => handleDeleted(entity));
+      socket.on(`${entity}:created`, () => handleEntityChange(entity));
+      socket.on(`${entity}:updated`, () => handleEntityChange(entity));
+      socket.on(`${entity}:deleted`, () => handleEntityChange(entity));
     });
 
     // Cleanup
@@ -71,6 +88,10 @@ export function useLiveUpdates() {
         socket.off(`${entity}:updated`);
         socket.off(`${entity}:deleted`);
       });
+      // Pending debounce clearen
+      if (dashboardDebounceRef.current) {
+        clearTimeout(dashboardDebounceRef.current);
+      }
     };
-  }, [socket, queryClient]);
+  }, [socket, queryClient, debouncedDashboardInvalidate]);
 }

@@ -7,51 +7,54 @@ Ein modernes Personalmanagementsystem mit Discord-Integration fuer das LSPD.
 ### Kernfunktionen
 - **Mitarbeiterverwaltung**: Mitarbeiter anlegen, bearbeiten, Befoerderungen, Degradierungen
 - **Discord Integration**: OAuth2 Login, automatische Rollensynchronisation
-- **Live-Sync**: Echtzeit-Updates via WebSockets
+- **Live-Sync**: Echtzeit-Updates via WebSockets (optimiert mit Debouncing)
 - **Benachrichtigungssystem**: In-App Benachrichtigungen und Discord-Ankuendigungen
+- **Kalender**: Terminplanung mit Discord-Rollen-Benachrichtigungen und Erinnerungen
 
 ### Units & Abteilungen
 - **Units-Uebersicht**: Alle Einheiten mit Mitgliedern und Leitungspositionen
 - **Human Resources (HR)**: Bewerbungsverwaltung mit mehrstufigem Prozess
-- **Police Academy**: Ausbildungsmodule, Pruefungen, Nachschulungen
+- **Police Academy**: Ausbildungsmodule, Pruefungen, Nachschulungen, Azubi-Fortschritt
 - **Internal Affairs (IA)**: Interne Ermittlungen, Teamwechsel-Berichte
 - **Quality Assurance (QA)**: Unit-Reviews und Qualitaetssicherung
 - **Detectives**: Ermittlungsakten und Fallverwaltung
 - **Teamleitung**: Uprank-Antraege an das Management
 
 ### Leadership Features
-- **Dashboard**: Umfassende Statistiken und Ueberblick
-- **Kasse (Treasury)**: Normale Kasse und Schwarzgeld-Verwaltung
+- **Dashboard**: Umfassende Statistiken und Ueberblick mit Quick-Links
+- **Kasse (Treasury)**: Normale Kasse und Schwarzgeld-Verwaltung mit Transaktionshistorie
 - **Sanktionen**: Verwarnungen, Geldstrafen, Massnahmen
-- **Aufgaben & Notizen**: Team-Organisation
+- **Aufgaben**: Team-Organisation mit Beschreibungen, Prioritaeten und Zuweisung
+- **Notizen**: Pinnbare Notizen mit Kategorien
 - **Ankuendigungen**: Discord-Kanal und In-App Broadcasts
 
 ### Weitere Module
-- **Abmeldungen**: Abmeldungen und Dienstfrei
-- **Asservate**: Beweismittelverwaltung
-- **Tuning-Rechnungen**: Fahrzeugtuning-Abrechnung
+- **Abmeldungen**: Abmeldungen und Dienstfrei mit Kalenderansicht
+- **Asservate**: Beweismittelverwaltung mit Kategorien
+- **Tuning-Rechnungen**: Fahrzeugtuning-Abrechnung mit Bildnachweis
 - **Raububerfaelle**: Einsatzdokumentation
 - **Blacklist**: Gesperrte Bewerber
-- **Uprank-Sperren**: Automatische Sperren bei Teamwechseln
+- **Uprank-Sperren**: Automatische Sperren bei Teamwechseln mit Historie
 
 ### Management
-- **Sonderzahlungen (Bonus)**: Wochenbasierte Bonusabrechnung
+- **Sonderzahlungen (Bonus)**: Wochenbasierte Bonusabrechnung mit Mitarbeiterstatistiken
 - **Uprank-Antraege**: Bearbeitung von Befoerderungsantraegen
 - **Archiv**: Befoerderungs- und Kuendigungshistorie
 
 ### Administration
 - **Benutzer & Rollen**: Berechtigungsverwaltung
-- **Audit-Logs**: Vollstaendige Aktivitaetsprotokollierung
+- **Audit-Logs**: Vollstaendige Aktivitaetsprotokollierung mit Filterung
 - **Backups**: Datensicherung und Wiederherstellung
 - **System-Einstellungen**: Discord-Ankuendigungen, Bonus-Konfiguration
 - **Academy-Module**: Ausbildungsmodule verwalten
+- **Academy-Einstellungen**: Fragenkatalog und Einstellungskriterien
 - **Units-Verwaltung**: Discord-Rollen zu Units zuweisen
 
 ## Tech Stack
 
 - **Frontend**: React 18 + Vite + TypeScript + Tailwind CSS + TanStack Query
 - **Backend**: Express.js + TypeScript + Prisma ORM
-- **Datenbank**: SQLite
+- **Datenbank**: SQLite (mit optimierten Indizes)
 - **Discord**: discord.js v14
 - **Live-Sync**: Socket.io
 - **UI**: Lucide Icons, React Hot Toast
@@ -185,6 +188,7 @@ Das System nutzt ein rollenbasiertes Berechtigungssystem:
 | teamlead | Antraege anzeigen | Antraege erstellen |
 | management | Management-Bereich | Befoerderungen |
 | bonus | Sonderzahlungen anzeigen | Sonderzahlungen verwalten |
+| calendar | Kalender anzeigen | Termine verwalten |
 | admin | - | Vollzugriff (admin.full) |
 
 ## Projektstruktur
@@ -197,7 +201,7 @@ Personalsystem/
 │   │   │   └── layout/     # Layout-Komponenten (Sidebar, Header)
 │   │   ├── pages/          # Seiten
 │   │   │   └── admin/      # Admin-Seiten
-│   │   ├── hooks/          # Custom Hooks
+│   │   ├── hooks/          # Custom Hooks (Live-Updates, Permissions)
 │   │   ├── context/        # React Context (Auth, Socket)
 │   │   ├── services/       # API Services
 │   │   └── types/          # TypeScript Types
@@ -205,7 +209,7 @@ Personalsystem/
 │
 ├── server/                 # Express Backend
 │   ├── src/
-│   │   ├── routes/         # API Routes (~30 Module)
+│   │   ├── routes/         # API Routes (~35 Module)
 │   │   ├── middleware/     # Express Middleware (Auth)
 │   │   ├── services/       # Business Logic (Discord Bot, Bonus)
 │   │   └── types/          # TypeScript Types
@@ -215,6 +219,15 @@ Personalsystem/
 │
 └── .gitignore
 ```
+
+## Performance-Optimierungen
+
+Das System wurde fuer optimale Performance entwickelt:
+
+- **Query-Optimierung**: Aggregierte Datenbankabfragen statt N+1 Queries
+- **Debounced Live-Updates**: Dashboard-Updates werden gebuendelt (500ms)
+- **Datenbank-Indizes**: Optimierte Indizes fuer haeufige Filter/Sortierungen
+- **Effiziente Algorithmen**: O(n) statt O(n*m) fuer Mitgliederzaehlung
 
 ## Lizenz
 

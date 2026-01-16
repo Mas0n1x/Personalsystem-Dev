@@ -45,6 +45,14 @@ const upload = multer({
 
 const router = Router();
 
+// Statische Onboarding-Checkliste (könnte später auch aus DB kommen)
+const ONBOARDING_CHECKLIST = [
+  { id: 'clothes', text: 'Klamotten besorgen (Dienstkleidung)' },
+  { id: 'discord', text: 'Discord Rollen vergeben' },
+  { id: 'inventory', text: 'Standardinventar erklärt' },
+  { id: 'garage', text: 'Fahrzeuggarage erklärt' },
+];
+
 // GET alle Bewerbungen
 router.get('/', authMiddleware, requirePermission('hr.view'), async (req: AuthRequest, res: Response) => {
   try {
@@ -138,12 +146,6 @@ router.get('/criteria', authMiddleware, requirePermission('hr.view'), async (_re
 
 // GET Onboarding-Checkliste (statisch, könnte später auch dynamisch werden)
 router.get('/onboarding-checklist', authMiddleware, requirePermission('hr.view'), async (_req: AuthRequest, res: Response) => {
-  const ONBOARDING_CHECKLIST = [
-    { id: 'clothes', text: 'Klamotten besorgen (Dienstkleidung)' },
-    { id: 'discord', text: 'Discord Rollen vergeben' },
-    { id: 'inventory', text: 'Standardinventar erklärt' },
-    { id: 'garage', text: 'Fahrzeuggarage erklärt' },
-  ];
   res.json(ONBOARDING_CHECKLIST);
 });
 
@@ -373,11 +375,16 @@ router.put('/:id/questions', authMiddleware, requirePermission('hr.manage'), asy
     const { id } = req.params;
     const { questionsCompleted } = req.body;
 
+    // Hole aktive Fragen aus der Datenbank für Vollständigkeitsprüfung
+    const activeQuestions = await prisma.academyQuestion.count({
+      where: { isActive: true },
+    });
+
     // Prüfe ob alle Fragen beantwortet wurden
     const allQuestionsCompleted =
       questionsCompleted &&
       Array.isArray(questionsCompleted) &&
-      questionsCompleted.length === QUESTION_CATALOG.length;
+      questionsCompleted.length === activeQuestions;
 
     const application = await prisma.application.update({
       where: { id },

@@ -161,23 +161,23 @@ router.get('/trainees', requirePermission('academy.view'), async (_req: AuthRequ
       orderBy: { user: { displayName: 'asc' } },
     });
 
+    // OPTIMIERT: Module einmalig nach Kategorie gruppieren statt für jeden Trainee
+    const juniorOfficerModules = modules.filter(m => m.category === 'JUNIOR_OFFICER');
+    const officerModules = modules.filter(m => m.category === 'OFFICER');
+
     // Strukturiere die Daten
     const traineesWithProgress = trainees.map(trainee => {
-      const juniorOfficerModules = modules.filter(m => m.category === 'JUNIOR_OFFICER');
-      const officerModules = modules.filter(m => m.category === 'OFFICER');
-
-      const getModuleProgress = (moduleId: string) => {
-        return trainee.academyProgress.find(p => p.moduleId === moduleId);
-      };
+      // Progress-Map für schnellen Lookup
+      const progressMap = new Map(trainee.academyProgress.map(p => [p.moduleId, p]));
 
       const juniorOfficerProgress = juniorOfficerModules.map(m => ({
         module: m,
-        progress: getModuleProgress(m.id),
+        progress: progressMap.get(m.id),
       }));
 
       const officerProgress = officerModules.map(m => ({
         module: m,
-        progress: getModuleProgress(m.id),
+        progress: progressMap.get(m.id),
       }));
 
       const juniorOfficerCompleted = juniorOfficerProgress.filter(p => p.progress?.completed).length;

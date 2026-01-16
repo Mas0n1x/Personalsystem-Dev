@@ -22,30 +22,58 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
+server/prisma/dev.db-journal
 
 # Prisma
 server/prisma/migrations/
 
 # Test coverage
 coverage/
+.nyc_output/
 
-# Misc
-*.tgz
-*.tar.gz
+# Cache
 .cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+
+# Temp files
+*.tmp
+*.temp
 nul
 
-# Temp scripts
-check-absences.mjs
-fix-absences.mjs
+# Uploads (keep folder structure)
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Backups (keep folder structure)
+server/backups/*
+!server/backups/.gitkeep
+
+# TypeScript
+*.tsbuildinfo
+
+# Archives
+*.tgz
+*.tar.gz
+*.zip
+
+# Temp/Debug scripts
+check-*.mjs
+fix-*.mjs
+debug-*.mjs
+temp-*.mjs
+test-*.mjs

@@ -13,7 +13,7 @@ const DISCORD_CDN = 'https://cdn.discordapp.com';
 // Funktion um System-Rolle basierend auf Discord-Rollen zuzuweisen
 async function assignRoleFromDiscord(discordId: string): Promise<string | null> {
   try {
-    const client = getDiscordClient();
+    const client = await getDiscordClient();
     if (!client || !process.env.DISCORD_GUILD_ID) return null;
 
     const guild = client.guilds.cache.get(process.env.DISCORD_GUILD_ID);
@@ -147,7 +147,7 @@ router.post('/discord/callback', async (req: Request, res: Response) => {
     // Versuche den Server-Nickname aus Discord zu holen (falls verfügbar)
     let serverNickname: string | null = null;
     try {
-      const client = getDiscordClient();
+      const client = await getDiscordClient();
       if (client && process.env.DISCORD_GUILD_ID) {
         const guild = client.guilds.cache.get(process.env.DISCORD_GUILD_ID);
         if (guild) {
@@ -214,7 +214,7 @@ router.post('/discord/callback', async (req: Request, res: Response) => {
     // Token als HttpOnly Cookie setzen
     res.cookie('token', jwtToken, {
       httpOnly: true,
-      secure: false, // HTTP (nicht HTTPS) - für lokale Netzwerke
+      secure: process.env.NODE_ENV === 'production', // HTTPS nur in Production
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 Tage
     });

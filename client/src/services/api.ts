@@ -264,6 +264,7 @@ export const blacklistApi = {
 // Uprank-Sperren API
 export const uprankLockApi = {
   getAll: () => api.get('/uprank-locks'),
+  getHistory: (params?: Record<string, string>) => api.get('/uprank-locks/history', { params }),
   getStats: () => api.get('/uprank-locks/stats'),
   getByEmployee: (employeeId: string) => api.get(`/uprank-locks/employee/${employeeId}`),
   createAuto: (data: { employeeId: string; team: string }) =>

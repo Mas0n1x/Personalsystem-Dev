@@ -53,6 +53,42 @@ router.get('/', authMiddleware, requirePermission('uprank.view'), async (_req: A
   }
 });
 
+// GET kompletter Verlauf aller Uprank-Sperren (aktiv und inaktiv)
+router.get('/history', authMiddleware, requirePermission('uprank.view'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { limit = '50' } = req.query;
+
+    const locks = await prisma.uprankLock.findMany({
+      include: {
+        employee: {
+          include: {
+            user: {
+              select: {
+                displayName: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        createdBy: {
+          select: {
+            displayName: true,
+            username: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: parseInt(limit as string),
+    });
+
+    res.json(locks);
+  } catch (error) {
+    console.error('Get uprank lock history error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen des Sperren-Verlaufs' });
+  }
+});
+
 // GET Uprank-Sperre für spezifischen Mitarbeiter
 router.get('/employee/:employeeId', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {

@@ -25,6 +25,7 @@ import {
   Bell,
   Users,
   Globe,
+  History,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -70,6 +71,20 @@ interface Treasury {
   regularCash: number;
   blackMoney: number;
   updatedAt: string;
+}
+
+interface TreasuryTransaction {
+  id: string;
+  type: 'DEPOSIT' | 'WITHDRAWAL';
+  moneyType: 'REGULAR' | 'BLACK';
+  amount: number;
+  reason: string;
+  createdAt: string;
+  createdBy: {
+    displayName: string | null;
+    username: string;
+    avatar: string | null;
+  };
 }
 
 interface Employee {
@@ -138,6 +153,7 @@ export default function Leadership() {
 function TreasuryWidget() {
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [transactionType, setTransactionType] = useState<'DEPOSIT' | 'WITHDRAWAL'>('DEPOSIT');
   const [moneyType, setMoneyType] = useState<'REGULAR' | 'BLACK'>('REGULAR');
   const [amount, setAmount] = useState('');
@@ -148,12 +164,19 @@ function TreasuryWidget() {
     queryFn: () => treasuryApi.get(),
   });
 
+  const { data: transactionsData } = useQuery({
+    queryKey: ['treasury-transactions'],
+    queryFn: () => treasuryApi.getTransactions({ limit: '50' }),
+  });
+
   const treasury = treasuryData?.data as Treasury | undefined;
+  const transactions = (transactionsData?.data?.data || []) as TreasuryTransaction[];
 
   const depositMutation = useMutation({
     mutationFn: treasuryApi.deposit,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['treasury'] });
+      queryClient.invalidateQueries({ queryKey: ['treasury-transactions'] });
       closeModal();
       toast.success('Einzahlung erfolgreich');
     },
@@ -163,6 +186,7 @@ function TreasuryWidget() {
     mutationFn: treasuryApi.withdraw,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['treasury'] });
+      queryClient.invalidateQueries({ queryKey: ['treasury-transactions'] });
       closeModal();
       toast.success('Auszahlung erfolgreich');
     },
@@ -198,11 +222,22 @@ function TreasuryWidget() {
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(val);
 
+  const formatDateTime = (date: string) =>
+    new Date(date).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+
   return (
     <div className="card">
-      <div className="p-4 border-b border-slate-700 flex items-center gap-2">
-        <Wallet className="h-5 w-5 text-primary-400" />
-        <h2 className="font-semibold text-white">Kasse</h2>
+      <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Wallet className="h-5 w-5 text-primary-400" />
+          <h2 className="font-semibold text-white">Kasse</h2>
+        </div>
+        <button
+          onClick={() => setShowHistory(true)}
+          className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded flex items-center gap-1"
+        >
+          <History className="h-3 w-3" /> Verlauf
+        </button>
       </div>
       <div className="p-4 grid grid-cols-2 gap-4">
         {/* Normal */}
@@ -239,6 +274,7 @@ function TreasuryWidget() {
         </div>
       </div>
 
+      {/* Transaction Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
           <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl p-6 w-full max-w-sm mx-4 border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
@@ -261,6 +297,61 @@ function TreasuryWidget() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {showHistory && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl p-6 w-full max-w-2xl mx-4 border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <History className="h-5 w-5 text-primary-400" />
+                Transaktionsverlauf
+              </h2>
+              <button onClick={() => setShowHistory(false)} className="p-1 hover:bg-slate-700 rounded">
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {transactions.length === 0 ? (
+                <p className="text-slate-500 text-sm text-center py-8">Keine Transaktionen vorhanden</p>
+              ) : (
+                transactions.map((tx) => (
+                  <div key={tx.id} className="bg-slate-700/30 rounded-lg p-3 flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${tx.type === 'DEPOSIT' ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+                      {tx.type === 'DEPOSIT' ? (
+                        <ArrowUpCircle className="h-4 w-4 text-green-400" />
+                      ) : (
+                        <ArrowDownCircle className="h-4 w-4 text-red-400" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`font-semibold ${tx.type === 'DEPOSIT' ? 'text-green-400' : 'text-red-400'}`}>
+                          {tx.type === 'DEPOSIT' ? '+' : '-'}{formatCurrency(tx.amount)}
+                        </span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${tx.moneyType === 'REGULAR' ? 'bg-green-600/20 text-green-400' : 'bg-slate-600 text-slate-300'}`}>
+                          {tx.moneyType === 'REGULAR' ? 'Normal' : 'Schwarz'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-300 truncate mt-0.5">{tx.reason}</p>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                        <img
+                          src={tx.createdBy.avatar || `https://ui-avatars.com/api/?name=${tx.createdBy.displayName || tx.createdBy.username}&size=16`}
+                          className="h-4 w-4 rounded-full"
+                          alt=""
+                        />
+                        <span>{tx.createdBy.displayName || tx.createdBy.username}</span>
+                        <span>•</span>
+                        <span>{formatDateTime(tx.createdAt)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
