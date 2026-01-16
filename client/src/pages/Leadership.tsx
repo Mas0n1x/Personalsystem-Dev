@@ -53,7 +53,7 @@ interface Sanction {
   reason: string;
   amount: number | null;
   measure: string | null;
-  status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
+  status: 'ACTIVE' | 'REVOKED' | 'EXPIRED' | 'COMPLETED';
   expiresAt: string | null;
   createdAt: string;
   employee: {
@@ -840,6 +840,11 @@ function SanctionsWidget() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['sanctions'] }); toast.success('Widerrufen'); },
   });
 
+  const completeMutation = useMutation({
+    mutationFn: sanctionsApi.complete,
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['sanctions'] }); toast.success('Als erledigt markiert'); },
+  });
+
   const closeModal = () => {
     setShowModal(false);
     setHasWarning(false);
@@ -900,7 +905,22 @@ function SanctionsWidget() {
             const types = getSanctionTypes(s);
             return (
               <div key={s.id} className="bg-slate-700/30 rounded-lg p-3">
-                <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  {/* Checkbox zum Abhaken */}
+                  <button
+                    onClick={() => setConfirmDialog({
+                      isOpen: true,
+                      title: 'Sanktion als erledigt markieren',
+                      message: 'Möchtest du diese Sanktion als erledigt markieren?',
+                      confirmText: 'Erledigt',
+                      variant: 'default',
+                      onConfirm: () => completeMutation.mutate(s.id),
+                    })}
+                    className="mt-1 h-5 w-5 rounded border-2 border-slate-500 hover:border-green-500 hover:bg-green-500/20 flex items-center justify-center transition-colors flex-shrink-0"
+                    title="Als erledigt markieren"
+                  >
+                    <Check className="h-3 w-3 text-transparent hover:text-green-400" />
+                  </button>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       {types.map((t, i) => (
