@@ -132,10 +132,10 @@ router.post('/discord/callback', async (req: Request, res: Response) => {
       ? `${DISCORD_CDN}/avatars/${discordUser.id}/${discordUser.avatar}.png`
       : null;
 
-    // Prüfe ob User bereits existiert
+    // Prüfe ob User bereits existiert und hole den displayName
     const existingUser = await prisma.user.findUnique({
       where: { discordId: discordUser.id },
-      select: { id: true, roleId: true },
+      select: { id: true, roleId: true, displayName: true },
     });
 
     // Wenn User keine Rolle hat, versuche sie aus Discord zuzuweisen
@@ -144,13 +144,38 @@ router.post('/discord/callback', async (req: Request, res: Response) => {
       roleIdToAssign = await assignRoleFromDiscord(discordUser.id);
     }
 
+    // Versuche den Server-Nickname aus Discord zu holen (falls verfügbar)
+    let serverNickname: string | null = null;
+    try {
+      const client = getDiscordClient();
+      if (client && process.env.DISCORD_GUILD_ID) {
+        const guild = client.guilds.cache.get(process.env.DISCORD_GUILD_ID);
+        if (guild) {
+          const member = await guild.members.fetch(discordUser.id).catch(() => null);
+          if (member) {
+            // Server-Nickname hat Priorität, dann global_name, dann username
+            serverNickname = member.displayName || member.nickname || null;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching server nickname:', error);
+    }
+
+    // DisplayName Priorität:
+    // 1. Bestehender displayName (wenn vorhanden)
+    // 2. Server-Nickname aus Discord
+    // 3. Discord global_name
+    // 4. Discord username
+    const displayNameToUse = existingUser?.displayName || serverNickname || discordUser.global_name || discordUser.username;
+
     // Benutzer in Datenbank erstellen/aktualisieren
     const user = await prisma.user.upsert({
       where: { discordId: discordUser.id },
       create: {
         discordId: discordUser.id,
         username: discordUser.username,
-        displayName: discordUser.global_name,
+        displayName: displayNameToUse,
         avatar: avatarUrl,
         email: discordUser.email,
         lastLogin: new Date(),
@@ -158,7 +183,8 @@ router.post('/discord/callback', async (req: Request, res: Response) => {
       },
       update: {
         username: discordUser.username,
-        displayName: discordUser.global_name,
+        // displayName nur aktualisieren wenn noch keiner gesetzt ist
+        ...(existingUser?.displayName ? {} : { displayName: displayNameToUse }),
         avatar: avatarUrl,
         email: discordUser.email,
         lastLogin: new Date(),

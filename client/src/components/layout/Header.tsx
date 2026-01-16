@@ -21,6 +21,7 @@ import {
   Car,
   Users,
   Award,
+  X,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { formatDistanceToNow } from 'date-fns';
@@ -66,6 +67,7 @@ export default function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showOnlineUsers, setShowOnlineUsers] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const onlineMenuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -247,8 +249,15 @@ export default function Header() {
                   notifications.map((notification) => (
                     <div
                       key={notification.id}
+                      onClick={() => {
+                        setSelectedNotification(notification);
+                        setShowNotifications(false);
+                        if (!notification.isRead) {
+                          markAsReadMutation.mutate(notification.id);
+                        }
+                      }}
                       className={clsx(
-                        'px-4 py-3 border-b border-slate-700/50 hover:bg-slate-700/50 transition-colors',
+                        'px-4 py-3 border-b border-slate-700/50 hover:bg-slate-700/50 transition-colors cursor-pointer',
                         !notification.isRead && 'bg-slate-700/30'
                       )}
                     >
@@ -369,6 +378,43 @@ export default function Header() {
           )}
         </div>
       </div>
+
+      {/* Notification Detail Modal */}
+      {selectedNotification && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-lg border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between bg-slate-800/50">
+              <div className="flex items-center gap-3">
+                {getNotificationIcon(selectedNotification.type)}
+                <h2 className="text-lg font-bold text-white">{selectedNotification.title}</h2>
+              </div>
+              <button
+                onClick={() => setSelectedNotification(null)}
+                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-slate-300 whitespace-pre-wrap">{selectedNotification.message}</p>
+              <p className="text-xs text-slate-500 mt-4">
+                {formatDistanceToNow(new Date(selectedNotification.createdAt), {
+                  addSuffix: true,
+                  locale: de,
+                })}
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-700 flex justify-end">
+              <button
+                onClick={() => setSelectedNotification(null)}
+                className="btn-secondary"
+              >
+                Schließen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

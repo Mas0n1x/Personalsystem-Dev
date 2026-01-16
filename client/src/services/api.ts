@@ -179,6 +179,7 @@ export const sanctionsApi = {
     api.post('/sanctions', data),
   update: (id: string, data: Record<string, unknown>) => api.put(`/sanctions/${id}`, data),
   revoke: (id: string) => api.put(`/sanctions/${id}/revoke`),
+  complete: (id: string) => api.put(`/sanctions/${id}/complete`),
   delete: (id: string) => api.delete(`/sanctions/${id}`),
 };
 
@@ -233,9 +234,7 @@ export const tuningApi = {
   getAll: () => api.get('/tuning'),
   getStats: () => api.get('/tuning/stats'),
   getImageUrl: (filename: string) => `/api/tuning/image/${filename}`,
-  create: (formData: FormData) => api.post('/tuning', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }),
+  create: (formData: FormData) => api.post('/tuning', formData),
   complete: (id: string) => api.put(`/tuning/${id}/complete`),
   delete: (id: string) => api.delete(`/tuning/${id}`),
 };
@@ -246,9 +245,7 @@ export const robberyApi = {
   getStats: () => api.get('/robbery/stats'),
   getEmployees: () => api.get('/robbery/employees'),
   getImageUrl: (filename: string) => `/api/robbery/image/${filename}`,
-  create: (formData: FormData) => api.post('/robbery', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }),
+  create: (formData: FormData) => api.post('/robbery', formData),
   delete: (id: string) => api.delete(`/robbery/${id}`),
 };
 

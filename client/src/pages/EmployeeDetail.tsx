@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeesApi } from '../services/api';
 import { StatusBadge } from '../components/ui/Badge';
@@ -129,7 +129,21 @@ const formatDateTime = (date: string) => {
 export default function EmployeeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+
+  // Woher kam der Benutzer?
+  const fromPage = searchParams.get('from');
+
+  // Navigation zurück zur richtigen Seite
+  const handleGoBack = () => {
+    if (fromPage === 'management') {
+      navigate('/management');
+    } else {
+      navigate('/employees');
+    }
+  };
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [unitStatsPeriod, setUnitStatsPeriod] = useState<'week' | 'month' | 'all'>('all');
   const [editForm, setEditForm] = useState({
@@ -213,7 +227,7 @@ export default function EmployeeDetail() {
     return (
       <div className="text-center py-12">
         <p className="text-slate-400">Mitarbeiter nicht gefunden</p>
-        <button onClick={() => navigate('/employees')} className="btn-primary mt-4">
+        <button onClick={handleGoBack} className="btn-primary mt-4">
           Zurück zur Übersicht
         </button>
       </div>
@@ -225,7 +239,7 @@ export default function EmployeeDetail() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => navigate('/employees')}
+          onClick={handleGoBack}
           className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
         >
           <ArrowLeft className="h-5 w-5 text-slate-400" />

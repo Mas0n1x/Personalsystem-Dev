@@ -320,52 +320,25 @@ router.post('/', authMiddleware, requirePermission('hr.manage'), upload.single('
   }
 });
 
-// PUT Einstellungskriterien aktualisieren (Schritt 1)
+// PUT Einstellungskriterien aktualisieren (Schritt 1) - Dynamisch
 router.put('/:id/criteria', authMiddleware, requirePermission('hr.manage'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const {
-      criteriaStabilization,
-      criteriaVisa,
-      criteriaNoOffenses,
-      criteriaAppearance,
-      criteriaNoFactionLock,
-      criteriaNoOpenBills,
-      criteriaSearched,
-      criteriaBlacklistChecked,
-      criteriaHandbookGiven,
-      criteriaEmploymentTest,
-      criteriaRpSituation,
-    } = req.body;
+    const criteriaData = req.body; // { "criterionId1": true, "criterionId2": false, ... }
 
-    // Prüfe ob alle Kriterien erfüllt sind
-    const allCriteriaMet =
-      criteriaStabilization &&
-      criteriaVisa &&
-      criteriaNoOffenses &&
-      criteriaAppearance &&
-      criteriaNoFactionLock &&
-      criteriaNoOpenBills &&
-      criteriaSearched &&
-      criteriaBlacklistChecked &&
-      criteriaHandbookGiven &&
-      criteriaEmploymentTest &&
-      criteriaRpSituation;
+    // Hole alle aktiven Kriterien aus der Datenbank
+    const activeCriteria = await prisma.academyCriterion.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    // Prüfe ob alle aktiven Kriterien erfüllt sind
+    const allCriteriaMet = activeCriteria.every((criterion) => criteriaData[criterion.id] === true);
 
     const application = await prisma.application.update({
       where: { id },
       data: {
-        criteriaStabilization: criteriaStabilization || false,
-        criteriaVisa: criteriaVisa || false,
-        criteriaNoOffenses: criteriaNoOffenses || false,
-        criteriaAppearance: criteriaAppearance || false,
-        criteriaNoFactionLock: criteriaNoFactionLock || false,
-        criteriaNoOpenBills: criteriaNoOpenBills || false,
-        criteriaSearched: criteriaSearched || false,
-        criteriaBlacklistChecked: criteriaBlacklistChecked || false,
-        criteriaHandbookGiven: criteriaHandbookGiven || false,
-        criteriaEmploymentTest: criteriaEmploymentTest || false,
-        criteriaRpSituation: criteriaRpSituation || false,
+        criteriaData: JSON.stringify(criteriaData),
         // Wenn alle Kriterien erfüllt, zum nächsten Schritt
         status: allCriteriaMet ? 'QUESTIONS' : 'CRITERIA',
         currentStep: allCriteriaMet ? 2 : 1,

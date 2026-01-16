@@ -327,8 +327,8 @@ export default function Tuning() {
       {/* Create Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-md border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
-            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-md border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between bg-slate-800/50">
               <h2 className="text-xl font-bold text-white">Tuning-Rechnung einreichen</h2>
               <button onClick={closeModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
                 <X className="h-5 w-5 text-slate-400" />

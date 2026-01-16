@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
@@ -18,29 +18,64 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<Partial<User>[]>([]);
 
+  // Ref um die User-ID zu tracken und unnötige Reconnects zu vermeiden
+  const userIdRef = useRef<string | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+
   useEffect(() => {
-    if (!user) {
-      if (socket) {
-        socket.disconnect();
+    const userId = user?.id || null;
+
+    // Nur reconnecten wenn sich die User-ID wirklich geändert hat
+    if (userId === userIdRef.current && socketRef.current?.connected) {
+      return;
+    }
+
+    // Wenn User sich ausloggt
+    if (!userId) {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
         setSocket(null);
         setIsConnected(false);
       }
+      userIdRef.current = null;
       return;
     }
+
+    // Wenn bereits eine Verbindung mit demselben User besteht
+    if (socketRef.current?.connected && userId === userIdRef.current) {
+      return;
+    }
+
+    // Alte Verbindung trennen falls vorhanden
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+    }
+
+    userIdRef.current = userId;
 
     const newSocket = io({
       withCredentials: true,
       autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
+
+    socketRef.current = newSocket;
 
     newSocket.on('connect', () => {
       console.log('Socket connected');
       setIsConnected(true);
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('Socket disconnected');
+    newSocket.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
       setIsConnected(false);
+      // Nicht automatisch reconnecten wenn absichtlich getrennt
+      if (reason === 'io client disconnect') {
+        return;
+      }
     });
 
     newSocket.on('connect_error', (error) => {
@@ -59,8 +94,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       });
     });
 
-    newSocket.on('user:offline', ({ userId }: { userId: string }) => {
-      setOnlineUsers((prev) => prev.filter((u) => u.id !== userId));
+    newSocket.on('user:offline', ({ userId: offlineUserId }: { userId: string }) => {
+      setOnlineUsers((prev) => prev.filter((u) => u.id !== offlineUserId));
     });
 
     // Benachrichtigungen
@@ -80,9 +115,20 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     setSocket(newSocket);
 
     return () => {
-      newSocket.disconnect();
+      // Cleanup nur wenn Komponente wirklich unmountet wird
+      // (nicht bei React StrictMode double-render)
     };
-  }, [user]);
+  }, [user?.id]); // Nur auf user.id reagieren, nicht auf das gesamte user-Objekt
+
+  // Cleanup bei echtem Unmount
+  useEffect(() => {
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <SocketContext.Provider value={{ socket, isConnected, onlineUsers }}>

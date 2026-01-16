@@ -1029,15 +1029,14 @@ export default function InternalAffairs() {
                       Abschließen
                     </button>
                   )}
-                  {detail.status === 'CLOSED' && (
-                    <button
-                      onClick={() => updateInvestigation.mutate({ id: detail.id, data: { status: 'ARCHIVED' } })}
-                      className="btn-secondary flex items-center gap-2"
-                    >
-                      <XCircle className="h-4 w-4" />
-                      Archivieren
-                    </button>
-                  )}
+                  {/* Archivieren-Button für alle Status außer ARCHIVED */}
+                  <button
+                    onClick={() => updateInvestigation.mutate({ id: detail.id, data: { status: 'ARCHIVED' } })}
+                    className="btn-secondary flex items-center gap-2"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    Archivieren
+                  </button>
                 </div>
               )}
 

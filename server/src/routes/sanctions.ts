@@ -116,6 +116,9 @@ router.post('/', authMiddleware, requirePermission('sanctions.manage'), async (r
       return;
     }
 
+    // BigInt für große Geldbeträge konvertieren
+    const amountBigInt = hasFine && amount ? BigInt(amount) : null;
+
     const sanction = await prisma.sanction.create({
       data: {
         employeeId,
@@ -123,7 +126,7 @@ router.post('/', authMiddleware, requirePermission('sanctions.manage'), async (r
         hasFine: !!hasFine,
         hasMeasure: !!hasMeasure,
         reason,
-        amount: hasFine ? amount : null,
+        amount: amountBigInt,
         measure: hasMeasure ? measure : null,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         issuedById: req.user!.id,
@@ -199,6 +202,43 @@ router.post('/', authMiddleware, requirePermission('sanctions.manage'), async (r
   }
 });
 
+// PUT Sanktion als erledigt markieren
+router.put('/:id/complete', authMiddleware, requirePermission('sanctions.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const sanction = await prisma.sanction.update({
+      where: { id },
+      data: { status: 'COMPLETED' },
+      include: {
+        employee: {
+          include: {
+            user: {
+              select: {
+                displayName: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        issuedBy: {
+          select: {
+            displayName: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    res.json(sanction);
+  } catch (error) {
+    console.error('Complete sanction error:', error);
+    res.status(500).json({ error: 'Fehler beim Abschließen der Sanktion' });
+  }
+});
+
 // PUT Sanktion widerrufen
 router.put('/:id/revoke', authMiddleware, requirePermission('sanctions.manage'), async (req: AuthRequest, res: Response) => {
   try {
@@ -242,11 +282,14 @@ router.put('/:id', authMiddleware, requirePermission('sanctions.manage'), async 
     const { id } = req.params;
     const { reason, amount, status, expiresAt } = req.body;
 
+    // BigInt für große Geldbeträge konvertieren
+    const amountBigInt = amount !== undefined && amount !== null ? BigInt(amount) : undefined;
+
     const sanction = await prisma.sanction.update({
       where: { id },
       data: {
         reason,
-        amount,
+        ...(amountBigInt !== undefined ? { amount: amountBigInt } : {}),
         status,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
       },

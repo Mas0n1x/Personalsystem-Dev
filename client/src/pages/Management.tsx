@@ -786,7 +786,7 @@ export default function Management() {
                         </div>
                       </div>
                       <a
-                        href={`/employees/${employee.id}`}
+                        href={`/employees/${employee.id}?from=management`}
                         className="btn-secondary text-sm"
                         onClick={(e) => e.stopPropagation()}
                       >

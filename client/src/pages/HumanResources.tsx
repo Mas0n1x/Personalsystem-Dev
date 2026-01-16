@@ -50,17 +50,7 @@ interface Application {
   discordUsername: string | null;
   status: 'CRITERIA' | 'QUESTIONS' | 'ONBOARDING' | 'COMPLETED' | 'REJECTED';
   currentStep: number;
-  criteriaStabilization: boolean;
-  criteriaVisa: boolean;
-  criteriaNoOffenses: boolean;
-  criteriaAppearance: boolean;
-  criteriaNoFactionLock: boolean;
-  criteriaNoOpenBills: boolean;
-  criteriaSearched: boolean;
-  criteriaBlacklistChecked: boolean;
-  criteriaHandbookGiven: boolean;
-  criteriaEmploymentTest: boolean;
-  criteriaRpSituation: boolean;
+  criteriaData: string | null; // JSON: {"criterionId": true/false, ...}
   questionsCompleted: string | null;
   onboardingCompleted: string | null;
   discordInviteLink: string | null;
@@ -90,20 +80,19 @@ interface OnboardingItem {
 
 type Tab = 'applications' | 'blacklist';
 
-// Mapping von dynamischen Kriterien-IDs zu Datenbank-Feldern
-// Neue Kriterien werden über criteriaCustom (JSON-Feld) gespeichert
-const LEGACY_CRITERIA_KEYS = [
-  'criteriaStabilization',
-  'criteriaVisa',
-  'criteriaNoOffenses',
-  'criteriaAppearance',
-  'criteriaNoFactionLock',
-  'criteriaNoOpenBills',
-  'criteriaSearched',
-  'criteriaBlacklistChecked',
-  'criteriaHandbookGiven',
-  'criteriaEmploymentTest',
-  'criteriaRpSituation',
+// Fallback-Kriterien für den Fall, dass keine dynamischen Kriterien konfiguriert sind
+const FALLBACK_CRITERIA = [
+  { id: 'stabilization', name: 'Stabilisationsschein geprüft' },
+  { id: 'visa', name: 'Visumsstufe geprüft' },
+  { id: 'noOffenses', name: 'Keine Straftaten (7 Tage)' },
+  { id: 'appearance', name: 'Angemessenes Aussehen' },
+  { id: 'noFactionLock', name: 'Keine Fraktionssperre' },
+  { id: 'noOpenBills', name: 'Keine offenen Rechnungen' },
+  { id: 'searched', name: 'Durchsuchen' },
+  { id: 'blacklistChecked', name: 'Blacklist gecheckt' },
+  { id: 'handbookGiven', name: 'Diensthandbuch ausgegeben' },
+  { id: 'employmentTest', name: 'Einstellungstest' },
+  { id: 'rpSituation', name: 'RP Situation dargestellt (AVK) & Smalltalk' },
 ];
 
 export default function HumanResources() {
@@ -218,31 +207,18 @@ export default function HumanResources() {
   const onboardingItems = (onboardingData?.data || []) as OnboardingItem[];
   const dynamicCriteria = (criteriaData?.data || []) as Criterion[];
 
-  // Mapping von dynamischen Kriterien zu Legacy-Feldern
-  // Index 0-10 entspricht den Legacy-Feldern
+  // Dynamische Kriterien - nutzt die aus der Datenbank oder Fallback
   const CRITERIA_ITEMS = useMemo(() => {
     if (dynamicCriteria.length === 0) {
-      // Fallback zu den Legacy-Kriterien, wenn keine dynamischen geladen
-      return LEGACY_CRITERIA_KEYS.map((key, index) => ({
-        key,
-        label: [
-          'Stabilisationsschein geprüft',
-          'Visumsstufe geprüft',
-          'Keine Straftaten (7 Tage)',
-          'Angemessenes Aussehen',
-          'Keine Fraktionssperre',
-          'Keine offenen Rechnungen',
-          'Durchsuchen',
-          'Blacklist gecheckt',
-          'Diensthandbuch ausgegeben',
-          'Einstellungstest',
-          'RP Situation dargestellt (AVK) & Smalltalk',
-        ][index] || key,
+      // Fallback zu den Standard-Kriterien, wenn keine dynamischen konfiguriert
+      return FALLBACK_CRITERIA.map((c) => ({
+        key: c.id,
+        label: c.name,
       }));
     }
-    // Dynamische Kriterien mit Legacy-Keys mappen
-    return dynamicCriteria.map((c, index) => ({
-      key: LEGACY_CRITERIA_KEYS[index] || `criteria_${c.id}`,
+    // Dynamische Kriterien aus der Datenbank
+    return dynamicCriteria.map((c) => ({
+      key: c.id,
       label: c.name,
     }));
   }, [dynamicCriteria]);
@@ -535,12 +511,22 @@ export default function HumanResources() {
   const openDetailModal = (app: Application) => {
     setSelectedApplication(app);
 
-    // Criteria laden
-    const criteriaState: Record<string, boolean> = {};
-    CRITERIA_ITEMS.forEach((item) => {
-      criteriaState[item.key] = (app as Record<string, boolean>)[item.key] || false;
-    });
-    setCriteria(criteriaState);
+    // Criteria laden (aus dem JSON-Feld criteriaData)
+    try {
+      const savedCriteria = app.criteriaData ? JSON.parse(app.criteriaData) : {};
+      const criteriaState: Record<string, boolean> = {};
+      CRITERIA_ITEMS.forEach((item) => {
+        criteriaState[item.key] = savedCriteria[item.key] || false;
+      });
+      setCriteria(criteriaState);
+    } catch {
+      // Fallback: Initialisiere alle Kriterien als false
+      const criteriaState: Record<string, boolean> = {};
+      CRITERIA_ITEMS.forEach((item) => {
+        criteriaState[item.key] = false;
+      });
+      setCriteria(criteriaState);
+    }
 
     // Questions laden
     try {
@@ -1096,8 +1082,8 @@ export default function HumanResources() {
       {/* Create Application Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-lg border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
-            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-lg border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between bg-slate-800/50">
               <h2 className="text-xl font-bold text-white">Neue Bewerbung</h2>
               <button onClick={closeCreateModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
                 <X className="h-5 w-5 text-slate-400" />
@@ -1263,8 +1249,8 @@ export default function HumanResources() {
       {/* Detail Modal */}
       {showDetailModal && selectedApplication && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-3xl border border-slate-700/50 shadow-2xl shadow-black/50 my-8 animate-scale-in">
-            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-3xl border border-slate-700/50 shadow-2xl shadow-black/50 my-8 animate-scale-in overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between bg-slate-800/50">
               <div>
                 <h2 className="text-xl font-bold text-white">{selectedApplication.applicantName}</h2>
                 <p className="text-sm text-slate-400">
@@ -1352,16 +1338,42 @@ export default function HumanResources() {
                   </div>
                   <div className="space-y-2">
                     {questions.map((q, index) => (
-                      <div
+                      <label
                         key={q.id}
-                        className="flex items-start gap-3 p-3 rounded-lg bg-slate-600/30"
+                        className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                          questionsCompleted.includes(q.id)
+                            ? 'bg-green-600/20 border border-green-600/30'
+                            : 'bg-slate-600/30 hover:bg-slate-600/50'
+                        }`}
                       >
+                        <input
+                          type="checkbox"
+                          checked={questionsCompleted.includes(q.id)}
+                          onChange={() => handleQuestionToggle(q.id)}
+                          disabled={selectedApplication.status === 'COMPLETED' || selectedApplication.status === 'REJECTED'}
+                          className="mt-1 h-4 w-4 rounded border-slate-500 text-green-600 focus:ring-green-500 focus:ring-offset-slate-800"
+                        />
                         <span className="flex-shrink-0 w-6 h-6 rounded-full bg-purple-600/30 text-purple-400 text-xs flex items-center justify-center font-medium">
                           {index + 1}
                         </span>
-                        <span className="text-sm text-slate-300">{q.text}</span>
-                      </div>
+                        <span className={`text-sm ${questionsCompleted.includes(q.id) ? 'text-green-400' : 'text-slate-300'}`}>
+                          {q.text}
+                        </span>
+                      </label>
                     ))}
+                  </div>
+                  {/* Richtige Antworten Zähler */}
+                  <div className="mt-4 p-3 bg-slate-600/30 rounded-lg flex items-center justify-between">
+                    <span className="text-sm text-slate-400">Richtige Antworten:</span>
+                    <span className={`text-lg font-bold ${
+                      questionsCompleted.length === questions.length
+                        ? 'text-green-400'
+                        : questionsCompleted.length >= questions.length * 0.7
+                        ? 'text-yellow-400'
+                        : 'text-slate-300'
+                    }`}>
+                      {questionsCompleted.length} / {questions.length}
+                    </span>
                   </div>
                 </div>
               )}
@@ -1549,8 +1561,8 @@ export default function HumanResources() {
       {/* Reject Modal */}
       {showRejectModal && selectedApplication && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-fade-in">
-          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-lg border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
-            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-lg border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between bg-slate-800/50">
               <h2 className="text-xl font-bold text-white">Bewerbung ablehnen</h2>
               <button onClick={closeRejectModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
                 <X className="h-5 w-5 text-slate-400" />
@@ -1635,8 +1647,8 @@ export default function HumanResources() {
       {/* Blacklist Modal */}
       {showBlacklistModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-md border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
-            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-md border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between bg-slate-800/50">
               <h2 className="text-xl font-bold text-white">
                 {editingBlacklist ? 'Blacklist bearbeiten' : 'Zur Blacklist hinzufügen'}
               </h2>

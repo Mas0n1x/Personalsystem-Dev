@@ -220,7 +220,7 @@ model Sanction {
   hasFine     Boolean   @default(false) // Geldstrafe
   hasMeasure  Boolean   @default(false) // Maßnahme
   reason      String
-  amount      Int?      // Für Geldstrafen (in Dollar)
+  amount      BigInt?   // Für Geldstrafen (in Dollar) - BigInt für große Beträge
   measure     String?   // Beschreibung der Maßnahme
   issuedById  String
   issuedBy    User      @relation(fields: [issuedById], references: [id])
@@ -410,7 +410,10 @@ model Application {
   discordId       String?                         // Discord ID des Bewerbers
   discordUsername String?                         // Discord Username
 
-  // Einstellungskriterien (Checkboxen)
+  // Einstellungskriterien (dynamisch als JSON)
+  criteriaData             String?                   // JSON Object: {"criterionId": true/false, ...}
+
+  // Legacy Einstellungskriterien (für Abwärtskompatibilität)
   criteriaStabilization    Boolean @default(false)  // Stabilisationsschein geprüft
   criteriaVisa             Boolean @default(false)  // Visumsstufe geprüft
   criteriaNoOffenses       Boolean @default(false)  // Keine Straftaten (7 Tage)

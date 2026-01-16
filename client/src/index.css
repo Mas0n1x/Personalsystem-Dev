@@ -12,6 +12,23 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
+  /* Performance-Optimierung: Reduziere backdrop-blur global für flüssigere Animationen */
+  .backdrop-blur-sm {
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+  }
+
+  .backdrop-blur-xl {
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+  }
+
+  /* GPU-Beschleunigung für Modal-Container */
+  .fixed.inset-0 {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
+
   /* Customized Selection */
   ::selection {
     @apply bg-primary-500/30 text-white;
@@ -204,12 +221,19 @@
   }
 
   /* ==================== MODAL ==================== */
+  /* Performance-optimiert: reduzierter backdrop-blur, GPU-Beschleunigung */
   .modal-overlay {
-    @apply fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in;
+    @apply fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 animate-fade-in;
+    will-change: opacity;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 
   .modal {
-    @apply bg-slate-800/95 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl shadow-black/50 max-w-lg w-full max-h-[90vh] overflow-auto animate-scale-in;
+    @apply bg-slate-800 border border-slate-700/50 rounded-2xl shadow-2xl shadow-black/50 max-w-lg w-full max-h-[90vh] overflow-auto animate-scale-in;
+    will-change: transform, opacity;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 
   .modal-header {
@@ -276,20 +300,25 @@
 
 @layer utilities {
   /* ==================== ANIMATIONS ==================== */
+  /* GPU-beschleunigte Animationen für flüssige Performance */
   .animate-fade-in {
-    animation: fadeIn 0.2s ease-out;
+    animation: fadeIn 0.15s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    will-change: opacity;
   }
 
   .animate-slide-up {
-    animation: slideUp 0.3s ease-out;
+    animation: slideUp 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    will-change: transform, opacity;
   }
 
   .animate-slide-down {
-    animation: slideDown 0.3s ease-out;
+    animation: slideDown 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    will-change: transform, opacity;
   }
 
   .animate-scale-in {
-    animation: scaleIn 0.2s ease-out;
+    animation: scaleIn 0.15s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    will-change: transform, opacity;
   }
 
   .animate-spin-slow {
@@ -316,33 +345,33 @@
   @keyframes slideUp {
     from {
       opacity: 0;
-      transform: translateY(10px);
+      transform: translate3d(0, 10px, 0);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translate3d(0, 0, 0);
     }
   }
 
   @keyframes slideDown {
     from {
       opacity: 0;
-      transform: translateY(-10px);
+      transform: translate3d(0, -10px, 0);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translate3d(0, 0, 0);
     }
   }
 
   @keyframes scaleIn {
     from {
       opacity: 0;
-      transform: scale(0.95);
+      transform: scale3d(0.95, 0.95, 1);
     }
     to {
       opacity: 1;
-      transform: scale(1);
+      transform: scale3d(1, 1, 1);
     }
   }
 
