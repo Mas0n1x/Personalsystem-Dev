@@ -21,6 +21,8 @@ const AuditLogs = lazy(() => import('./pages/admin/AuditLogs'));
 const Settings = lazy(() => import('./pages/admin/Settings'));
 const AcademyModules = lazy(() => import('./pages/admin/AcademyModules'));
 const AcademySettings = lazy(() => import('./pages/admin/AcademySettings'));
+const IASettings = lazy(() => import('./pages/admin/IASettings'));
+const QASettings = lazy(() => import('./pages/admin/QASettings'));
 const Backups = lazy(() => import('./pages/admin/Backups'));
 const BonusSettings = lazy(() => import('./pages/admin/BonusSettings'));
 const DiscordAnnouncements = lazy(() => import('./pages/admin/DiscordAnnouncements'));
@@ -119,6 +121,8 @@ function App() {
         <Route path="admin/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
         <Route path="admin/academy-modules" element={<Suspense fallback={<PageLoader />}><AcademyModules /></Suspense>} />
         <Route path="admin/academy-settings" element={<Suspense fallback={<PageLoader />}><AcademySettings /></Suspense>} />
+        <Route path="admin/ia-settings" element={<Suspense fallback={<PageLoader />}><IASettings /></Suspense>} />
+        <Route path="admin/qa-settings" element={<Suspense fallback={<PageLoader />}><QASettings /></Suspense>} />
         <Route path="admin/backups" element={<Suspense fallback={<PageLoader />}><Backups /></Suspense>} />
         <Route path="admin/bonus" element={<Suspense fallback={<PageLoader />}><BonusSettings /></Suspense>} />
         <Route path="admin/discord-announcements" element={<Suspense fallback={<PageLoader />}><DiscordAnnouncements /></Suspense>} />

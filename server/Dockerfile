@@ -9,12 +9,11 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-# Copy prisma schema and generate client
-COPY prisma ./prisma/
-RUN npx prisma generate
-
-# Copy source code
+# Copy source code (including prisma schema)
 COPY . .
+
+# Generate Prisma client with the actual schema
+RUN npx prisma generate
 
 # Create directories for data
 RUN mkdir -p uploads backups
@@ -22,4 +21,4 @@ RUN mkdir -p uploads backups
 EXPOSE 3001
 
 # Run with tsx (TypeScript execution without compilation)
-CMD ["sh", "-c", "npx prisma db push && npx tsx src/index.ts"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npx tsx src/index.ts"]

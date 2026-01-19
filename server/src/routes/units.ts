@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { getGuildInfo, getAllMembersWithRoles, getMemberRoles } from '../services/discordBot.js';
 

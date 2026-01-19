@@ -9,7 +9,7 @@ import {
   SeparatorSpacingSize,
   ButtonStyle,
 } from 'discord.js';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 
 // Discord Client wird vom discordBot.ts exportiert
 let discordClient: Client | null = null;

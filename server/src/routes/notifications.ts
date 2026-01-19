@@ -1,8 +1,8 @@
 import { Router, Response } from 'express';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { getGuildInfo, getAllMembersWithRoles } from '../services/discordBot.js';
-import { io } from '../index.js';
+import { emitToUser, emitToAll, broadcastCreate } from '../services/socketService.js';
 
 const router = Router();
 
@@ -269,14 +269,17 @@ router.post('/broadcast', authMiddleware, requirePermission('leadership.view'), 
       })),
     });
 
-    // Sende Echtzeit-Benachrichtigung via Socket.io
+    // Sende Echtzeit-Benachrichtigung via Socket.io an jeden User direkt
     for (const user of users) {
-      io.to(`user:${user.id}`).emit('notification', {
+      emitToUser(user.id, 'notification', {
         title: title.trim(),
         message: message.trim(),
-        type: type,
+        type: type.toLowerCase(),
       });
     }
+
+    // Auch die notification:created Event für Live-Updates im Header
+    broadcastCreate('notification', { recipientCount: users.length });
 
     res.json({
       success: true,
@@ -320,12 +323,15 @@ router.post('/broadcast-all', authMiddleware, requirePermission('admin.full'), a
       })),
     });
 
-    // Sende Echtzeit-Benachrichtigung via Socket.io
-    io.emit('notification', {
+    // Sende Echtzeit-Benachrichtigung via Socket.io an alle
+    emitToAll('notification', {
       title: title.trim(),
       message: message.trim(),
-      type: type,
+      type: type.toLowerCase(),
     });
+
+    // Auch die notification:created Event für Live-Updates im Header
+    broadcastCreate('notification', { recipientCount: users.length });
 
     res.json({
       success: true,

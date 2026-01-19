@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { notifyPromotion } from '../services/notificationService.js';
 import { announcePromotion, announceAcademyGraduation } from '../services/discordAnnouncements.js';
@@ -379,7 +379,7 @@ router.delete('/:id', requirePermission('teamlead.manage'), async (req: AuthRequ
 });
 
 // Get my requests (for team leaders)
-router.get('/my/requests', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.get('/my/requests', authMiddleware, requirePermission('teamlead.view'), async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
 

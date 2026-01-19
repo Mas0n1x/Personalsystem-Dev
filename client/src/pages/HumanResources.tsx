@@ -1381,29 +1381,17 @@ export default function HumanResources() {
                   {/* Discord Server Einladung */}
                   <div className="mb-4 p-3 bg-[#5865F2]/20 border border-[#5865F2]/30 rounded-lg">
                     <h4 className="text-sm font-medium text-[#5865F2] mb-3">Discord Server Einladung</h4>
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                      <div>
-                        <label className="label text-xs">Discord ID *</label>
-                        <input
-                          type="text"
-                          value={detailDiscordId}
-                          onChange={(e) => setDetailDiscordId(e.target.value)}
-                          className="input text-sm"
-                          placeholder="123456789..."
-                          disabled={selectedApplication.status === 'COMPLETED' || selectedApplication.status === 'REJECTED'}
-                        />
-                      </div>
-                      <div>
-                        <label className="label text-xs">Discord Username *</label>
-                        <input
-                          type="text"
-                          value={detailDiscordUsername}
-                          onChange={(e) => setDetailDiscordUsername(e.target.value)}
-                          className="input text-sm"
-                          placeholder="username"
-                          disabled={selectedApplication.status === 'COMPLETED' || selectedApplication.status === 'REJECTED'}
-                        />
-                      </div>
+                    <div className="mb-3">
+                      <label className="label text-xs">Discord ID *</label>
+                      <input
+                        type="text"
+                        value={detailDiscordId}
+                        onChange={(e) => setDetailDiscordId(e.target.value)}
+                        className="input text-sm"
+                        placeholder="123456789..."
+                        disabled={selectedApplication.status === 'COMPLETED' || selectedApplication.status === 'REJECTED'}
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Der Anzeigename wird vom Bot automatisch aus dem Personalsystem übernommen</p>
                     </div>
                     <div className="mb-3">
                       <label className="label text-xs">Einladungslink</label>
@@ -1511,7 +1499,7 @@ export default function HumanResources() {
                 <button
                   onClick={handleComplete}
                   className="btn-primary bg-green-600 hover:bg-green-700 flex items-center gap-2"
-                  disabled={!detailDiscordId || !detailDiscordUsername || completeApplicationMutation.isPending}
+                  disabled={!detailDiscordId || completeApplicationMutation.isPending}
                 >
                   <CheckCircle className="h-4 w-4" />
                   Bewerbung abschließen
@@ -1644,26 +1632,24 @@ export default function HumanResources() {
               {!editingBlacklist && (
                 <>
                   <div>
-                    <label className="label">Discord ID *</label>
+                    <label className="label">Discord ID</label>
                     <input
                       type="text"
                       value={discordId}
                       onChange={(e) => setDiscordId(e.target.value)}
                       className="input"
                       placeholder="z.B. 123456789012345678"
-                      required
                     />
                   </div>
 
                   <div>
-                    <label className="label">Username *</label>
+                    <label className="label">Username</label>
                     <input
                       type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       className="input"
                       placeholder="Discord Username"
-                      required
                     />
                   </div>
                 </>

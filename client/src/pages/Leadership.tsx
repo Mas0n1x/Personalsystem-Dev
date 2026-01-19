@@ -32,6 +32,15 @@ import toast from 'react-hot-toast';
 
 // ==================== TYPES ====================
 
+interface TaskAssignee {
+  id: string;
+  employeeId: string;
+  employee: {
+    id: string;
+    user: { displayName: string | null; username: string; avatar: string | null };
+  };
+}
+
 interface Task {
   id: string;
   title: string;
@@ -39,10 +48,8 @@ interface Task {
   status: 'OPEN' | 'IN_PROGRESS' | 'DONE';
   priority: 'LOW' | 'MEDIUM' | 'HIGH';
   dueDate: string | null;
-  assignee: {
-    id: string;
-    user: { displayName: string | null; username: string; avatar: string | null };
-  } | null;
+  dueTime: string | null;
+  assignees: TaskAssignee[];
   createdBy: { displayName: string | null; username: string };
   createdAt: string;
 }
@@ -686,8 +693,9 @@ function TasksWidget() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM');
-  const [assigneeId, setAssigneeId] = useState('');
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState('');
+  const [dueTime, setDueTime] = useState('');
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -730,14 +738,22 @@ function TasksWidget() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tasks'] }); toast.success('Gelöscht'); },
   });
 
-  const openCreateModal = () => { setEditingTask(null); setTitle(''); setDescription(''); setPriority('MEDIUM'); setAssigneeId(''); setDueDate(''); setShowModal(true); };
-  const openEditModal = (t: Task) => { setEditingTask(t); setTitle(t.title); setDescription(t.description || ''); setPriority(t.priority); setAssigneeId(t.assignee?.id || ''); setDueDate(t.dueDate?.split('T')[0] || ''); setShowModal(true); };
+  const openCreateModal = () => { setEditingTask(null); setTitle(''); setDescription(''); setPriority('MEDIUM'); setAssigneeIds([]); setDueDate(''); setDueTime(''); setShowModal(true); };
+  const openEditModal = (t: Task) => { setEditingTask(t); setTitle(t.title); setDescription(t.description || ''); setPriority(t.priority); setAssigneeIds(t.assignees.map(a => a.employeeId)); setDueDate(t.dueDate?.split('T')[0] || ''); setDueTime(t.dueTime || ''); setShowModal(true); };
   const closeModal = () => { setShowModal(false); setEditingTask(null); };
+
+  const toggleAssignee = (employeeId: string) => {
+    setAssigneeIds(prev =>
+      prev.includes(employeeId)
+        ? prev.filter(id => id !== employeeId)
+        : [...prev, employeeId]
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    const data = { title: title.trim(), description: description.trim() || undefined, priority, assigneeId: assigneeId || undefined, dueDate: dueDate || undefined };
+    const data = { title: title.trim(), description: description.trim() || undefined, priority, assigneeIds: assigneeIds.length > 0 ? assigneeIds : undefined, dueDate: dueDate || undefined, dueTime: dueTime || undefined };
     if (editingTask) updateMutation.mutate({ id: editingTask.id, data });
     else createMutation.mutate(data);
   };
@@ -803,14 +819,26 @@ function TasksWidget() {
                         {task.description && (
                           <p className="text-[10px] text-slate-400 mt-1 line-clamp-2">{task.description}</p>
                         )}
-                        <div className="flex items-center gap-1 mt-1">
+                        <div className="flex items-center gap-1 mt-1 flex-wrap">
                           <span className={`px-1 py-0.5 rounded text-[10px] font-medium ${PRIORITY_COLORS[task.priority]}`}>{PRIORITY_LABELS[task.priority]}</span>
-                          {task.dueDate && <span className="text-[10px] text-slate-400 flex items-center gap-0.5"><Calendar className="h-2.5 w-2.5" />{formatDate(task.dueDate)}</span>}
+                          {task.dueDate && <span className="text-[10px] text-slate-400 flex items-center gap-0.5"><Calendar className="h-2.5 w-2.5" />{formatDate(task.dueDate)}{task.dueTime && ` ${task.dueTime}`}</span>}
                         </div>
-                        {task.assignee && (
+                        {task.assignees && task.assignees.length > 0 && (
                           <div className="flex items-center gap-1 mt-1">
-                            <img src={task.assignee.user.avatar || `https://ui-avatars.com/api/?name=${task.assignee.user.displayName || task.assignee.user.username}&size=16`} className="h-4 w-4 rounded-full" alt="" />
-                            <span className="text-[10px] text-slate-400 truncate">{task.assignee.user.displayName || task.assignee.user.username}</span>
+                            <div className="flex -space-x-1">
+                              {task.assignees.slice(0, 3).map((a) => (
+                                <img key={a.id} src={a.employee.user.avatar || `https://ui-avatars.com/api/?name=${a.employee.user.displayName || a.employee.user.username}&size=16`} className="h-4 w-4 rounded-full border border-slate-700" alt="" title={a.employee.user.displayName || a.employee.user.username} />
+                              ))}
+                              {task.assignees.length > 3 && (
+                                <span className="h-4 w-4 rounded-full bg-slate-600 text-[8px] flex items-center justify-center text-slate-300 border border-slate-700">+{task.assignees.length - 3}</span>
+                              )}
+                            </div>
+                            {task.assignees.length === 1 && (
+                              <span className="text-[10px] text-slate-400 truncate">{task.assignees[0].employee.user.displayName || task.assignees[0].employee.user.username}</span>
+                            )}
+                            {task.assignees.length > 1 && (
+                              <span className="text-[10px] text-slate-400">{task.assignees.length} Personen</span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -849,17 +877,34 @@ function TasksWidget() {
                   ))}
                 </div>
               </div>
+              <div>
+                <label className="label">Zugewiesen an ({assigneeIds.length} ausgewählt)</label>
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-2 bg-slate-700/50 rounded-lg">
+                  {employees.map((emp) => (
+                    <button
+                      key={emp.id}
+                      type="button"
+                      onClick={() => toggleAssignee(emp.id)}
+                      className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
+                        assigneeIds.includes(emp.id)
+                          ? 'bg-primary-600/30 text-primary-400 border border-primary-500'
+                          : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                      }`}
+                    >
+                      {assigneeIds.includes(emp.id) && <Check className="h-3 w-3" />}
+                      {emp.user.displayName || emp.user.username}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label">Zugewiesen</label>
-                  <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className="input">
-                    <option value="">-</option>
-                    {employees.map((e) => <option key={e.id} value={e.id}>{e.user.displayName || e.user.username}</option>)}
-                  </select>
+                  <label className="label">Fällig am</label>
+                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input" />
                 </div>
                 <div>
-                  <label className="label">Fällig</label>
-                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input" />
+                  <label className="label">Uhrzeit</label>
+                  <input type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} className="input" />
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
@@ -1009,7 +1054,7 @@ function SanctionsWidget() {
                       title: 'Sanktion als erledigt markieren',
                       message: 'Möchtest du diese Sanktion als erledigt markieren?',
                       confirmText: 'Erledigt',
-                      variant: 'default',
+                      variant: 'success',
                       onConfirm: () => completeMutation.mutate(s.id),
                     })}
                     className="mt-1 h-5 w-5 rounded border-2 border-slate-500 hover:border-green-500 hover:bg-green-500/20 flex items-center justify-center transition-colors flex-shrink-0"

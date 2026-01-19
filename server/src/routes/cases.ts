@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { triggerCaseOpened, triggerCaseClosed, getEmployeeIdFromUserId } from '../services/bonusService.js';
 import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
@@ -468,7 +468,7 @@ router.get('/:id', authMiddleware, requirePermission('detectives.view'), async (
 });
 
 // GET Bild
-router.get('/image/:filename', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.get('/image/:filename', authMiddleware, requirePermission('detectives.view'), async (req: AuthRequest, res: Response) => {
   try {
     const filePath = path.join(uploadDir, req.params.filename);
     if (fs.existsSync(filePath)) {

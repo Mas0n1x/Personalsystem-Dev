@@ -32,8 +32,8 @@ export function useLiveUpdates() {
     // Entity zu Query-Key Mapping (ohne Dashboard - wird separat gehandled)
     const entityQueryKeys: Record<string, string[][]> = {
       employee: [['employees'], ['employee']],
-      absence: [['absences']],
-      bonus: [['bonus'], ['bonusPayments']],
+      absence: [['absences'], ['active-absences']],
+      bonus: [['bonus'], ['bonusPayments'], ['my-bonuses'], ['weekly-bonus-summary']],
       sanction: [['sanctions']],
       task: [['tasks']],
       investigation: [['investigations']],

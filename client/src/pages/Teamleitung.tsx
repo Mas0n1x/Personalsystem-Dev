@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { uprankRequestsApi, uprankLockApi, employeesApi } from '../services/api';
+import { uprankRequestsApi, uprankLockApi, employeesApi, teamChangeReportsApi } from '../services/api';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { usePermissions } from '../hooks/usePermissions';
 import { useLiveUpdates } from '../hooks/useLiveUpdates';
@@ -21,6 +21,8 @@ import {
   X,
   RefreshCw,
   History,
+  ArrowRightLeft,
+  FileText,
 } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
@@ -92,6 +94,36 @@ interface UprankLock {
   };
 }
 
+interface TeamChangeReport {
+  id: string;
+  employeeId: string;
+  previousTeam: string;
+  newTeam: string;
+  status: 'PENDING' | 'REVIEWED' | 'ARCHIVED';
+  notes?: string;
+  reviewNotes?: string;
+  createdAt: string;
+  reviewedAt?: string;
+  employee: {
+    id: string;
+    rank: string;
+    badgeNumber: string | null;
+    user: {
+      displayName: string | null;
+      username: string;
+      avatar: string | null;
+    };
+  };
+  createdBy: {
+    displayName: string | null;
+    username: string;
+  };
+  reviewedBy?: {
+    displayName: string | null;
+    username: string;
+  };
+}
+
 const RANKS = [
   'Cadet',
   'Officer I',
@@ -116,7 +148,7 @@ export default function Teamleitung() {
   useLiveUpdates(); // Live-Updates für Teamleitung aktivieren
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'requests' | 'locks'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'locks' | 'teamchanges'>('requests');
 
   // Request State
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -151,6 +183,9 @@ export default function Teamleitung() {
   const canManage = permissions.hasAnyPermission('teamlead.manage', 'admin.full');
   const canProcess = permissions.hasAnyPermission('management.uprank', 'admin.full');
   const canManageLocks = permissions.hasAnyPermission('uprank.manage', 'admin.full');
+
+  // Team Change State
+  const [selectedTeamChange, setSelectedTeamChange] = useState<TeamChangeReport | null>(null);
 
   // Request Queries
   const { data: stats } = useQuery({
@@ -196,6 +231,17 @@ export default function Teamleitung() {
   });
 
   const allEmployees = (allEmployeesData?.data || []) as Employee[];
+
+  // Team Change Queries
+  const { data: teamChangeStats } = useQuery({
+    queryKey: ['team-change-stats'],
+    queryFn: () => teamChangeReportsApi.getStats().then((r) => r.data),
+  });
+
+  const { data: teamChangeReports = [], isLoading: teamChangesLoading } = useQuery({
+    queryKey: ['team-change-reports-teamleitung'],
+    queryFn: () => teamChangeReportsApi.getAll().then((r) => r.data),
+  });
 
   // Request Mutations
   const createMutation = useMutation({
@@ -426,6 +472,27 @@ export default function Teamleitung() {
           </div>
           {activeTab === 'locks' && (
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400" />
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('teamchanges')}
+          className={`px-4 py-2 font-medium transition-colors relative ${
+            activeTab === 'teamchanges'
+              ? 'text-purple-400'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <ArrowRightLeft className="h-4 w-4" />
+            Teamwechsel-Berichte
+            {teamChangeStats && teamChangeStats.pending > 0 && (
+              <span className="px-2 py-0.5 text-xs bg-purple-600/20 text-purple-400 rounded-full">
+                {teamChangeStats.pending}
+              </span>
+            )}
+          </div>
+          {activeTab === 'teamchanges' && (
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-400" />
           )}
         </button>
       </div>
@@ -757,6 +824,236 @@ export default function Teamleitung() {
                   );
                 })
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Teamwechsel Tab */}
+      {activeTab === 'teamchanges' && (
+        <div className="space-y-6">
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="card p-5 bg-gradient-to-br from-purple-900/20 to-slate-800/50 border-purple-700/30">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-purple-600/20 rounded-xl">
+                  <ArrowRightLeft className="h-6 w-6 text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-purple-400">{teamChangeStats?.total || 0}</p>
+                  <p className="text-sm text-slate-400">Gesamt</p>
+                </div>
+              </div>
+            </div>
+            <div className="card p-5 bg-gradient-to-br from-yellow-900/20 to-slate-800/50 border-yellow-700/30">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-yellow-600/20 rounded-xl">
+                  <Clock className="h-6 w-6 text-yellow-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-yellow-400">{teamChangeStats?.pending || 0}</p>
+                  <p className="text-sm text-slate-400">Ausstehend</p>
+                </div>
+              </div>
+            </div>
+            <div className="card p-5 bg-gradient-to-br from-green-900/20 to-slate-800/50 border-green-700/30">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-green-600/20 rounded-xl">
+                  <CheckCircle className="h-6 w-6 text-green-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-green-400">{teamChangeStats?.reviewed || 0}</p>
+                  <p className="text-sm text-slate-400">Überprüft</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Berichte-Liste */}
+          <div className="card overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
+              <h3 className="font-semibold text-white flex items-center gap-2">
+                <FileText className="h-5 w-5 text-purple-400" />
+                Teamwechsel-Berichte
+              </h3>
+              <span className="text-sm text-slate-400">
+                {teamChangeReports.length} Berichte
+              </span>
+            </div>
+
+            {teamChangesLoading ? (
+              <div className="p-12 text-center">
+                <div className="animate-spin h-8 w-8 border-2 border-purple-400 border-t-transparent rounded-full mx-auto"></div>
+              </div>
+            ) : teamChangeReports.length === 0 ? (
+              <div className="p-12 text-center">
+                <ArrowRightLeft className="h-12 w-12 text-slate-600 mx-auto mb-3" />
+                <p className="text-slate-400">Keine Teamwechsel-Berichte vorhanden</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-700">
+                {(teamChangeReports as TeamChangeReport[]).map((report) => (
+                  <div
+                    key={report.id}
+                    className="p-4 hover:bg-slate-700/30 transition-colors cursor-pointer"
+                    onClick={() => setSelectedTeamChange(report)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-purple-600/20 rounded-lg">
+                          <ArrowRightLeft className="h-5 w-5 text-purple-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-white">
+                            {report.employee?.user?.displayName || report.employee?.user?.username || 'Unbekannt'}
+                          </p>
+                          <p className="text-sm text-slate-400">
+                            {report.previousTeam} → {report.newTeam}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={clsx(
+                          'px-2 py-1 rounded-lg text-xs font-medium',
+                          report.status === 'PENDING' && 'bg-yellow-600/20 text-yellow-400',
+                          report.status === 'REVIEWED' && 'bg-green-600/20 text-green-400',
+                          report.status === 'ARCHIVED' && 'bg-slate-600/20 text-slate-400'
+                        )}>
+                          {report.status === 'PENDING' && 'Ausstehend'}
+                          {report.status === 'REVIEWED' && 'Überprüft'}
+                          {report.status === 'ARCHIVED' && 'Archiviert'}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          {new Date(report.createdAt).toLocaleDateString('de-DE')}
+                        </span>
+                        <Eye className="h-4 w-4 text-slate-400" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Team Change Detail Modal */}
+      {selectedTeamChange && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
+            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Teamwechsel-Bericht</h2>
+                <p className="text-sm text-slate-400">
+                  {selectedTeamChange.employee?.user?.displayName || selectedTeamChange.employee?.user?.username}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedTeamChange(null)}
+                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Status Badge */}
+              <div className="flex justify-center">
+                <span className={clsx(
+                  'px-4 py-2 rounded-xl text-sm font-medium',
+                  selectedTeamChange.status === 'PENDING' && 'bg-yellow-600/20 text-yellow-400 border border-yellow-600/30',
+                  selectedTeamChange.status === 'REVIEWED' && 'bg-green-600/20 text-green-400 border border-green-600/30',
+                  selectedTeamChange.status === 'ARCHIVED' && 'bg-slate-600/20 text-slate-400 border border-slate-600/30'
+                )}>
+                  {selectedTeamChange.status === 'PENDING' && 'Ausstehend'}
+                  {selectedTeamChange.status === 'REVIEWED' && 'Überprüft'}
+                  {selectedTeamChange.status === 'ARCHIVED' && 'Archiviert'}
+                </span>
+              </div>
+
+              {/* Mitarbeiter */}
+              <div className="p-4 bg-slate-700/30 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-purple-600/30 rounded-xl flex items-center justify-center">
+                    <User className="h-6 w-6 text-purple-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">
+                      {selectedTeamChange.employee?.user?.displayName || selectedTeamChange.employee?.user?.username}
+                    </p>
+                    <p className="text-sm text-slate-400">
+                      {selectedTeamChange.employee?.rank} • {selectedTeamChange.employee?.badgeNumber || 'Keine DN'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Teamwechsel Details */}
+              <div className="p-4 bg-slate-700/30 rounded-xl">
+                <p className="text-sm font-medium text-slate-400 mb-3">Teamwechsel</p>
+                <div className="flex items-center justify-between">
+                  <div className="text-center flex-1">
+                    <p className="text-lg font-bold text-red-400">{selectedTeamChange.previousTeam}</p>
+                    <p className="text-xs text-slate-500">Vorheriges Team</p>
+                  </div>
+                  <ArrowRightLeft className="h-6 w-6 text-purple-400 mx-4" />
+                  <div className="text-center flex-1">
+                    <p className="text-lg font-bold text-green-400">{selectedTeamChange.newTeam}</p>
+                    <p className="text-xs text-slate-500">Neues Team</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notizen */}
+              {selectedTeamChange.notes && (
+                <div className="p-4 bg-slate-700/30 rounded-xl">
+                  <p className="text-sm font-medium text-slate-400 mb-2">Notizen</p>
+                  <p className="text-white whitespace-pre-wrap">{selectedTeamChange.notes}</p>
+                </div>
+              )}
+
+              {/* Review Notizen */}
+              {selectedTeamChange.reviewNotes && (
+                <div className="p-4 bg-green-900/20 border border-green-700/30 rounded-xl">
+                  <p className="text-sm font-medium text-green-400 mb-2">Review-Notizen</p>
+                  <p className="text-white whitespace-pre-wrap">{selectedTeamChange.reviewNotes}</p>
+                  {selectedTeamChange.reviewedBy && (
+                    <p className="text-xs text-slate-400 mt-2">
+                      Überprüft von {selectedTeamChange.reviewedBy.displayName || selectedTeamChange.reviewedBy.username}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Meta-Infos */}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="p-3 bg-slate-700/30 rounded-lg">
+                  <p className="text-slate-400">Erstellt</p>
+                  <p className="text-white">
+                    {new Date(selectedTeamChange.createdAt).toLocaleDateString('de-DE', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+                <div className="p-3 bg-slate-700/30 rounded-lg">
+                  <p className="text-slate-400">Von</p>
+                  <p className="text-white">
+                    {selectedTeamChange.createdBy?.displayName || selectedTeamChange.createdBy?.username || 'System'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Info-Hinweis */}
+              <div className="p-3 bg-blue-900/20 border border-blue-700/30 rounded-lg text-sm">
+                <p className="text-blue-400">
+                  <strong>Hinweis:</strong> Teamwechsel-Berichte werden von der Internen Ermittlung (IA) verwaltet.
+                  Hier können Sie die Berichte einsehen.
+                </p>
+              </div>
             </div>
           </div>
         </div>

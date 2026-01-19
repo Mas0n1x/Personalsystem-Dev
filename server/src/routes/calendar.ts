@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 import { sendCalendarReminder } from '../services/calendarService.js';
@@ -9,6 +9,12 @@ const router = Router();
 // GET alle Kalender-Events (mit optionalem Datumsbereich)
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
+    if (!prisma) {
+      console.error('Prisma client is undefined in /calendar');
+      res.status(500).json({ error: 'Database not available' });
+      return;
+    }
+
     const { start, end, category } = req.query;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,6 +58,12 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 // GET nächste Termine (für Dashboard)
 router.get('/upcoming', authMiddleware, async (_req: AuthRequest, res: Response) => {
   try {
+    if (!prisma || typeof prisma.calendarEvent === 'undefined') {
+      console.error('Prisma client or calendarEvent is undefined in /calendar/upcoming', { prisma: !!prisma, calendarEvent: prisma ? !!prisma.calendarEvent : 'no prisma' });
+      res.status(500).json({ error: 'Database not available' });
+      return;
+    }
+
     const now = new Date();
 
     const events = await prisma.calendarEvent.findMany({
@@ -123,6 +135,7 @@ router.post('/', authMiddleware, requirePermission('calendar.manage'), async (re
       color,
       category,
       discordRoleIds,
+      notifyEmployeeIds,
       reminderMinutes,
     } = req.body;
 
@@ -142,6 +155,7 @@ router.post('/', authMiddleware, requirePermission('calendar.manage'), async (re
         color: color || '#3b82f6',
         category: category || 'GENERAL',
         discordRoleIds: discordRoleIds ? JSON.stringify(discordRoleIds) : null,
+        notifyEmployeeIds: notifyEmployeeIds ? JSON.stringify(notifyEmployeeIds) : null,
         reminderMinutes: reminderMinutes || null,
         createdById: req.user!.id,
       },
@@ -180,6 +194,7 @@ router.put('/:id', authMiddleware, requirePermission('calendar.manage'), async (
       color,
       category,
       discordRoleIds,
+      notifyEmployeeIds,
       reminderMinutes,
     } = req.body;
 
@@ -195,6 +210,7 @@ router.put('/:id', authMiddleware, requirePermission('calendar.manage'), async (
         color,
         category,
         discordRoleIds: discordRoleIds ? JSON.stringify(discordRoleIds) : null,
+        notifyEmployeeIds: notifyEmployeeIds ? JSON.stringify(notifyEmployeeIds) : null,
         reminderMinutes,
         // Reset reminderSent wenn sich Startdatum oder Erinnerungszeit ändert
         reminderSent: false,

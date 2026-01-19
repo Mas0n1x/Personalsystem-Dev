@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { getGuildInfo, syncAllRoles, syncDiscordMembers } from '../services/discordBot.js';
 import * as fs from 'fs';
@@ -1010,6 +1010,351 @@ router.put('/academy-criteria/reorder', authMiddleware, requirePermission('admin
   } catch (error) {
     console.error('Reorder academy criteria error:', error);
     res.status(500).json({ error: 'Fehler beim Neuordnen der Kriterien' });
+  }
+});
+
+// ==================== ONBOARDING ITEMS ====================
+
+// Alle aktiven Onboarding-Items (für HR)
+router.get('/onboarding-items', authMiddleware, async (_req: AuthRequest, res: Response) => {
+  try {
+    const items = await prisma.onboardingItem.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    res.json(items);
+  } catch (error) {
+    console.error('Get onboarding items error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Onboarding-Items' });
+  }
+});
+
+// Alle Onboarding-Items inkl. inaktiver (für Admin)
+router.get('/onboarding-items/all', authMiddleware, requirePermission('admin.full'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const items = await prisma.onboardingItem.findMany({
+      orderBy: { sortOrder: 'asc' },
+    });
+    res.json(items);
+  } catch (error) {
+    console.error('Get all onboarding items error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Onboarding-Items' });
+  }
+});
+
+// Neues Onboarding-Item erstellen
+router.post('/onboarding-items', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { text } = req.body;
+
+    if (!text) {
+      res.status(400).json({ error: 'Text ist erforderlich' });
+      return;
+    }
+
+    // Höchste sortOrder ermitteln
+    const maxOrder = await prisma.onboardingItem.findFirst({
+      orderBy: { sortOrder: 'desc' },
+      select: { sortOrder: true },
+    });
+
+    const item = await prisma.onboardingItem.create({
+      data: {
+        text,
+        sortOrder: (maxOrder?.sortOrder || 0) + 1,
+      },
+    });
+
+    res.status(201).json(item);
+  } catch (error) {
+    console.error('Create onboarding item error:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen des Onboarding-Items' });
+  }
+});
+
+// Onboarding-Item aktualisieren
+router.put('/onboarding-items/:id', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { text, isActive } = req.body;
+
+    const item = await prisma.onboardingItem.update({
+      where: { id },
+      data: {
+        text,
+        isActive,
+      },
+    });
+
+    res.json(item);
+  } catch (error) {
+    console.error('Update onboarding item error:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren des Onboarding-Items' });
+  }
+});
+
+// Onboarding-Item löschen
+router.delete('/onboarding-items/:id', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    await prisma.onboardingItem.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete onboarding item error:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen des Onboarding-Items' });
+  }
+});
+
+// Onboarding-Items neu ordnen
+router.put('/onboarding-items/reorder', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { items } = req.body; // Array mit { id, sortOrder }
+
+    for (const item of items) {
+      await prisma.onboardingItem.update({
+        where: { id: item.id },
+        data: { sortOrder: item.sortOrder },
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Reorder onboarding items error:', error);
+    res.status(500).json({ error: 'Fehler beim Neuordnen der Onboarding-Items' });
+  }
+});
+
+// ==================== IA CATEGORIES (IA-Kategorien) ====================
+
+// Alle aktiven IA-Kategorien (für IA)
+router.get('/ia-categories', authMiddleware, async (_req: AuthRequest, res: Response) => {
+  try {
+    const categories = await prisma.iACategory.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    res.json(categories);
+  } catch (error) {
+    console.error('Get IA categories error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der IA-Kategorien' });
+  }
+});
+
+// Alle IA-Kategorien inkl. inaktiver (für Admin)
+router.get('/ia-categories/all', authMiddleware, requirePermission('admin.full'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const categories = await prisma.iACategory.findMany({
+      orderBy: { sortOrder: 'asc' },
+    });
+    res.json(categories);
+  } catch (error) {
+    console.error('Get all IA categories error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der IA-Kategorien' });
+  }
+});
+
+// Neue IA-Kategorie erstellen
+router.post('/ia-categories', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, key, description } = req.body;
+
+    if (!name || !key) {
+      res.status(400).json({ error: 'Name und Schlüssel sind erforderlich' });
+      return;
+    }
+
+    // Höchste sortOrder ermitteln
+    const maxOrder = await prisma.iACategory.findFirst({
+      orderBy: { sortOrder: 'desc' },
+      select: { sortOrder: true },
+    });
+
+    const category = await prisma.iACategory.create({
+      data: {
+        name,
+        key: key.toUpperCase(),
+        description,
+        sortOrder: (maxOrder?.sortOrder || 0) + 1,
+      },
+    });
+
+    res.status(201).json(category);
+  } catch (error) {
+    console.error('Create IA category error:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen der IA-Kategorie' });
+  }
+});
+
+// IA-Kategorie aktualisieren
+router.put('/ia-categories/:id', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, key, description, isActive } = req.body;
+
+    const category = await prisma.iACategory.update({
+      where: { id },
+      data: {
+        name,
+        key: key?.toUpperCase(),
+        description,
+        isActive,
+      },
+    });
+
+    res.json(category);
+  } catch (error) {
+    console.error('Update IA category error:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren der IA-Kategorie' });
+  }
+});
+
+// IA-Kategorie löschen
+router.delete('/ia-categories/:id', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    await prisma.iACategory.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete IA category error:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen der IA-Kategorie' });
+  }
+});
+
+// IA-Kategorien neu ordnen
+router.put('/ia-categories/reorder', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { items } = req.body; // Array mit { id, sortOrder }
+
+    for (const item of items) {
+      await prisma.iACategory.update({
+        where: { id: item.id },
+        data: { sortOrder: item.sortOrder },
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Reorder IA categories error:', error);
+    res.status(500).json({ error: 'Fehler beim Neuordnen der IA-Kategorien' });
+  }
+});
+
+// ==================== QA UNITS (Quality Assurance Units) ====================
+
+// Alle aktiven QA-Units (für QA)
+router.get('/qa-units', authMiddleware, async (_req: AuthRequest, res: Response) => {
+  try {
+    const units = await prisma.qAUnit.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    res.json(units);
+  } catch (error) {
+    console.error('Get QA units error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der QA-Units' });
+  }
+});
+
+// Alle QA-Units inkl. inaktiver (für Admin)
+router.get('/qa-units/all', authMiddleware, requirePermission('admin.full'), async (_req: AuthRequest, res: Response) => {
+  try {
+    if (!prisma) {
+      console.error('Prisma client is undefined in /admin/qa-units/all');
+      res.status(500).json({ error: 'Database not available' });
+      return;
+    }
+
+    const units = await prisma.qAUnit.findMany({
+      orderBy: { sortOrder: 'asc' },
+    });
+    res.json(units);
+  } catch (error) {
+    console.error('Get all QA units error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der QA-Units' });
+  }
+});
+
+// Neue QA-Unit erstellen
+router.post('/qa-units', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, description } = req.body;
+
+    if (!name) {
+      res.status(400).json({ error: 'Name ist erforderlich' });
+      return;
+    }
+
+    // Höchste sortOrder ermitteln
+    const maxOrder = await prisma.qAUnit.findFirst({
+      orderBy: { sortOrder: 'desc' },
+      select: { sortOrder: true },
+    });
+
+    const unit = await prisma.qAUnit.create({
+      data: {
+        name,
+        description,
+        sortOrder: (maxOrder?.sortOrder || 0) + 1,
+      },
+    });
+
+    res.status(201).json(unit);
+  } catch (error) {
+    console.error('Create QA unit error:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen der QA-Unit' });
+  }
+});
+
+// QA-Unit aktualisieren
+router.put('/qa-units/:id', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, description, isActive } = req.body;
+
+    const unit = await prisma.qAUnit.update({
+      where: { id },
+      data: {
+        name,
+        description,
+        isActive,
+      },
+    });
+
+    res.json(unit);
+  } catch (error) {
+    console.error('Update QA unit error:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren der QA-Unit' });
+  }
+});
+
+// QA-Unit löschen
+router.delete('/qa-units/:id', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    await prisma.qAUnit.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete QA unit error:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen der QA-Unit' });
+  }
+});
+
+// QA-Units neu ordnen
+router.put('/qa-units/reorder', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { items } = req.body; // Array mit { id, sortOrder }
+
+    for (const item of items) {
+      await prisma.qAUnit.update({
+        where: { id: item.id },
+        data: { sortOrder: item.sortOrder },
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Reorder QA units error:', error);
+    res.status(500).json({ error: 'Fehler beim Neuordnen der QA-Units' });
   }
 });
 

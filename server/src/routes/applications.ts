@@ -1,8 +1,8 @@
 import { Router, Response } from 'express';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
-import { createInviteLink } from '../services/discordBot.js';
-import { triggerApplicationCompleted, triggerApplicationOnboarding, getEmployeeIdFromUserId } from '../services/bonusService.js';
+import { createInviteLink, updateDiscordNickname, assignHireRoles } from '../services/discordBot.js';
+import { triggerApplicationCompleted, triggerApplicationOnboarding, triggerApplicationRejected, getEmployeeIdFromUserId } from '../services/bonusService.js';
 import { announceHire } from '../services/discordAnnouncements.js';
 import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 import multer from 'multer';
@@ -45,13 +45,27 @@ const upload = multer({
 
 const router = Router();
 
-// Statische Onboarding-Checkliste (könnte später auch aus DB kommen)
-const ONBOARDING_CHECKLIST = [
+// Fallback Onboarding-Checkliste falls keine in DB konfiguriert
+const FALLBACK_ONBOARDING_CHECKLIST = [
   { id: 'clothes', text: 'Klamotten besorgen (Dienstkleidung)' },
   { id: 'discord', text: 'Discord Rollen vergeben' },
   { id: 'inventory', text: 'Standardinventar erklärt' },
   { id: 'garage', text: 'Fahrzeuggarage erklärt' },
 ];
+
+// Hilfsfunktion um Onboarding-Items zu laden (aus DB oder Fallback)
+async function getOnboardingChecklist() {
+  const dbItems = await prisma.onboardingItem.findMany({
+    where: { isActive: true },
+    orderBy: { sortOrder: 'asc' },
+  });
+
+  if (dbItems.length > 0) {
+    return dbItems.map(item => ({ id: item.id, text: item.text }));
+  }
+
+  return FALLBACK_ONBOARDING_CHECKLIST;
+}
 
 // GET alle Bewerbungen
 router.get('/', authMiddleware, requirePermission('hr.view'), async (req: AuthRequest, res: Response) => {
@@ -165,9 +179,15 @@ router.get('/criteria', authMiddleware, requirePermission('hr.view'), async (_re
   }
 });
 
-// GET Onboarding-Checkliste (statisch, könnte später auch dynamisch werden)
+// GET Onboarding-Checkliste (dynamisch aus DB oder Fallback)
 router.get('/onboarding-checklist', authMiddleware, requirePermission('hr.view'), async (_req: AuthRequest, res: Response) => {
-  res.json(ONBOARDING_CHECKLIST);
+  try {
+    const checklist = await getOnboardingChecklist();
+    res.json(checklist);
+  } catch (error) {
+    console.error('Get onboarding checklist error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Onboarding-Checkliste' });
+  }
 });
 
 // POST Discord Einladungslink generieren
@@ -425,12 +445,10 @@ router.put('/:id/questions', authMiddleware, requirePermission('hr.manage'), asy
     // Verwende Fallback-Anzahl, wenn keine Fragen in der DB
     const totalQuestions = dbQuestionsCount > 0 ? dbQuestionsCount : FALLBACK_QUESTIONS.length;
 
-    // Prüfe ob alle Fragen beantwortet wurden (mindestens eine muss existieren)
-    const allQuestionsCompleted =
-      totalQuestions > 0 &&
-      questionsCompleted &&
-      Array.isArray(questionsCompleted) &&
-      questionsCompleted.length >= totalQuestions;
+    // Mindestens 70% der Fragen müssen richtig beantwortet werden (nicht alle)
+    const minQuestionsRequired = Math.ceil(totalQuestions * 0.7);
+    const questionsAnswered = questionsCompleted && Array.isArray(questionsCompleted) ? questionsCompleted.length : 0;
+    const allQuestionsCompleted = questionsAnswered >= minQuestionsRequired;
 
     const application = await prisma.application.update({
       where: { id },
@@ -466,11 +484,12 @@ router.put('/:id/onboarding', authMiddleware, requirePermission('hr.manage'), as
     const { id } = req.params;
     const { onboardingCompleted, discordId, discordUsername, discordInviteLink, discordRolesAssigned } = req.body;
 
-    // Prüfe ob Onboarding vollständig
+    // Prüfe ob Onboarding vollständig (dynamisch basierend auf DB-Items)
+    const checklist = await getOnboardingChecklist();
     const allOnboardingCompleted =
       onboardingCompleted &&
       Array.isArray(onboardingCompleted) &&
-      onboardingCompleted.length === ONBOARDING_CHECKLIST.length;
+      onboardingCompleted.length >= checklist.length;
 
     const application = await prisma.application.update({
       where: { id },
@@ -515,8 +534,8 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
       return;
     }
 
-    if (!application.discordId || !application.discordUsername) {
-      res.status(400).json({ error: 'Discord-Daten sind erforderlich' });
+    if (!application.discordId) {
+      res.status(400).json({ error: 'Discord ID ist erforderlich' });
       return;
     }
 
@@ -542,10 +561,45 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
       user = await prisma.user.create({
         data: {
           discordId: application.discordId,
-          username: application.discordUsername,
+          username: application.discordUsername || application.applicantName,
           displayName: application.applicantName,
         },
       });
+    }
+
+    // Discord Nickname automatisch setzen auf den Namen aus dem Personalsystem
+    try {
+      await updateDiscordNickname(application.discordId, application.applicantName);
+      console.log(`Discord Nickname für ${application.discordId} auf "${application.applicantName}" gesetzt`);
+    } catch (nickError) {
+      console.error('Fehler beim Setzen des Discord Nicknames:', nickError);
+      // Nicht abbrechen, da das kein kritischer Fehler ist
+    }
+
+    // Discord-Rollen aus Admin-Einstellungen zuweisen
+    try {
+      const hireRolesSetting = await prisma.systemSetting.findUnique({
+        where: { key: 'hrOnboardingRoleIds' },
+      });
+
+      if (hireRolesSetting?.value) {
+        // Unterstütze sowohl kommaseparierte IDs als auch JSON-Array
+        let roleIds: string[] = [];
+        try {
+          roleIds = JSON.parse(hireRolesSetting.value) as string[];
+        } catch {
+          // Fallback: kommaseparierte IDs
+          roleIds = hireRolesSetting.value.split(',').map(id => id.trim()).filter(Boolean);
+        }
+
+        if (roleIds && roleIds.length > 0) {
+          const roleResult = await assignHireRoles(application.discordId, roleIds);
+          console.log(`Discord Rollen zugewiesen: ${roleResult.assigned.length} erfolgreich, ${roleResult.failed.length} fehlgeschlagen`);
+        }
+      }
+    } catch (roleError) {
+      console.error('Fehler beim Zuweisen der Discord-Rollen:', roleError);
+      // Nicht abbrechen, da das kein kritischer Fehler ist
     }
 
     // Prüfe ob bereits Mitarbeiter
@@ -688,6 +742,12 @@ router.put('/:id/reject', authMiddleware, requirePermission('hr.manage'), async 
         },
       },
     });
+
+    // Bonus-Trigger für abgelehnte Bewerbung
+    const processorEmployeeId = await getEmployeeIdFromUserId(req.user!.id);
+    if (processorEmployeeId) {
+      await triggerApplicationRejected(processorEmployeeId, application.applicantName, id);
+    }
 
     // Live-Update broadcast
     broadcastUpdate('application', updatedApplication);

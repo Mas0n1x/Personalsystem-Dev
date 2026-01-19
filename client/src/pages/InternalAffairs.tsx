@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { investigationsApi, teamChangeReportsApi, employeesApi } from '../services/api';
+import { investigationsApi, teamChangeReportsApi, employeesApi, adminApi } from '../services/api';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { usePermissions } from '../hooks/usePermissions';
 import { useLiveUpdates } from '../hooks/useLiveUpdates';
@@ -96,12 +96,22 @@ const priorityColors: Record<string, string> = {
   CRITICAL: 'text-red-400',
 };
 
-const categoryLabels: Record<string, string> = {
+// Fallback-Kategorien (werden überschrieben wenn DB-Kategorien vorhanden sind)
+const fallbackCategoryLabels: Record<string, string> = {
   BESCHWERDE: 'Beschwerde',
   DISZIPLINAR: 'Disziplinarverfahren',
   KORRUPTION: 'Korruption',
   SONSTIGES: 'Sonstiges',
 };
+
+interface IACategory {
+  id: string;
+  name: string;
+  key: string;
+  description?: string;
+  sortOrder: number;
+  isActive: boolean;
+}
 
 // Teams für Dropdown
 const AVAILABLE_TEAMS = [
@@ -172,6 +182,20 @@ export default function InternalAffairs() {
   });
 
   // Queries
+  // IA-Kategorien aus der Datenbank laden
+  const { data: iaCategories = [] } = useQuery({
+    queryKey: ['ia-categories'],
+    queryFn: () => adminApi.getIACategories().then(res => res.data),
+  });
+
+  // Generiere categoryLabels aus DB-Kategorien oder verwende Fallback
+  const categoryLabels: Record<string, string> = iaCategories.length > 0
+    ? (iaCategories as IACategory[]).reduce((acc, cat) => {
+        acc[cat.key] = cat.name;
+        return acc;
+      }, {} as Record<string, string>)
+    : fallbackCategoryLabels;
+
   const { data: stats } = useQuery({
     queryKey: ['investigations', 'stats'],
     queryFn: () => investigationsApi.getStats().then(res => res.data),

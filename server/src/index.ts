@@ -4,7 +4,7 @@ import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './prisma.js';
 
 // BigInt JSON Serialization Support
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -72,8 +72,6 @@ const io = new Server(httpServer, {
     credentials: true,
   },
 });
-
-export const prisma = new PrismaClient();
 
 // Middleware
 app.use(cors({

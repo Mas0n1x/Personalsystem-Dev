@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 
 const router = Router();
@@ -89,25 +89,32 @@ router.post('/', authMiddleware, requirePermission('blacklist.manage'), async (r
   try {
     const { discordId, username, reason, expiresAt } = req.body;
 
-    if (!discordId || !username || !reason) {
-      res.status(400).json({ error: 'Discord ID, Username und Grund sind erforderlich' });
+    if (!reason) {
+      res.status(400).json({ error: 'Grund ist erforderlich' });
       return;
     }
 
-    // Prüfe ob bereits auf Blacklist
-    const existing = await prisma.blacklist.findUnique({
-      where: { discordId },
-    });
-
-    if (existing) {
-      res.status(400).json({ error: 'Diese Discord ID ist bereits auf der Blacklist' });
+    if (!discordId && !username) {
+      res.status(400).json({ error: 'Discord ID oder Username ist erforderlich' });
       return;
+    }
+
+    // Prüfe ob bereits auf Blacklist (nur wenn Discord ID vorhanden)
+    if (discordId) {
+      const existing = await prisma.blacklist.findUnique({
+        where: { discordId },
+      });
+
+      if (existing) {
+        res.status(400).json({ error: 'Diese Discord ID ist bereits auf der Blacklist' });
+        return;
+      }
     }
 
     const entry = await prisma.blacklist.create({
       data: {
-        discordId,
-        username,
+        discordId: discordId || `manual-${Date.now()}`, // Fallback für Einträge ohne Discord ID
+        username: username || 'Unbekannt',
         reason,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         addedById: req.user!.id,

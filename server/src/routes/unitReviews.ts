@@ -1,13 +1,13 @@
 import { Router, Response } from 'express';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 
 const router = Router();
 
 router.use(authMiddleware);
 
-// Available units for review
-const UNITS = [
+// Fallback Units (werden verwendet wenn keine in DB)
+const FALLBACK_UNITS = [
   'Team Green',
   'Team Silver',
   'Team Gold',
@@ -20,9 +20,24 @@ const UNITS = [
   'Detectives',
 ];
 
-// Get units list
+// Get units list (dynamisch aus DB oder Fallback)
 router.get('/units', requirePermission('qa.view'), async (_req: AuthRequest, res: Response) => {
-  res.json(UNITS);
+  try {
+    const dbUnits = await prisma.qAUnit.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+      select: { name: true },
+    });
+
+    if (dbUnits.length > 0) {
+      res.json(dbUnits.map(u => u.name));
+    } else {
+      res.json(FALLBACK_UNITS);
+    }
+  } catch (error) {
+    console.error('Get units error:', error);
+    res.json(FALLBACK_UNITS);
+  }
 });
 
 // Get stats

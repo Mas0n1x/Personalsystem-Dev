@@ -1,5 +1,5 @@
 import { Client, GatewayIntentBits, EmbedBuilder, TextChannel, Guild, ChannelType, GuildMember } from 'discord.js';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { setDiscordClient } from './discordAnnouncements.js';
 
 let client: Client | null = null;
@@ -297,6 +297,66 @@ export async function syncUserRole(
   } catch (error) {
     console.error(`Error syncing role for ${discordId}:`, error);
     return false;
+  }
+}
+
+// Mehrere Discord-Rollen einem Benutzer zuweisen (für Einstellung)
+export async function assignHireRoles(discordId: string, roleIds: string[]): Promise<{ success: boolean; assigned: string[]; failed: string[] }> {
+  const result = { success: true, assigned: [] as string[], failed: [] as string[] };
+
+  if (!guild) {
+    console.error('Guild nicht verfügbar für Rollen-Zuweisung');
+    return { success: false, assigned: [], failed: roleIds };
+  }
+
+  if (!roleIds || roleIds.length === 0) {
+    console.log('Keine Rollen zum Zuweisen konfiguriert');
+    return result;
+  }
+
+  try {
+    const member = await guild.members.fetch(discordId);
+    if (!member) {
+      console.error(`Mitglied ${discordId} nicht gefunden`);
+      return { success: false, assigned: [], failed: roleIds };
+    }
+
+    console.log(`\n=== Discord Rollen-Zuweisung bei Einstellung ===`);
+    console.log(`Mitglied: ${member.user.tag}`);
+    console.log(`Zuzuweisende Rollen: ${roleIds.length}`);
+
+    for (const roleId of roleIds) {
+      try {
+        const role = guild.roles.cache.get(roleId);
+        if (!role) {
+          console.warn(`Rolle ${roleId} nicht gefunden`);
+          result.failed.push(roleId);
+          continue;
+        }
+
+        // Prüfe ob Member die Rolle bereits hat
+        if (member.roles.cache.has(roleId)) {
+          console.log(`  ℹ️ Rolle "${role.name}" bereits vorhanden`);
+          result.assigned.push(roleId);
+          continue;
+        }
+
+        await member.roles.add(roleId);
+        console.log(`  ✅ Rolle "${role.name}" hinzugefügt`);
+        result.assigned.push(roleId);
+      } catch (roleError) {
+        console.error(`  ❌ Fehler bei Rolle ${roleId}:`, roleError);
+        result.failed.push(roleId);
+      }
+    }
+
+    result.success = result.failed.length === 0;
+    console.log(`=== Rollen-Zuweisung abgeschlossen: ${result.assigned.length} erfolgreich, ${result.failed.length} fehlgeschlagen ===\n`);
+
+    return result;
+  } catch (error) {
+    console.error(`Error assigning hire roles for ${discordId}:`, error);
+    return { success: false, assigned: [], failed: roleIds };
   }
 }
 
@@ -1085,6 +1145,21 @@ export async function sendAnnouncementToChannel(
 
     const textChannel = channel as TextChannel;
 
+    // Prüfe Bot-Berechtigungen im Channel
+    const permissions = textChannel.permissionsFor(client.user!);
+    if (!permissions) {
+      console.error(`[Discord] Bot hat keine Berechtigungen im Channel ${textChannel.name}`);
+      throw new Error('Bot hat keine Berechtigungen in diesem Channel');
+    }
+
+    const requiredPermissions = ['SendMessages', 'EmbedLinks', 'MentionEveryone'] as const;
+    const missingPermissions = requiredPermissions.filter(perm => !permissions.has(perm));
+
+    if (missingPermissions.length > 0) {
+      console.error(`[Discord] Fehlende Berechtigungen im Channel ${textChannel.name}: ${missingPermissions.join(', ')}`);
+      throw new Error(`Bot fehlen folgende Berechtigungen: ${missingPermissions.join(', ')}`);
+    }
+
     const embed = new EmbedBuilder()
       .setTitle(title)
       .setDescription(content)
@@ -1100,7 +1175,7 @@ export async function sendAnnouncementToChannel(
     return message.id;
   } catch (error) {
     console.error('Error sending announcement to channel:', error);
-    return null;
+    throw error; // Throw error statt null zurückgeben für besseres Error Handling
   }
 }
 

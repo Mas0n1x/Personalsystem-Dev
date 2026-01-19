@@ -102,7 +102,10 @@
       "Bash(docker stop:*)",
       "Bash(docker rm:*)",
       "Bash(pm2 describe:*)",
-      "Bash(node --version:*)"
+      "Bash(node --version:*)",
+      "Bash(pm2 restart:*)",
+      "Bash(docker system prune:*)",
+      "Bash(docker build:*)"
     ]
   }
 }

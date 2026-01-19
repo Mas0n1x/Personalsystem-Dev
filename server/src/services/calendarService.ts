@@ -1,4 +1,4 @@
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { EmbedBuilder, TextChannel, ChannelType } from 'discord.js';
 import { client } from './discordBot.js';
 import cron from 'node-cron';
@@ -157,9 +157,26 @@ export async function sendCalendarReminder(event: CalendarEvent): Promise<boolea
 export function initializeCalendarReminders(): void {
   console.log('[Calendar] Initialisiere Erinnerungs-Service...');
 
+  // Verzögere den ersten Run um 30 Sekunden, damit Prisma vollständig initialisiert ist
+  let isReady = false;
+  setTimeout(() => {
+    isReady = true;
+  }, 30000);
+
   // Jede Minute prüfen
   cron.schedule('* * * * *', async () => {
     try {
+      // Skip if not ready yet
+      if (!isReady) {
+        return;
+      }
+
+      // Verify prisma is available
+      if (!prisma || !prisma.calendarEvent) {
+        console.error('[Calendar] Prisma not available yet, skipping reminder check');
+        return;
+      }
+
       const now = new Date();
 
       // Alle Events finden, die noch nicht erinnert wurden und deren Erinnerungszeit erreicht ist

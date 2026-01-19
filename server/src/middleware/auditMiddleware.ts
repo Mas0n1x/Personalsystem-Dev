@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { AuthRequest } from './authMiddleware.js';
 
 // Aktionen die geloggt werden sollen

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Modal from '../../components/ui/Modal';
+import PermissionSelector from '../../components/admin/PermissionSelector';
 import { Plus, Edit, Trash2, Shield, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Role, Permission } from '../../types';
@@ -98,6 +99,16 @@ export default function Roles() {
     acc[perm.category].push(perm);
     return acc;
   }, {} as Record<string, Permission[]>);
+
+  const handlePermissionToggle = useCallback((permissionId: string) => {
+    setSelectedPermissions((prev) => {
+      if (prev.includes(permissionId)) {
+        return prev.filter((id) => id !== permissionId);
+      } else {
+        return [...prev, permissionId];
+      }
+    });
+  }, []);
 
   const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -250,7 +261,7 @@ export default function Roles() {
           setSelectedPermissions([]);
         }}
         title="Neue Rolle"
-        size="lg"
+        size="xl"
         footer={
           <>
             <button
@@ -302,44 +313,13 @@ export default function Roles() {
           </div>
           <div>
             <label className="label">Berechtigungen</label>
-            <div className="max-h-64 overflow-y-auto space-y-4 p-4 bg-slate-700/50 rounded-lg">
-              {permissionsByCategory &&
-                Object.entries(permissionsByCategory).map(([category, perms]) => (
-                  <div key={category}>
-                    <p className="text-sm font-medium text-slate-300 mb-2 uppercase">
-                      {category}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {perms.map((perm) => (
-                        <label
-                          key={perm.id}
-                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${
-                            selectedPermissions.includes(perm.id)
-                              ? 'bg-primary-600 text-white'
-                              : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedPermissions.includes(perm.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedPermissions([...selectedPermissions, perm.id]);
-                              } else {
-                                setSelectedPermissions(
-                                  selectedPermissions.filter((id) => id !== perm.id)
-                                );
-                              }
-                            }}
-                            className="sr-only"
-                          />
-                          <span className="text-sm">{perm.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-            </div>
+            {permissionsByCategory && (
+              <PermissionSelector
+                permissionsByCategory={permissionsByCategory}
+                selectedPermissions={selectedPermissions}
+                onToggle={handlePermissionToggle}
+              />
+            )}
           </div>
         </form>
       </Modal>
@@ -352,7 +332,7 @@ export default function Roles() {
           setSelectedPermissions([]);
         }}
         title="Rolle bearbeiten"
-        size="lg"
+        size="xl"
         footer={
           <>
             <button
@@ -426,44 +406,13 @@ export default function Roles() {
             </div>
             <div>
               <label className="label">Berechtigungen</label>
-              <div className="max-h-64 overflow-y-auto space-y-4 p-4 bg-slate-700/50 rounded-lg">
-                {permissionsByCategory &&
-                  Object.entries(permissionsByCategory).map(([category, perms]) => (
-                    <div key={category}>
-                      <p className="text-sm font-medium text-slate-300 mb-2 uppercase">
-                        {category}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {perms.map((perm) => (
-                          <label
-                            key={perm.id}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${
-                              selectedPermissions.includes(perm.id)
-                                ? 'bg-primary-600 text-white'
-                                : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedPermissions.includes(perm.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedPermissions([...selectedPermissions, perm.id]);
-                                } else {
-                                  setSelectedPermissions(
-                                    selectedPermissions.filter((id) => id !== perm.id)
-                                  );
-                                }
-                              }}
-                              className="sr-only"
-                            />
-                            <span className="text-sm">{perm.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-              </div>
+              {permissionsByCategory && (
+                <PermissionSelector
+                  permissionsByCategory={permissionsByCategory}
+                  selectedPermissions={selectedPermissions}
+                  onToggle={handlePermissionToggle}
+                />
+              )}
             </div>
           </form>
         )}

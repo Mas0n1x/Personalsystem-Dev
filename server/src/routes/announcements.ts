@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { sendAnnouncementToChannel, getAnnouncementChannels } from '../services/discordBot.js';
 import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
@@ -101,13 +101,28 @@ router.post('/:id/send', authMiddleware, requirePermission('leadership.manage'),
     }
 
     // An Discord senden
-    const messageId = await sendAnnouncementToChannel(
-      announcement.channelId,
-      announcement.title,
-      announcement.content
-    );
+    let messageId: string | null = null;
+    try {
+      messageId = await sendAnnouncementToChannel(
+        announcement.channelId,
+        announcement.title,
+        announcement.content
+      );
+    } catch (discordError: any) {
+      console.error('Discord send error:', discordError);
 
-    if (!messageId) {
+      // Spezifische Fehlermeldung für Berechtigungsfehler
+      if (discordError.message && discordError.message.includes('Berechtigungen')) {
+        res.status(403).json({ error: discordError.message });
+        return;
+      }
+
+      // Spezifische Fehlermeldung für Discord API Fehler
+      if (discordError.code === 50001) {
+        res.status(403).json({ error: 'Bot hat keinen Zugriff auf den ausgewählten Channel. Bitte prüfe die Discord-Berechtigungen des Bots.' });
+        return;
+      }
+
       res.status(500).json({ error: 'Fehler beim Senden an Discord' });
       return;
     }
@@ -217,15 +232,23 @@ router.post('/send-direct', authMiddleware, requirePermission('leadership.manage
     // Direkt an Discord senden
     const messageId = await sendAnnouncementToChannel(channelId, title, content);
 
-    if (!messageId) {
-      res.status(500).json({ error: 'Fehler beim Senden an Discord' });
+    res.json({ success: true, messageId });
+  } catch (error: any) {
+    console.error('Send direct announcement error:', error);
+
+    // Spezifische Fehlermeldung für Berechtigungsfehler
+    if (error.message && error.message.includes('Berechtigungen')) {
+      res.status(403).json({ error: error.message });
       return;
     }
 
-    res.json({ success: true, messageId });
-  } catch (error) {
-    console.error('Send direct announcement error:', error);
-    res.status(500).json({ error: 'Fehler beim Senden der Ankündigung' });
+    // Spezifische Fehlermeldung für Discord API Fehler
+    if (error.code === 50001) {
+      res.status(403).json({ error: 'Bot hat keinen Zugriff auf den Channel. Bitte prüfe die Discord-Berechtigungen.' });
+      return;
+    }
+
+    res.status(500).json({ error: 'Fehler beim Senden der Ankündigung an Discord' });
   }
 });
 

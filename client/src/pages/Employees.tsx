@@ -125,6 +125,8 @@ export default function Employees() {
   // Handlers
   const handleUprank = (e: React.MouseEvent, employee: Employee) => {
     e.stopPropagation();
+    // Verhindere doppelte Ausführung
+    if (uprankMutation.isPending) return;
     if (employee.rankLevel >= 17) {
       toast.error('Höchster Rang bereits erreicht');
       return;
@@ -134,6 +136,8 @@ export default function Employees() {
 
   const handleDownrank = (e: React.MouseEvent, employee: Employee) => {
     e.stopPropagation();
+    // Verhindere doppelte Ausführung
+    if (downrankMutation.isPending) return;
     if (employee.rankLevel <= 1) {
       toast.error('Niedrigster Rang bereits erreicht');
       return;

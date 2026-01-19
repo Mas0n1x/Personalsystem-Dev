@@ -1440,7 +1440,7 @@ export default function Management() {
               {/* Invoice Image */}
               <div className="rounded-lg overflow-hidden bg-slate-900">
                 <img
-                  src={`/api${tuningApi.getImageUrl(selectedInvoice.imagePath)}`}
+                  src={tuningApi.getImageUrl(selectedInvoice.imagePath)}
                   alt="Rechnung"
                   className="w-full h-auto"
                 />

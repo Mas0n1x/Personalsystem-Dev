@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { triggerSanctionIssued, getEmployeeIdFromUserId } from '../services/bonusService.js';
 import { notifySanction } from '../services/notificationService.js';

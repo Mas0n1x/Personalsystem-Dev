@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { calendarApi, notificationsApi } from '../services/api';
+import { calendarApi, notificationsApi, employeesApi } from '../services/api';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import {
   Calendar as CalendarIcon,
@@ -31,6 +31,7 @@ interface CalendarEvent {
   color: string;
   category: string;
   discordRoleIds: string | null;
+  notifyEmployeeIds: string | null;
   reminderMinutes: number | null;
   reminderSent: boolean;
   createdBy: {
@@ -45,6 +46,15 @@ interface DiscordRole {
   id: string;
   name: string;
   color: number;
+}
+
+interface Employee {
+  id: string;
+  rank: string;
+  user: {
+    displayName: string | null;
+    username: string;
+  };
 }
 
 // ==================== CONSTANTS ====================
@@ -140,6 +150,7 @@ export default function Calendar() {
   const [category, setCategory] = useState('GENERAL');
   const [color, setColor] = useState('#3b82f6');
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [reminderMinutes, setReminderMinutes] = useState<number>(0);
 
   // Calculate date range for current month view
@@ -166,8 +177,18 @@ export default function Calendar() {
     },
   });
 
+  // Query Employees
+  const { data: employeesData } = useQuery({
+    queryKey: ['employees-list'],
+    queryFn: async () => {
+      const res = await employeesApi.getAll();
+      return res.data as Employee[];
+    },
+  });
+
   const events = (eventsData?.data || []) as CalendarEvent[];
   const discordRoles = rolesData?.roles || [];
+  const employees = employeesData || [];
   const days = getDaysInMonth(year, month);
 
   // Mutations
@@ -232,6 +253,7 @@ export default function Calendar() {
     setCategory('GENERAL');
     setColor('#3b82f6');
     setSelectedRoles([]);
+    setSelectedEmployees([]);
     setReminderMinutes(0);
     setShowModal(true);
   };
@@ -256,6 +278,7 @@ export default function Calendar() {
     setCategory(event.category);
     setColor(event.color);
     setSelectedRoles(event.discordRoleIds ? JSON.parse(event.discordRoleIds) : []);
+    setSelectedEmployees(event.notifyEmployeeIds ? JSON.parse(event.notifyEmployeeIds) : []);
     setReminderMinutes(event.reminderMinutes || 0);
     setShowModal(true);
   };
@@ -292,6 +315,7 @@ export default function Calendar() {
       color,
       category,
       discordRoleIds: selectedRoles.length > 0 ? selectedRoles : undefined,
+      notifyEmployeeIds: selectedEmployees.length > 0 ? selectedEmployees : undefined,
       reminderMinutes: reminderMinutes > 0 ? reminderMinutes : undefined,
     };
 
@@ -307,6 +331,14 @@ export default function Calendar() {
       prev.includes(roleId)
         ? prev.filter((id) => id !== roleId)
         : [...prev, roleId]
+    );
+  };
+
+  const toggleEmployee = (employeeId: string) => {
+    setSelectedEmployees((prev) =>
+      prev.includes(employeeId)
+        ? prev.filter((id) => id !== employeeId)
+        : [...prev, employeeId]
     );
   };
 
@@ -713,8 +745,38 @@ export default function Calendar() {
                 )}
               </div>
 
+              {/* Mitarbeiter benachrichtigen */}
+              <div>
+                <label className="label flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Mitarbeiter benachrichtigen
+                </label>
+                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 bg-slate-700/30 rounded-lg">
+                  {employees.map((emp) => (
+                    <button
+                      key={emp.id}
+                      type="button"
+                      onClick={() => toggleEmployee(emp.id)}
+                      className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
+                        selectedEmployees.includes(emp.id)
+                          ? 'bg-green-600/30 text-green-400 border border-green-500'
+                          : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                      }`}
+                    >
+                      {selectedEmployees.includes(emp.id) && <Check className="h-3 w-3" />}
+                      {emp.user.displayName || emp.user.username}
+                    </button>
+                  ))}
+                </div>
+                {selectedEmployees.length > 0 && (
+                  <p className="text-xs text-green-400 mt-1">
+                    {selectedEmployees.length} Mitarbeiter ausgewählt
+                  </p>
+                )}
+              </div>
+
               {/* Reminder */}
-              {selectedRoles.length > 0 && (
+              {(selectedRoles.length > 0 || selectedEmployees.length > 0) && (
                 <div>
                   <label className="label flex items-center gap-2">
                     <Bell className="h-4 w-4" />

@@ -153,6 +153,39 @@ export const adminApi = {
   deleteAcademyCriterion: (id: string) => api.delete(`/admin/academy-criteria/${id}`),
   reorderAcademyCriteria: (items: { id: string; sortOrder: number }[]) =>
     api.put('/admin/academy-criteria/reorder', { items }),
+
+  // Onboarding Items
+  getOnboardingItems: () => api.get('/admin/onboarding-items'),
+  getAllOnboardingItems: () => api.get('/admin/onboarding-items/all'),
+  createOnboardingItem: (data: { text: string }) =>
+    api.post('/admin/onboarding-items', data),
+  updateOnboardingItem: (id: string, data: { text?: string; isActive?: boolean }) =>
+    api.put(`/admin/onboarding-items/${id}`, data),
+  deleteOnboardingItem: (id: string) => api.delete(`/admin/onboarding-items/${id}`),
+  reorderOnboardingItems: (items: { id: string; sortOrder: number }[]) =>
+    api.put('/admin/onboarding-items/reorder', { items }),
+
+  // IA Categories
+  getIACategories: () => api.get('/admin/ia-categories'),
+  getAllIACategories: () => api.get('/admin/ia-categories/all'),
+  createIACategory: (data: { name: string; key: string; description?: string }) =>
+    api.post('/admin/ia-categories', data),
+  updateIACategory: (id: string, data: { name?: string; key?: string; description?: string; isActive?: boolean }) =>
+    api.put(`/admin/ia-categories/${id}`, data),
+  deleteIACategory: (id: string) => api.delete(`/admin/ia-categories/${id}`),
+  reorderIACategories: (items: { id: string; sortOrder: number }[]) =>
+    api.put('/admin/ia-categories/reorder', { items }),
+
+  // QA Units
+  getQAUnits: () => api.get('/admin/qa-units'),
+  getAllQAUnits: () => api.get('/admin/qa-units/all'),
+  createQAUnit: (data: { name: string; description?: string }) =>
+    api.post('/admin/qa-units', data),
+  updateQAUnit: (id: string, data: { name?: string; description?: string; isActive?: boolean }) =>
+    api.put(`/admin/qa-units/${id}`, data),
+  deleteQAUnit: (id: string) => api.delete(`/admin/qa-units/${id}`),
+  reorderQAUnits: (items: { id: string; sortOrder: number }[]) =>
+    api.put('/admin/qa-units/reorder', { items }),
 };
 
 // Absences API
@@ -169,7 +202,7 @@ export const absencesApi = {
 // Tasks API
 export const tasksApi = {
   getAll: (params?: Record<string, string>) => api.get('/tasks', { params }),
-  create: (data: { title: string; description?: string; assigneeId?: string; priority?: string; dueDate?: string }) =>
+  create: (data: { title: string; description?: string; assigneeIds?: string[]; priority?: string; dueDate?: string; dueTime?: string }) =>
     api.post('/tasks', data),
   update: (id: string, data: Record<string, unknown>) => api.put(`/tasks/${id}`, data),
   updateStatus: (id: string, status: string) => api.put(`/tasks/${id}/status`, { status }),

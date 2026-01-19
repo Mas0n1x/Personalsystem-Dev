@@ -1,9 +1,35 @@
 import { Router, Response } from 'express';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 
 const router = Router();
+
+// Hilfsfunktion für Task-Include
+const taskInclude = {
+  assignees: {
+    include: {
+      employee: {
+        include: {
+          user: {
+            select: {
+              displayName: true,
+              username: true,
+              avatar: true,
+            },
+          },
+        },
+      },
+    },
+  },
+  createdBy: {
+    select: {
+      displayName: true,
+      username: true,
+      avatar: true,
+    },
+  },
+};
 
 // GET alle Tasks (mit Filter)
 router.get('/', authMiddleware, requirePermission('leadership.view'), async (req: AuthRequest, res: Response) => {
@@ -18,7 +44,11 @@ router.get('/', authMiddleware, requirePermission('leadership.view'), async (req
     }
 
     if (assigneeId) {
-      where.assigneeId = assigneeId as string;
+      where.assignees = {
+        some: {
+          employeeId: assigneeId as string,
+        },
+      };
     }
 
     if (priority) {
@@ -27,26 +57,7 @@ router.get('/', authMiddleware, requirePermission('leadership.view'), async (req
 
     const tasks = await prisma.task.findMany({
       where,
-      include: {
-        assignee: {
-          include: {
-            user: {
-              select: {
-                displayName: true,
-                username: true,
-                avatar: true,
-              },
-            },
-          },
-        },
-        createdBy: {
-          select: {
-            displayName: true,
-            username: true,
-            avatar: true,
-          },
-        },
-      },
+      include: taskInclude,
       orderBy: [
         { status: 'asc' },
         { order: 'asc' },
@@ -64,42 +75,30 @@ router.get('/', authMiddleware, requirePermission('leadership.view'), async (req
 // POST neuen Task erstellen
 router.post('/', authMiddleware, requirePermission('leadership.manage'), async (req: AuthRequest, res: Response) => {
   try {
-    const { title, description, priority, assigneeId, dueDate } = req.body;
+    const { title, description, priority, assigneeIds, dueDate, dueTime } = req.body;
 
     if (!title) {
       res.status(400).json({ error: 'Titel ist erforderlich' });
       return;
     }
 
+    // Task erstellen
     const task = await prisma.task.create({
       data: {
         title,
         description,
         priority: priority || 'MEDIUM',
-        assigneeId: assigneeId || null,
         dueDate: dueDate ? new Date(dueDate) : null,
+        dueTime: dueTime || null,
         createdById: req.user!.id,
+        // Assignees hinzufügen wenn vorhanden
+        assignees: assigneeIds && assigneeIds.length > 0 ? {
+          create: assigneeIds.map((employeeId: string) => ({
+            employeeId,
+          })),
+        } : undefined,
       },
-      include: {
-        assignee: {
-          include: {
-            user: {
-              select: {
-                displayName: true,
-                username: true,
-                avatar: true,
-              },
-            },
-          },
-        },
-        createdBy: {
-          select: {
-            displayName: true,
-            username: true,
-            avatar: true,
-          },
-        },
-      },
+      include: taskInclude,
     });
 
     // Live-Update broadcast
@@ -126,26 +125,7 @@ router.put('/:id/status', authMiddleware, requirePermission('leadership.manage')
     const task = await prisma.task.update({
       where: { id },
       data: { status },
-      include: {
-        assignee: {
-          include: {
-            user: {
-              select: {
-                displayName: true,
-                username: true,
-                avatar: true,
-              },
-            },
-          },
-        },
-        createdBy: {
-          select: {
-            displayName: true,
-            username: true,
-            avatar: true,
-          },
-        },
-      },
+      include: taskInclude,
     });
 
     // Live-Update broadcast
@@ -162,38 +142,31 @@ router.put('/:id/status', authMiddleware, requirePermission('leadership.manage')
 router.put('/:id', authMiddleware, requirePermission('leadership.manage'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { title, description, priority, assigneeId, dueDate, status } = req.body;
+    const { title, description, priority, assigneeIds, dueDate, dueTime, status } = req.body;
 
+    // Zuerst alle bestehenden Assignees löschen
+    await prisma.taskAssignee.deleteMany({
+      where: { taskId: id },
+    });
+
+    // Task aktualisieren und neue Assignees hinzufügen
     const task = await prisma.task.update({
       where: { id },
       data: {
         title,
         description,
         priority,
-        assigneeId: assigneeId || null,
         dueDate: dueDate ? new Date(dueDate) : null,
+        dueTime: dueTime || null,
         status,
+        // Neue Assignees hinzufügen
+        assignees: assigneeIds && assigneeIds.length > 0 ? {
+          create: assigneeIds.map((employeeId: string) => ({
+            employeeId,
+          })),
+        } : undefined,
       },
-      include: {
-        assignee: {
-          include: {
-            user: {
-              select: {
-                displayName: true,
-                username: true,
-                avatar: true,
-              },
-            },
-          },
-        },
-        createdBy: {
-          select: {
-            displayName: true,
-            username: true,
-            avatar: true,
-          },
-        },
-      },
+      include: taskInclude,
     });
 
     // Live-Update broadcast

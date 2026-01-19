@@ -1,6 +1,6 @@
 import { Router, Response, Request } from 'express';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/authMiddleware.js';
 import { DiscordUserInfo, DiscordTokenResponse } from '../types/index.js';
 import { getDiscordClient } from '../services/discordBot.js';

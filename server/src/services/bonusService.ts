@@ -1,4 +1,4 @@
-import { prisma } from '../index.js';
+import { prisma } from '../prisma.js';
 import { getWeekBounds, createBonusPayment } from '../routes/bonus.js';
 
 // ==================== BONUS TRIGGER FUNCTIONS ====================
@@ -26,6 +26,20 @@ export async function triggerApplicationOnboarding(processedByEmployeeId: string
     'APPLICATION_ONBOARDING',
     processedByEmployeeId,
     `Onboarding für ${applicantName} durchgeführt`,
+    applicationId,
+    'Application'
+  );
+}
+
+/**
+ * Trigger für abgelehnte Bewerbung (HR)
+ * Der HR-Mitarbeiter erhält auch bei Ablehnung eine Sonderzahlung für die Bearbeitung
+ */
+export async function triggerApplicationRejected(processedByEmployeeId: string, applicantName: string, applicationId: string): Promise<void> {
+  await createBonusPayment(
+    'APPLICATION_REJECTED',
+    processedByEmployeeId,
+    `Bewerbung von ${applicantName} bearbeitet (abgelehnt)`,
     applicationId,
     'Application'
   );
