@@ -409,8 +409,8 @@ router.get('/:id/bonuses', authMiddleware, requirePermission('employees.view'), 
       prisma.$queryRaw<Array<{ category: string; count: bigint; paidAmount: bigint }>>`
         SELECT bc.category, COUNT(*) as count,
                COALESCE(SUM(CASE WHEN bp.status = 'PAID' THEN bp.amount ELSE 0 END), 0) as paidAmount
-        FROM BonusPayment bp
-        JOIN BonusConfig bc ON bp.configId = bc.id
+        FROM bonus_payments bp
+        JOIN bonus_configs bc ON bp.configId = bc.id
         WHERE bp.employeeId = ${employeeId}
         GROUP BY bc.category
       `,

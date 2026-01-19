@@ -15,14 +15,14 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 Minuten
 
 // API Response Types
 export interface DutyStats {
-  total: { hours: number; minutes: number };
-  week: { hours: number; minutes: number };
-  month: { hours: number; minutes: number };
+  total: { hours: number; minutes: number; total_minutes: number };
+  week: { hours: number; minutes: number; total_minutes: number };
+  month: { hours: number; minutes: number; total_minutes: number };
   last_session: {
-    start: string;
-    end: string;
+    start: string | null;
+    end: string | null;
     active: boolean;
-  };
+  } | null;
   requested_range?: {
     start: string;
     end: string;
@@ -203,17 +203,17 @@ function formatEmployeeDutyTime(employee: LeitstelleEmployee): FormattedDutyTime
   const formatted: FormattedDutyTime = {
     discordId: employee.discord_id,
     displayName: employee.display_name,
-    total: formatDuration(stats.total.minutes),
-    totalMinutes: stats.total.minutes,
-    week: formatDuration(stats.week.minutes),
-    weekMinutes: stats.week.minutes,
-    month: formatDuration(stats.month.minutes),
-    monthMinutes: stats.month.minutes,
+    total: formatDuration(stats.total.total_minutes),
+    totalMinutes: stats.total.total_minutes,
+    week: formatDuration(stats.week.total_minutes),
+    weekMinutes: stats.week.total_minutes,
+    month: formatDuration(stats.month.total_minutes),
+    monthMinutes: stats.month.total_minutes,
     lastSession: {
-      start: stats.last_session.start || null,
-      end: stats.last_session.end || null,
-      active: stats.last_session.active,
-      duration: stats.last_session.start && stats.last_session.end
+      start: stats.last_session?.start || null,
+      end: stats.last_session?.end || null,
+      active: stats.last_session?.active || false,
+      duration: stats.last_session?.start && stats.last_session?.end
         ? calculateSessionDuration(stats.last_session.start, stats.last_session.end)
         : null,
     },
