@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { uprankRequestsApi, uprankLockApi, employeesApi } from '../services/api';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { usePermissions } from '../hooks/usePermissions';
+import { useLiveUpdates } from '../hooks/useLiveUpdates';
 import {
   TrendingUp,
   Clock,
@@ -112,6 +113,7 @@ const RANKS = [
 export default function Teamleitung() {
   const queryClient = useQueryClient();
   const permissions = usePermissions();
+  useLiveUpdates(); // Live-Updates für Teamleitung aktivieren
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'requests' | 'locks'>('requests');

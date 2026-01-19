@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tuningApi } from '../services/api';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useAuth } from '../context/AuthContext';
+import { useLiveUpdates } from '../hooks/useLiveUpdates';
 import {
   Plus,
   X,
@@ -39,6 +40,7 @@ interface Stats {
 export default function Tuning() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  useLiveUpdates();
   const [showModal, setShowModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState<string | null>(null);
   const [amount, setAmount] = useState('');

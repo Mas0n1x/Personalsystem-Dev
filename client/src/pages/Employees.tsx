@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { employeesApi } from '../services/api';
 import { usePermissions } from '../hooks/usePermissions';
+import { useLiveUpdates } from '../hooks/useLiveUpdates';
 import Table from '../components/ui/Table';
 import { Search, Filter, ChevronUp, ChevronDown, Users, UserX, X, Check, TrendingUp, Shield, Star, Moon, CalendarOff } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -41,6 +42,7 @@ interface UnitRole {
 export default function Employees() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  useLiveUpdates();
   const { canEditEmployees, canDeleteEmployees } = usePermissions();
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState('');

@@ -273,6 +273,99 @@ router.put('/:id/restore', authMiddleware, requirePermission('evidence.manage'),
   }
 });
 
+// PUT Asservat vernichten (mit optionaler Mengenangabe)
+router.put('/:id/destroy', authMiddleware, requirePermission('evidence.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { quantity } = req.body;
+
+    // Hole aktuelles Asservat
+    const existing = await prisma.evidence.findUnique({
+      where: { id },
+      select: { id: true, name: true, quantity: true, category: true, description: true, storedById: true, status: true },
+    });
+
+    if (!existing) {
+      res.status(404).json({ error: 'Asservat nicht gefunden' });
+      return;
+    }
+
+    if (existing.status !== 'EINGELAGERT') {
+      res.status(400).json({ error: 'Nur eingelagerte Asservate können vernichtet werden' });
+      return;
+    }
+
+    const destroyQuantity = quantity ? parseInt(quantity) : existing.quantity;
+
+    if (destroyQuantity <= 0 || destroyQuantity > existing.quantity) {
+      res.status(400).json({ error: 'Ungültige Menge' });
+      return;
+    }
+
+    let result;
+
+    if (destroyQuantity >= existing.quantity) {
+      // Vernichte alles - setze Status auf VERNICHTET
+      result = await prisma.evidence.update({
+        where: { id },
+        data: {
+          status: 'VERNICHTET',
+          releasedAt: new Date(),
+          releasedById: req.user!.id,
+        },
+        include: {
+          storedBy: { select: { displayName: true, username: true, avatar: true } },
+          releasedBy: { select: { displayName: true, username: true, avatar: true } },
+        },
+      });
+
+      broadcastUpdate('evidence', result);
+    } else {
+      // Teilweise vernichten: Reduziere Menge und erstelle vernichteten Eintrag
+      const [updated, destroyed] = await prisma.$transaction([
+        // Reduziere die Menge des Original-Asservats
+        prisma.evidence.update({
+          where: { id },
+          data: {
+            quantity: existing.quantity - destroyQuantity,
+          },
+          include: {
+            storedBy: { select: { displayName: true, username: true, avatar: true } },
+            releasedBy: { select: { displayName: true, username: true, avatar: true } },
+          },
+        }),
+        // Erstelle einen neuen Eintrag für die vernichtete Menge
+        prisma.evidence.create({
+          data: {
+            name: existing.name,
+            description: existing.description,
+            category: existing.category,
+            quantity: destroyQuantity,
+            status: 'VERNICHTET',
+            storedById: existing.storedById,
+            releasedById: req.user!.id,
+            releasedAt: new Date(),
+          },
+          include: {
+            storedBy: { select: { displayName: true, username: true, avatar: true } },
+            releasedBy: { select: { displayName: true, username: true, avatar: true } },
+          },
+        }),
+      ]);
+
+      broadcastUpdate('evidence', updated);
+      broadcastCreate('evidence', destroyed);
+
+      result = { updated, destroyed, partialDestroy: true };
+    }
+
+    res.json({ success: true, result, destroyedQuantity: destroyQuantity });
+  } catch (error) {
+    console.error('Destroy evidence error:', error);
+    res.status(500).json({ error: 'Fehler beim Vernichten des Asservats' });
+  }
+});
+
 // PUT Mehrere Asservate vernichten (Bulk)
 router.put('/destroy-bulk', authMiddleware, requirePermission('evidence.manage'), async (req: AuthRequest, res: Response) => {
   try {

@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  frontend-dev:
+    image: nginx:alpine
+    container_name: personalsystem-dev
+    restart: unless-stopped
+    ports:
+      - "8095:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /srv/Personalsystem-Dev/client/dist:/usr/share/nginx/html:ro
+      - /srv/Personalsystem-Dev/nginx-dev.conf:/etc/nginx/conf.d/default.conf:ro

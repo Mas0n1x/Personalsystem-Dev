@@ -2,6 +2,8 @@
 
 Ein modernes Personalmanagementsystem mit Discord-Integration fuer das LSPD.
 
+**Live**: https://personal.corleone-lspd.de
+
 ## Features
 
 ### Kernfunktionen
@@ -10,14 +12,15 @@ Ein modernes Personalmanagementsystem mit Discord-Integration fuer das LSPD.
 - **Live-Sync**: Echtzeit-Updates via WebSockets (optimiert mit Debouncing)
 - **Benachrichtigungssystem**: In-App Benachrichtigungen und Discord-Ankuendigungen
 - **Kalender**: Terminplanung mit Discord-Rollen-Benachrichtigungen und Erinnerungen
+- **Dienstzeiten-Tracking**: Automatische Erfassung via Discord-Aktivitaet
 
 ### Units & Abteilungen
 - **Units-Uebersicht**: Alle Einheiten mit Mitgliedern und Leitungspositionen
-- **Human Resources (HR)**: Bewerbungsverwaltung mit mehrstufigem Prozess
-- **Police Academy**: Ausbildungsmodule, Pruefungen, Nachschulungen, Azubi-Fortschritt
+- **Human Resources (HR)**: Bewerbungsverwaltung mit mehrstufigem Prozess (Kriterien, Fragen, Onboarding)
+- **Police Academy**: Ausbildungsmodule, Pruefungen, Nachschulungen, Azubi-Fortschritt mit Suchfunktion
 - **Internal Affairs (IA)**: Interne Ermittlungen, Teamwechsel-Berichte
 - **Quality Assurance (QA)**: Unit-Reviews und Qualitaetssicherung
-- **Detectives**: Ermittlungsakten und Fallverwaltung
+- **Detectives**: Ermittlungsakten und Fallverwaltung mit Bearbeitungsfunktion
 - **Teamleitung**: Uprank-Antraege an das Management
 
 ### Leadership Features
@@ -30,7 +33,7 @@ Ein modernes Personalmanagementsystem mit Discord-Integration fuer das LSPD.
 
 ### Weitere Module
 - **Abmeldungen**: Abmeldungen und Dienstfrei mit Kalenderansicht
-- **Asservate**: Beweismittelverwaltung mit Kategorien
+- **Asservate**: Beweismittelverwaltung mit Kategorien, Teilvernichtung und Mengenangabe
 - **Tuning-Rechnungen**: Fahrzeugtuning-Abrechnung mit Bildnachweis
 - **Raububerfaelle**: Einsatzdokumentation
 - **Blacklist**: Gesperrte Bewerber
@@ -43,11 +46,11 @@ Ein modernes Personalmanagementsystem mit Discord-Integration fuer das LSPD.
 
 ### Administration
 - **Benutzer & Rollen**: Berechtigungsverwaltung
-- **Audit-Logs**: Vollstaendige Aktivitaetsprotokollierung mit Filterung
+- **Audit-Logs**: Vollstaendige Aktivitaetsprotokollierung mit Filterung und lesbaren Beschreibungen
 - **Backups**: Datensicherung und Wiederherstellung
 - **System-Einstellungen**: Discord-Ankuendigungen, Bonus-Konfiguration
 - **Academy-Module**: Ausbildungsmodule verwalten
-- **Academy-Einstellungen**: Fragenkatalog und Einstellungskriterien
+- **Academy-Einstellungen**: Fragenkatalog und Einstellungskriterien (dynamisch konfigurierbar)
 - **Units-Verwaltung**: Discord-Rollen zu Units zuweisen
 
 ## Tech Stack
@@ -64,13 +67,49 @@ Ein modernes Personalmanagementsystem mit Discord-Integration fuer das LSPD.
 - Node.js 18+
 - Discord Application (OAuth2 und Bot)
 
-## Installation
+## Deployment (Produktion)
+
+Das System laeuft auf einem Server mit Docker und Cloudflare Tunnel:
+
+### Architektur
+- **Frontend**: nginx Container auf Port 8095 (serviert statische Dateien aus `client/dist`)
+- **Backend**: Node.js auf Port 3001 (direkt auf Host)
+- **Datenbank**: SQLite (in `server/dev.db`)
+- **Reverse Proxy**: Cloudflare Tunnel zu `personal.corleone-lspd.de`
+
+### Deployment-Befehle
+
+```bash
+# Frontend bauen und deployen
+cd /srv/Personalsystem-Dev/client
+npm run build
+docker restart personalsystem-dev
+
+# Backend neu starten
+cd /srv/Personalsystem-Dev/server
+npm run build
+# Server-Prozess neu starten (kill old + start new)
+lsof -i :3001 -t | xargs kill -9
+nohup node dist/index.js > /tmp/personalsystem.log 2>&1 &
+```
+
+### Docker Container
+```bash
+# Container Status
+docker ps | grep personalsystem
+
+# Logs ansehen
+docker logs personalsystem-dev
+tail -f /tmp/personalsystem.log
+```
+
+## Installation (Entwicklung)
 
 ### 1. Repository klonen
 
 ```bash
 git clone <repository-url>
-cd Personalsystem
+cd Personalsystem-Dev
 ```
 
 ### 2. Backend einrichten
@@ -194,29 +233,35 @@ Das System nutzt ein rollenbasiertes Berechtigungssystem:
 ## Projektstruktur
 
 ```
-Personalsystem/
+Personalsystem-Dev/
 ├── client/                 # React Frontend
 │   ├── src/
 │   │   ├── components/     # UI-Komponenten
-│   │   │   └── layout/     # Layout-Komponenten (Sidebar, Header)
+│   │   │   ├── layout/     # Layout-Komponenten (Sidebar, Header)
+│   │   │   └── ui/         # Wiederverwendbare UI-Elemente
 │   │   ├── pages/          # Seiten
 │   │   │   └── admin/      # Admin-Seiten
 │   │   ├── hooks/          # Custom Hooks (Live-Updates, Permissions)
 │   │   ├── context/        # React Context (Auth, Socket)
 │   │   ├── services/       # API Services
 │   │   └── types/          # TypeScript Types
+│   ├── dist/               # Build Output (von nginx serviert)
 │   └── ...
 │
 ├── server/                 # Express Backend
 │   ├── src/
 │   │   ├── routes/         # API Routes (~35 Module)
-│   │   ├── middleware/     # Express Middleware (Auth)
-│   │   ├── services/       # Business Logic (Discord Bot, Bonus)
+│   │   ├── middleware/     # Express Middleware (Auth, Audit)
+│   │   ├── services/       # Business Logic (Discord Bot, Bonus, Calendar)
 │   │   └── types/          # TypeScript Types
-│   ├── prisma/             # Prisma Schema + SQLite DB
-│   ├── uploads/            # Hochgeladene Dateien
-│   └── backups/            # Datenbank-Backups
+│   ├── dist/               # Kompiliertes JavaScript
+│   ├── prisma/             # Prisma Schema
+│   ├── uploads/            # Hochgeladene Dateien (Bilder etc.)
+│   ├── backups/            # Datenbank-Backups
+│   └── dev.db              # SQLite Datenbank
 │
+├── docker-compose.dev.yml  # Docker Konfiguration fuer Frontend
+├── nginx-dev.conf          # Nginx Konfiguration
 └── .gitignore
 ```
 

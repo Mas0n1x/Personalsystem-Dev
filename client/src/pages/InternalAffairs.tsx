@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { investigationsApi, teamChangeReportsApi, employeesApi } from '../services/api';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { usePermissions } from '../hooks/usePermissions';
+import { useLiveUpdates } from '../hooks/useLiveUpdates';
 import {
   ShieldAlert,
   Plus,
@@ -142,6 +143,7 @@ interface TeamChangeReport {
 export default function InternalAffairs() {
   const permissions = usePermissions();
   const queryClient = useQueryClient();
+  useLiveUpdates(); // Live-Updates für Internal Affairs aktivieren
   const canManage = permissions.hasAnyPermission('ia.manage', 'admin.full');
 
   const [activeTab, setActiveTab] = useState<'investigations' | 'teamchanges'>('investigations');

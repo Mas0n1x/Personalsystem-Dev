@@ -4,6 +4,7 @@ import { absencesApi } from '../services/api';
 import { Calendar, Clock, Trash2, Plus, Coffee, CalendarOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { useLiveUpdates } from '../hooks/useLiveUpdates';
 
 interface Absence {
   id: string;
@@ -34,6 +35,7 @@ interface AbsencesResponse {
 
 export default function Absences() {
   const queryClient = useQueryClient();
+  useLiveUpdates(); // Live-Updates für Abmeldungen aktivieren
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [absenceType, setAbsenceType] = useState<'ABSENCE' | 'DAY_OFF'>('ABSENCE');
   const [reason, setReason] = useState('');

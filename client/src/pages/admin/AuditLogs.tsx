@@ -25,39 +25,59 @@ function getActionDescription(action: string, entity: string, details: string | 
 
   const body = parsedDetails.body || {};
 
+  // Auth-spezifische Beschreibungen
+  if (path.includes('/auth/discord/callback') || entity === 'callback') {
+    return 'Discord Login durchgeführt';
+  }
+  if (path.includes('/auth/logout') || (entity === 'auth' && path.includes('logout'))) {
+    return 'Benutzer ausgeloggt';
+  }
+  if (path.includes('/auth/') || entity === 'auth') {
+    if (path.includes('callback')) return 'Discord Login durchgeführt';
+    if (path.includes('login')) return 'Benutzer eingeloggt';
+    return 'Authentifizierung';
+  }
+
+  // Wenn entity "unknown" ist, versuche aus dem Pfad zu extrahieren
+  if (entity === 'unknown') {
+    if (path.includes('/discord')) return 'Discord-Aktion';
+    if (path.includes('/auth')) return 'Authentifizierung';
+    return 'Systemaktivität';
+  }
+
   // Spezifische Beschreibungen basierend auf Pfad und Methode
   if (path.includes('/employees') && method === 'POST' && !path.includes('/')) {
     return `Neuer Mitarbeiter erstellt: ${body.badgeNumber || 'Unbekannt'}`;
   }
   if (path.includes('/terminate')) {
-    return `Mitarbeiter gekündigt`;
+    return 'Mitarbeiter gekündigt';
   }
   if (path.includes('/promote')) {
     return `Mitarbeiter befördert zu ${body.newRank || 'Unbekannt'}`;
   }
   if (path.includes('/employees') && method === 'PUT') {
-    return `Mitarbeiter bearbeitet`;
+    return 'Mitarbeiter bearbeitet';
   }
   if (path.includes('/absences') && method === 'POST') {
     return `Abmeldung erstellt (${body.type === 'DAY_OFF' ? 'Dienstfrei' : 'Abwesenheit'})`;
   }
   if (path.includes('/absences') && method === 'DELETE') {
-    return `Abmeldung gelöscht`;
+    return 'Abmeldung gelöscht';
   }
   if (path.includes('/sanctions') && method === 'POST') {
     return `Sanktion erstellt: ${body.reason ? String(body.reason).substring(0, 30) + '...' : 'Ohne Grund'}`;
   }
   if (path.includes('/revoke')) {
-    return `Sanktion widerrufen`;
+    return 'Sanktion widerrufen';
   }
   if (path.includes('/tasks') && method === 'POST') {
     return `Aufgabe erstellt: ${body.title || 'Unbekannt'}`;
   }
   if (path.includes('/tasks') && method === 'PUT') {
-    return `Aufgabe aktualisiert`;
+    return 'Aufgabe aktualisiert';
   }
   if (path.includes('/tasks') && method === 'DELETE') {
-    return `Aufgabe gelöscht`;
+    return 'Aufgabe gelöscht';
   }
   if (path.includes('/treasury/deposit')) {
     return `Einzahlung: $${body.amount || 0} (${body.moneyType === 'BLACK' ? 'Schwarz' : 'Normal'}) - ${body.reason || 'Kein Grund'}`;
@@ -66,22 +86,25 @@ function getActionDescription(action: string, entity: string, details: string | 
     return `Auszahlung: $${body.amount || 0} (${body.moneyType === 'BLACK' ? 'Schwarz' : 'Normal'}) - ${body.reason || 'Kein Grund'}`;
   }
   if (path.includes('/accept')) {
-    return `Bewerbung angenommen`;
+    return 'Bewerbung angenommen';
   }
   if (path.includes('/reject')) {
-    return `Bewerbung abgelehnt`;
+    return 'Bewerbung abgelehnt';
   }
   if (path.includes('/applications') && method === 'POST') {
-    return `Neue Bewerbung eingereicht`;
+    return 'Neue Bewerbung eingereicht';
   }
   if (path.includes('/approve')) {
-    return `Anfrage genehmigt`;
+    return 'Anfrage genehmigt';
   }
   if (path.includes('/cases') && method === 'POST') {
     return `Fall erstellt: ${body.title || 'Unbekannt'}`;
   }
+  if (path.includes('/cases') && method === 'PUT') {
+    return 'Fall aktualisiert';
+  }
   if (path.includes('/investigations') && method === 'POST') {
-    return `Ermittlung erstellt`;
+    return 'Ermittlung erstellt';
   }
   if (path.includes('/trainings') && method === 'POST') {
     return `Training erstellt: ${body.topic || 'Unbekannt'}`;
@@ -89,8 +112,14 @@ function getActionDescription(action: string, entity: string, details: string | 
   if (path.includes('/evidence') && method === 'POST') {
     return `Asservat eingelagert: ${body.name || 'Unbekannt'}`;
   }
+  if (path.includes('/evidence') && path.includes('/destroy')) {
+    return `Asservat vernichtet${body.quantity ? ` (${body.quantity}x)` : ''}`;
+  }
+  if (path.includes('/evidence') && path.includes('/release')) {
+    return 'Asservat ausgelagert';
+  }
   if (path.includes('/robbery') && method === 'POST') {
-    return `Raub eingetragen`;
+    return 'Raub eingetragen';
   }
   if (path.includes('/tuning') && method === 'POST') {
     return `Tuning-Rechnung eingereicht: $${body.amount || 0}`;
@@ -99,25 +128,31 @@ function getActionDescription(action: string, entity: string, details: string | 
     return `Termin erstellt: ${body.title || 'Unbekannt'}`;
   }
   if (path.includes('/calendar') && method === 'PUT') {
-    return `Termin aktualisiert`;
+    return 'Termin aktualisiert';
   }
   if (path.includes('/calendar') && method === 'DELETE') {
-    return `Termin gelöscht`;
+    return 'Termin gelöscht';
   }
   if (path.includes('/bonus') && path.includes('/pay')) {
-    return `Sonderzahlung ausgezahlt`;
+    return 'Sonderzahlung ausgezahlt';
   }
   if (path.includes('/units') && method === 'POST') {
     return `Unit erstellt: ${body.name || 'Unbekannt'}`;
   }
   if (path.includes('/units') && method === 'PUT') {
-    return `Unit aktualisiert`;
+    return 'Unit aktualisiert';
   }
   if (path.includes('/team-change-reports') && method === 'POST') {
     return `Teamwechsel: ${body.previousTeam || '?'} → ${body.newTeam || '?'}`;
   }
   if (path.includes('/login')) {
-    return `Benutzer eingeloggt`;
+    return 'Benutzer eingeloggt';
+  }
+  if (path.includes('/notifications') && method === 'PUT') {
+    return 'Benachrichtigung gelesen';
+  }
+  if (path.includes('/notifications') && method === 'POST') {
+    return 'Benachrichtigung erstellt';
   }
 
   // Fallback
@@ -146,11 +181,14 @@ function getActionDescription(action: string, entity: string, details: string | 
     'bonus': 'Bonus',
     'units': 'Unit',
     'auth': 'Authentifizierung',
+    'callback': 'Discord Login',
     'uprank-requests': 'Uprank-Anfrage',
     'uprank-locks': 'Uprank-Sperre',
     'team-change-reports': 'Teamwechsel',
     'announcements': 'Ankündigung',
     'notifications': 'Benachrichtigung',
+    'discord': 'Discord',
+    'unknown': 'System',
   };
 
   return `${actionMap[method] || method} - ${entityMap[entity] || entity}`;
@@ -174,7 +212,10 @@ const entityLabels: Record<string, string> = {
   'calendar': 'Kalender',
   'bonus': 'Bonus',
   'units': 'Units',
-  'auth': 'Auth',
+  'auth': 'Login',
+  'callback': 'Login',
+  'discord': 'Discord',
+  'unknown': 'System',
   'uprank-requests': 'Uprank-Anfragen',
   'uprank-locks': 'Uprank-Sperren',
   'team-change-reports': 'Teamwechsel',

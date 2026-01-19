@@ -90,7 +90,19 @@
       "Bash(docker restart:*)",
       "Bash(journalctl:*)",
       "Bash(dmesg:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(grep:*)",
+      "Bash(xargs:*)",
+      "Bash(npx pm2:*)",
+      "Bash(lsof:*)",
+      "Bash(ls:*)",
+      "Bash(git -C /srv/Personalsystem-Dev log --oneline -20)",
+      "Bash(git -C /srv/Personalsystem-Dev status)",
+      "Bash(docker-compose:*)",
+      "Bash(docker stop:*)",
+      "Bash(docker rm:*)",
+      "Bash(pm2 describe:*)",
+      "Bash(node --version:*)"
     ]
   }
 }

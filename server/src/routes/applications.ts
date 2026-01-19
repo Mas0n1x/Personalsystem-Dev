@@ -115,6 +115,13 @@ router.get('/stats', authMiddleware, requirePermission('hr.view'), async (_req: 
   }
 });
 
+// Fallback-Fragen für den Fall, dass keine in der Datenbank konfiguriert sind
+const FALLBACK_QUESTIONS = [
+  { id: 'q1', text: 'Was sind deine Aufgaben als Cadet?' },
+  { id: 'q2', text: 'Wie verhältst du dich bei einer Verkehrskontrolle?' },
+  { id: 'q3', text: 'Was machst du bei einem Notruf?' },
+];
+
 // GET Fragenkatalog (dynamisch aus Datenbank)
 router.get('/questions', authMiddleware, requirePermission('hr.view'), async (_req: AuthRequest, res: Response) => {
   try {
@@ -122,6 +129,13 @@ router.get('/questions', authMiddleware, requirePermission('hr.view'), async (_r
       where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
     });
+
+    // Verwende Fallback, wenn keine Fragen in der DB
+    if (questions.length === 0) {
+      res.json(FALLBACK_QUESTIONS);
+      return;
+    }
+
     // Format für Frontend-Kompatibilität
     res.json(questions.map(q => ({ id: q.id, text: q.question })));
   } catch (error) {
@@ -137,6 +151,13 @@ router.get('/criteria', authMiddleware, requirePermission('hr.view'), async (_re
       where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
     });
+
+    // Verwende Fallback, wenn keine Kriterien in der DB
+    if (criteria.length === 0) {
+      res.json(FALLBACK_CRITERIA);
+      return;
+    }
+
     res.json(criteria.map(c => ({ id: c.id, name: c.name })));
   } catch (error) {
     console.error('Get criteria error:', error);
@@ -326,6 +347,21 @@ router.post('/', authMiddleware, requirePermission('hr.manage'), upload.single('
   }
 });
 
+// Fallback-Kriterien für den Fall, dass keine in der Datenbank konfiguriert sind
+const FALLBACK_CRITERIA = [
+  { id: 'stabilization', name: 'Stabilisationsschein geprüft' },
+  { id: 'visa', name: 'Visumsstufe geprüft' },
+  { id: 'noOffenses', name: 'Keine Straftaten (7 Tage)' },
+  { id: 'appearance', name: 'Angemessenes Aussehen' },
+  { id: 'noFactionLock', name: 'Keine Fraktionssperre' },
+  { id: 'noOpenBills', name: 'Keine offenen Rechnungen' },
+  { id: 'searched', name: 'Durchsuchen' },
+  { id: 'blacklistChecked', name: 'Blacklist gecheckt' },
+  { id: 'handbookGiven', name: 'Diensthandbuch ausgegeben' },
+  { id: 'employmentTest', name: 'Einstellungstest' },
+  { id: 'rpSituation', name: 'RP Situation dargestellt (AVK) & Smalltalk' },
+];
+
 // PUT Einstellungskriterien aktualisieren (Schritt 1) - Dynamisch
 router.put('/:id/criteria', authMiddleware, requirePermission('hr.manage'), async (req: AuthRequest, res: Response) => {
   try {
@@ -333,13 +369,19 @@ router.put('/:id/criteria', authMiddleware, requirePermission('hr.manage'), asyn
     const criteriaData = req.body; // { "criterionId1": true, "criterionId2": false, ... }
 
     // Hole alle aktiven Kriterien aus der Datenbank
-    const activeCriteria = await prisma.academyCriterion.findMany({
+    const dbCriteria = await prisma.academyCriterion.findMany({
       where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
     });
 
-    // Prüfe ob alle aktiven Kriterien erfüllt sind
-    const allCriteriaMet = activeCriteria.every((criterion) => criteriaData[criterion.id] === true);
+    // Verwende Fallback-Kriterien, wenn keine in der DB konfiguriert sind
+    const activeCriteria = dbCriteria.length > 0
+      ? dbCriteria
+      : FALLBACK_CRITERIA;
+
+    // Prüfe ob alle Kriterien erfüllt sind (mindestens eines muss existieren)
+    const allCriteriaMet = activeCriteria.length > 0 &&
+      activeCriteria.every((criterion) => criteriaData[criterion.id] === true);
 
     const application = await prisma.application.update({
       where: { id },
@@ -376,15 +418,19 @@ router.put('/:id/questions', authMiddleware, requirePermission('hr.manage'), asy
     const { questionsCompleted } = req.body;
 
     // Hole aktive Fragen aus der Datenbank für Vollständigkeitsprüfung
-    const activeQuestions = await prisma.academyQuestion.count({
+    const dbQuestionsCount = await prisma.academyQuestion.count({
       where: { isActive: true },
     });
 
-    // Prüfe ob alle Fragen beantwortet wurden
+    // Verwende Fallback-Anzahl, wenn keine Fragen in der DB
+    const totalQuestions = dbQuestionsCount > 0 ? dbQuestionsCount : FALLBACK_QUESTIONS.length;
+
+    // Prüfe ob alle Fragen beantwortet wurden (mindestens eine muss existieren)
     const allQuestionsCompleted =
+      totalQuestions > 0 &&
       questionsCompleted &&
       Array.isArray(questionsCompleted) &&
-      questionsCompleted.length === activeQuestions;
+      questionsCompleted.length >= totalQuestions;
 
     const application = await prisma.application.update({
       where: { id },

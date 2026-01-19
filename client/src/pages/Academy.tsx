@@ -21,6 +21,7 @@ import {
   XCircle,
   Clock,
   AlertCircle,
+  Search,
 } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
@@ -182,6 +183,7 @@ export default function Academy() {
   const [expandedTrainees, setExpandedTrainees] = useState<Set<string>>(new Set());
   const [showNotesFor, setShowNotesFor] = useState<string | null>(null);
   const [newNoteContent, setNewNoteContent] = useState('');
+  const [traineeSearch, setTraineeSearch] = useState('');
 
   // Exam states
   const [showExamModal, setShowExamModal] = useState(false);
@@ -388,9 +390,17 @@ export default function Academy() {
     return 'text-red-500';
   };
 
-  // Separate trainees by current rank
-  const juniorOfficerTrainees = trainees.filter((t: Trainee) => t.rankLevel === 1);
-  const officerTrainees = trainees.filter((t: Trainee) => t.rankLevel === 2);
+  // Filter trainees by search term and rank
+  const filterBySearch = (trainee: Trainee) => {
+    if (!traineeSearch.trim()) return true;
+    const searchLower = traineeSearch.toLowerCase();
+    const displayName = (trainee.user.displayName || trainee.user.username).toLowerCase();
+    const badgeNumber = (trainee.badgeNumber || '').toLowerCase();
+    return displayName.includes(searchLower) || badgeNumber.includes(searchLower);
+  };
+
+  const juniorOfficerTrainees = trainees.filter((t: Trainee) => t.rankLevel === 1 && filterBySearch(t));
+  const officerTrainees = trainees.filter((t: Trainee) => t.rankLevel === 2 && filterBySearch(t));
 
   const renderModuleList = (modules: ModuleProgress[], employeeId: string) => (
     <div className="space-y-1">
@@ -531,6 +541,20 @@ export default function Academy() {
   // Tab Content Renderers
   const renderTrainingTab = () => (
     <div className="space-y-6">
+      {/* Search Bar */}
+      <div className="card p-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            value={traineeSearch}
+            onChange={(e) => setTraineeSearch(e.target.value)}
+            className="input pl-10"
+            placeholder="Azubi suchen (Name oder Dienstnummer)..."
+          />
+        </div>
+      </div>
+
       {traineesLoading && (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
@@ -543,6 +567,16 @@ export default function Academy() {
           <h3 className="text-lg font-medium text-white mb-2">Keine Azubis vorhanden</h3>
           <p className="text-slate-400">
             Es gibt derzeit keine Mitarbeiter mit Rang 1-2.
+          </p>
+        </div>
+      )}
+
+      {!traineesLoading && trainees.length > 0 && juniorOfficerTrainees.length === 0 && officerTrainees.length === 0 && traineeSearch && (
+        <div className="card p-8 text-center">
+          <Search className="h-12 w-12 text-slate-600 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-white mb-2">Keine Ergebnisse</h3>
+          <p className="text-slate-400">
+            Kein Azubi gefunden für "{traineeSearch}"
           </p>
         </div>
       )}

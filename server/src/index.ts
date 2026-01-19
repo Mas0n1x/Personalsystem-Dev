@@ -62,6 +62,8 @@ const allowedOrigins = [
   'http://192.168.2.103:5173',
   'http://test.mas0n1x.online',
   'https://test.mas0n1x.online',
+  'http://personal.corleone-lspd.de',
+  'https://personal.corleone-lspd.de',
 ];
 
 const io = new Server(httpServer, {

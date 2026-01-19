@@ -4,9 +4,14 @@ import toast from 'react-hot-toast';
 const api = axios.create({
   baseURL: '/api',
   withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+});
+
+// Request Interceptor - Content-Type nur für JSON setzen, nicht für FormData
+api.interceptors.request.use((config) => {
+  if (!(config.data instanceof FormData)) {
+    config.headers['Content-Type'] = 'application/json';
+  }
+  return config;
 });
 
 // Response Interceptor für Fehlerbehandlung
@@ -225,6 +230,7 @@ export const evidenceApi = {
   update: (id: string, data: Record<string, unknown>) => api.put(`/evidence/${id}`, data),
   release: (id: string, data: { status: string; releaseReason?: string }) => api.put(`/evidence/${id}/release`, data),
   restore: (id: string) => api.put(`/evidence/${id}/restore`),
+  destroy: (id: string, quantity?: number) => api.put(`/evidence/${id}/destroy`, { quantity }),
   destroyBulk: (ids: string[]) => api.put('/evidence/destroy-bulk', { ids }),
   delete: (id: string) => api.delete(`/evidence/${id}`),
 };

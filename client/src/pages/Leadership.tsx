@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tasksApi, employeesApi, sanctionsApi, treasuryApi, announcementsApi, notificationsApi } from '../services/api';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { useLiveUpdates } from '../hooks/useLiveUpdates';
 import {
   Plus,
   X,
@@ -678,6 +679,7 @@ function AnnouncementsWidget() {
 
 function TasksWidget() {
   const queryClient = useQueryClient();
+  useLiveUpdates();
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
@@ -822,8 +824,8 @@ function TasksWidget() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
-          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl p-6 w-full max-w-md mx-4 border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl p-6 w-full max-w-md border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-white">{editingTask ? 'Bearbeiten' : 'Neue Aufgabe'}</h2>
               <button onClick={closeModal} className="p-1 hover:bg-slate-700 rounded"><X className="h-5 w-5 text-slate-400" /></button>

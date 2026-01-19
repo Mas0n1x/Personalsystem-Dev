@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { evidenceApi } from '../services/api';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import MaterialIcon from '../components/ui/MaterialIcon';
+import { useLiveUpdates } from '../hooks/useLiveUpdates';
 import {
   Plus,
   X,
@@ -109,6 +110,7 @@ const STATUS_OPTIONS = [
 
 export default function Evidence() {
   const queryClient = useQueryClient();
+  useLiveUpdates();
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -148,6 +150,11 @@ export default function Evidence() {
     variant: 'danger',
     onConfirm: () => {},
   });
+
+  // Destroy modal state
+  const [showDestroyModal, setShowDestroyModal] = useState(false);
+  const [destroyingEvidence, setDestroyingEvidence] = useState<Evidence | null>(null);
+  const [destroyQuantity, setDestroyQuantity] = useState('1');
 
   const { data: evidenceData, isLoading } = useQuery({
     queryKey: ['evidence', search, filterCategory],
@@ -222,6 +229,17 @@ export default function Evidence() {
     },
   });
 
+  const destroyMutation = useMutation({
+    mutationFn: ({ id, quantity }: { id: string; quantity?: number }) => evidenceApi.destroy(id, quantity),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['evidence'] });
+      queryClient.invalidateQueries({ queryKey: ['evidence-stats'] });
+      closeDestroyModal();
+      const qty = variables.quantity || destroyingEvidence?.quantity || 1;
+      toast.success(`${qty}x vernichtet`);
+    },
+  });
+
   const openCreateModal = () => {
     setEditingEvidence(null);
     setItems([{ id: '1', name: '', category: 'SONSTIGES', quantity: 1 }]);
@@ -253,6 +271,34 @@ export default function Evidence() {
   const closeReleaseModal = () => {
     setShowReleaseModal(false);
     setReleasingEvidence(null);
+  };
+
+  const openDestroyModal = (e: Evidence) => {
+    setDestroyingEvidence(e);
+    setDestroyQuantity(String(e.quantity));
+    setShowDestroyModal(true);
+  };
+
+  const closeDestroyModal = () => {
+    setShowDestroyModal(false);
+    setDestroyingEvidence(null);
+    setDestroyQuantity('1');
+  };
+
+  const handleDestroy = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!destroyingEvidence) return;
+
+    const qty = parseInt(destroyQuantity);
+    if (qty <= 0 || qty > destroyingEvidence.quantity) {
+      toast.error('Ungültige Menge');
+      return;
+    }
+
+    destroyMutation.mutate({
+      id: destroyingEvidence.id,
+      quantity: qty,
+    });
   };
 
   // Multi-Item Functions
@@ -610,6 +656,26 @@ export default function Evidence() {
                       </div>
                     </div>
 
+                    {/* Actions */}
+                    {!isSelectMode && e.status === 'EINGELAGERT' && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(ev) => { ev.stopPropagation(); openDestroyModal(e); }}
+                          className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
+                          title="Vernichten"
+                        >
+                          <Flame className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={(ev) => { ev.stopPropagation(); openReleaseModal(e); }}
+                          className="p-2 text-amber-400 hover:bg-amber-500/20 rounded-lg transition-colors"
+                          title="Auslagern"
+                        >
+                          <ArchiveX className="h-5 w-5" />
+                        </button>
+                      </div>
+                    )}
+
                   </div>
                 </div>
               );
@@ -891,6 +957,82 @@ export default function Evidence() {
                   >
                     <ArchiveX className="h-4 w-4" />
                     {releaseMutation.isPending ? 'Wird ausgelagert...' : 'Auslagern'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Destroy Modal */}
+      {showDestroyModal && destroyingEvidence && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl w-full max-w-md border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
+            <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">Asservat vernichten</h2>
+              <button onClick={closeDestroyModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {/* Item Info */}
+              <div className="bg-slate-700/30 rounded-xl p-4 mb-5 flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${getCategoryInfo(destroyingEvidence.category).color}`}>
+                  <MaterialIcon name={getCategoryInfo(destroyingEvidence.category).icon} size={24} filled />
+                </div>
+                <div>
+                  <p className="font-semibold text-white">{destroyingEvidence.name}</p>
+                  <p className="text-sm text-slate-400">Verfügbar: {destroyingEvidence.quantity}x • {getCategoryInfo(destroyingEvidence.category).label}</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleDestroy} className="space-y-4">
+                <div>
+                  <label className="label">Menge zum Vernichten</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      value={destroyQuantity}
+                      onChange={(e) => setDestroyQuantity(e.target.value)}
+                      className="input w-32 text-center"
+                      min="1"
+                      max={destroyingEvidence.quantity}
+                    />
+                    <span className="text-slate-400">von {destroyingEvidence.quantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => setDestroyQuantity(String(destroyingEvidence.quantity))}
+                      className="text-sm text-red-400 hover:text-red-300"
+                    >
+                      Alle
+                    </button>
+                  </div>
+                  {parseInt(destroyQuantity) < destroyingEvidence.quantity && (
+                    <p className="text-xs text-slate-500 mt-2">
+                      Nach Vernichtung bleiben {destroyingEvidence.quantity - parseInt(destroyQuantity || '0')}x übrig
+                    </p>
+                  )}
+                </div>
+
+                <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-3">
+                  <p className="text-red-400 text-sm">
+                    Diese Aktion kann nicht rückgängig gemacht werden.
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button type="button" onClick={closeDestroyModal} className="btn-ghost px-5">
+                    Abbrechen
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={destroyMutation.isPending || parseInt(destroyQuantity) <= 0 || parseInt(destroyQuantity) > destroyingEvidence.quantity}
+                    className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2 rounded-xl flex items-center gap-2 transition-all"
+                  >
+                    <Flame className="h-4 w-4" />
+                    {destroyMutation.isPending ? 'Wird vernichtet...' : `${destroyQuantity}x Vernichten`}
                   </button>
                 </div>
               </form>

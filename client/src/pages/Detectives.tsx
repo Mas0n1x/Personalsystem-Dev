@@ -19,6 +19,8 @@ import {
   CheckCircle,
   ArrowLeft,
   User,
+  Pencil,
+  Save,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -120,6 +122,14 @@ export default function Detectives() {
   // Upload State
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageDescription, setImageDescription] = useState('');
+
+  // Edit State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editPriority, setEditPriority] = useState('');
+  const [editSuspects, setEditSuspects] = useState('');
+  const [editNotes, setEditNotes] = useState('');
 
   // Confirm Dialog State
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -308,6 +318,43 @@ export default function Detectives() {
   const closeDetailModal = () => {
     setShowDetailModal(false);
     setSelectedCase(null);
+    setIsEditing(false);
+  };
+
+  const startEditing = () => {
+    if (!selectedCase) return;
+    setEditTitle(selectedCase.title);
+    setEditDescription(selectedCase.description || '');
+    setEditPriority(selectedCase.priority);
+    setEditSuspects(selectedCase.suspects || '');
+    setEditNotes(selectedCase.notes || '');
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedCase) return;
+
+    updateCaseMutation.mutate({
+      id: selectedCase.id,
+      data: {
+        title: editTitle,
+        description: editDescription || null,
+        priority: editPriority,
+        suspects: editSuspects || null,
+        notes: editNotes || null,
+      },
+    }, {
+      onSuccess: async () => {
+        // Reload case details
+        const response = await casesApi.getById(selectedCase.id);
+        setSelectedCase(response.data as Case);
+        setIsEditing(false);
+      },
+    });
   };
 
   // Image Modal
@@ -641,19 +688,40 @@ export default function Detectives() {
               <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between sticky top-0 bg-slate-800 z-10">
                 <div>
                   <span className="font-mono text-sm text-purple-400">{selectedCase.caseNumber}</span>
-                  <h2 className="text-xl font-bold text-white">{selectedCase.title}</h2>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="input text-xl font-bold mt-1"
+                      placeholder="Titel"
+                    />
+                  ) : (
+                    <h2 className="text-xl font-bold text-white">{selectedCase.title}</h2>
+                  )}
                 </div>
-                <button onClick={closeDetailModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
-                  <X className="h-5 w-5 text-slate-400" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {canManage && !isEditing && (
+                    <button
+                      onClick={startEditing}
+                      className="p-2 hover:bg-slate-700 rounded-lg transition-colors text-slate-400 hover:text-white"
+                      title="Bearbeiten"
+                    >
+                      <Pencil className="h-5 w-5" />
+                    </button>
+                  )}
+                  <button onClick={closeDetailModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
+                    <X className="h-5 w-5 text-slate-400" />
+                  </button>
+                </div>
               </div>
 
               <div className="p-6 space-y-6">
                 {/* Status & Priority */}
                 <div className="flex items-center gap-4">
-                  {getStatusBadge(selectedCase.status)}
-                  {getPriorityBadge(selectedCase.priority)}
-                  {canManage && (
+                  {!isEditing && getStatusBadge(selectedCase.status)}
+                  {!isEditing && getPriorityBadge(selectedCase.priority)}
+                  {canManage && !isEditing && (
                     <select
                       value={selectedCase.status}
                       onChange={(e) => handleStatusChange(selectedCase.id, e.target.value)}
@@ -664,6 +732,23 @@ export default function Detectives() {
                       <option value="CLOSED">Abgeschlossen</option>
                       <option value="ARCHIVED">Archiviert</option>
                     </select>
+                  )}
+                  {isEditing && (
+                    <div className="flex items-center gap-4 w-full">
+                      <div>
+                        <label className="text-xs text-slate-500">Priorität</label>
+                        <select
+                          value={editPriority}
+                          onChange={(e) => setEditPriority(e.target.value)}
+                          className="input py-1 px-2 text-sm"
+                        >
+                          <option value="LOW">Niedrig</option>
+                          <option value="NORMAL">Normal</option>
+                          <option value="HIGH">Hoch</option>
+                          <option value="CRITICAL">Kritisch</option>
+                        </select>
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -686,28 +771,55 @@ export default function Detectives() {
                 </div>
 
                 {/* Description */}
-                {selectedCase.description && (
-                  <div>
-                    <p className="text-slate-500 text-sm mb-1">Beschreibung</p>
+                <div>
+                  <p className="text-slate-500 text-sm mb-1">Beschreibung</p>
+                  {isEditing ? (
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      className="input min-h-[80px]"
+                      placeholder="Beschreibung des Falls..."
+                    />
+                  ) : selectedCase.description ? (
                     <p className="text-white bg-slate-700/50 rounded-lg p-3">{selectedCase.description}</p>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-slate-500 bg-slate-700/30 rounded-lg p-3 italic">Keine Beschreibung</p>
+                  )}
+                </div>
 
                 {/* Suspects */}
-                {selectedCase.suspects && (
-                  <div>
-                    <p className="text-slate-500 text-sm mb-1">Verdächtige</p>
+                <div>
+                  <p className="text-slate-500 text-sm mb-1">Verdächtige</p>
+                  {isEditing ? (
+                    <textarea
+                      value={editSuspects}
+                      onChange={(e) => setEditSuspects(e.target.value)}
+                      className="input min-h-[60px]"
+                      placeholder="Namen oder Beschreibungen der Verdächtigen..."
+                    />
+                  ) : selectedCase.suspects ? (
                     <p className="text-amber-400 bg-amber-900/20 rounded-lg p-3">{selectedCase.suspects}</p>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-slate-500 bg-slate-700/30 rounded-lg p-3 italic">Keine Verdächtigen eingetragen</p>
+                  )}
+                </div>
 
                 {/* Notes */}
-                {selectedCase.notes && (
-                  <div>
-                    <p className="text-slate-500 text-sm mb-1">Interne Notizen</p>
+                <div>
+                  <p className="text-slate-500 text-sm mb-1">Interne Notizen</p>
+                  {isEditing ? (
+                    <textarea
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      className="input min-h-[60px]"
+                      placeholder="Interne Notizen..."
+                    />
+                  ) : selectedCase.notes ? (
                     <p className="text-white bg-slate-700/50 rounded-lg p-3">{selectedCase.notes}</p>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-slate-500 bg-slate-700/30 rounded-lg p-3 italic">Keine Notizen</p>
+                  )}
+                </div>
 
                 {/* Images */}
                 <div>
@@ -805,10 +917,26 @@ export default function Detectives() {
                   )}
                 </div>
 
-                <div className="flex justify-end pt-2">
-                  <button onClick={closeDetailModal} className="btn-ghost px-5">
-                    Schließen
-                  </button>
+                <div className="flex justify-end gap-3 pt-2">
+                  {isEditing ? (
+                    <>
+                      <button onClick={cancelEditing} className="btn-ghost px-5">
+                        Abbrechen
+                      </button>
+                      <button
+                        onClick={handleSaveEdit}
+                        disabled={updateCaseMutation.isPending || !editTitle.trim()}
+                        className="btn-primary flex items-center gap-2 px-5"
+                      >
+                        <Save className="h-4 w-4" />
+                        {updateCaseMutation.isPending ? 'Wird gespeichert...' : 'Speichern'}
+                      </button>
+                    </>
+                  ) : (
+                    <button onClick={closeDetailModal} className="btn-ghost px-5">
+                      Schließen
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

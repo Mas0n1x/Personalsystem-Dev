@@ -4,6 +4,7 @@ import { dashboardApi, absencesApi, bonusApi, calendarApi } from '../services/ap
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { usePermissions } from '../hooks/usePermissions';
+import { useLiveUpdates } from '../hooks/useLiveUpdates';
 import { Link } from 'react-router-dom';
 import DutyTimeCard from '../components/DutyTimeCard';
 import {
@@ -259,6 +260,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { socket, onlineUsers } = useSocket();
   const queryClient = useQueryClient();
+  useLiveUpdates(); // Live-Updates aktivieren
   const permissions = usePermissions();
   const canViewAllBonuses = permissions.hasAnyPermission('bonus.view', 'bonus.pay', 'admin.full');
   const canViewPending = permissions.hasAnyPermission('hr.view', 'admin.full');

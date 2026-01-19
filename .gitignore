@@ -3,7 +3,8 @@ node_modules/
 .pnpm-store/
 
 # Build outputs
-dist/
+client/dist/
+server/dist/
 build/
 .next/
 
@@ -11,6 +12,7 @@ build/
 .env
 .env.local
 .env.*.local
+server/.env
 
 # IDE
 .idea/
@@ -30,11 +32,14 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+/tmp/*.log
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
+server/dev.db
+server/dev.db-journal
 server/prisma/dev.db-journal
 
 # Prisma
@@ -77,3 +82,12 @@ fix-*.mjs
 debug-*.mjs
 temp-*.mjs
 test-*.mjs
+
+# Docker volumes (falls lokal)
+docker-data/
+
+# PM2
+.pm2/
+
+# Deployment artifacts
+*.pid

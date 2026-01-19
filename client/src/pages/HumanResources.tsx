@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { blacklistApi, applicationApi, adminApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { useLiveUpdates } from '../hooks/useLiveUpdates';
 import {
   Plus,
   X,
@@ -80,24 +81,12 @@ interface OnboardingItem {
 
 type Tab = 'applications' | 'blacklist';
 
-// Fallback-Kriterien für den Fall, dass keine dynamischen Kriterien konfiguriert sind
-const FALLBACK_CRITERIA = [
-  { id: 'stabilization', name: 'Stabilisationsschein geprüft' },
-  { id: 'visa', name: 'Visumsstufe geprüft' },
-  { id: 'noOffenses', name: 'Keine Straftaten (7 Tage)' },
-  { id: 'appearance', name: 'Angemessenes Aussehen' },
-  { id: 'noFactionLock', name: 'Keine Fraktionssperre' },
-  { id: 'noOpenBills', name: 'Keine offenen Rechnungen' },
-  { id: 'searched', name: 'Durchsuchen' },
-  { id: 'blacklistChecked', name: 'Blacklist gecheckt' },
-  { id: 'handbookGiven', name: 'Diensthandbuch ausgegeben' },
-  { id: 'employmentTest', name: 'Einstellungstest' },
-  { id: 'rpSituation', name: 'RP Situation dargestellt (AVK) & Smalltalk' },
-];
+// Fallback-Kriterien wurden auf den Server verschoben (/api/applications/criteria)
 
 export default function HumanResources() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  useLiveUpdates();
   const [activeTab, setActiveTab] = useState<Tab>('applications');
 
   // Blacklist State
@@ -193,10 +182,10 @@ export default function HumanResources() {
     queryFn: () => applicationApi.getOnboardingChecklist(),
   });
 
-  // Dynamische Einstellungskriterien aus der Admin-API
+  // Dynamische Einstellungskriterien aus der Applications-API (inkl. Fallback)
   const { data: criteriaData } = useQuery({
-    queryKey: ['academy-criteria'],
-    queryFn: () => adminApi.getAcademyCriteria(),
+    queryKey: ['application-criteria'],
+    queryFn: () => applicationApi.getCriteria(),
   });
 
   const blacklist = (blacklistData?.data || []) as BlacklistEntry[];
@@ -205,18 +194,12 @@ export default function HumanResources() {
   const applicationStats = applicationStatsData?.data as { criteria: number; questions: number; onboarding: number; completed: number; rejected: number; pending: number; total: number } | undefined;
   const questions = (questionsData?.data || []) as Question[];
   const onboardingItems = (onboardingData?.data || []) as OnboardingItem[];
+  // Kriterien kommen jetzt direkt vom /applications/criteria Endpunkt (inkl. Fallback vom Server)
   const dynamicCriteria = (criteriaData?.data || []) as Criterion[];
 
-  // Dynamische Kriterien - nutzt die aus der Datenbank oder Fallback
+  // Kriterienliste - Server liefert jetzt bereits Fallback wenn keine in DB
   const CRITERIA_ITEMS = useMemo(() => {
-    if (dynamicCriteria.length === 0) {
-      // Fallback zu den Standard-Kriterien, wenn keine dynamischen konfiguriert
-      return FALLBACK_CRITERIA.map((c) => ({
-        key: c.id,
-        label: c.name,
-      }));
-    }
-    // Dynamische Kriterien aus der Datenbank
+    // Server gibt jetzt immer Kriterien zurück (entweder aus DB oder Fallback)
     return dynamicCriteria.map((c) => ({
       key: c.id,
       label: c.name,
