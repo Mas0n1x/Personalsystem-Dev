@@ -38,6 +38,9 @@ export function initializeSocket(socketIo: Server): void {
       }
 
       if (!token) {
+        console.error('Socket: No token found');
+        console.error('Socket cookies:', socket.handshake.headers.cookie);
+        console.error('Socket auth:', socket.handshake.auth);
         return next(new Error('Nicht authentifiziert'));
       }
 

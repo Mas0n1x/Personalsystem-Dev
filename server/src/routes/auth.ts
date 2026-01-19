@@ -107,7 +107,10 @@ router.post('/discord/callback', async (req: Request, res: Response) => {
     if (!tokenResponse.ok) {
       const error = await tokenResponse.text();
       console.error('Discord token error:', error);
-      res.status(400).json({ error: 'Discord Token-Abruf fehlgeschlagen' });
+      console.error('Used redirect_uri:', redirectUri);
+      console.error('Origin:', req.headers.origin);
+      console.error('Referer:', req.headers.referer);
+      res.status(400).json({ error: 'Discord Token-Abruf fehlgeschlagen', details: error });
       return;
     }
 
@@ -215,7 +218,7 @@ router.post('/discord/callback', async (req: Request, res: Response) => {
     res.cookie('token', jwtToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production', // HTTPS nur in Production
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 Tage
     });
 

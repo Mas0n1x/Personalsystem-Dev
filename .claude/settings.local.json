@@ -73,7 +73,24 @@
       "Bash(cmd //c \"taskkill /PID 21960 /F\")",
       "Bash(cmd //c \"taskkill /PID 9612 /F\")",
       "Bash(cmd /c \"taskkill /PID 1324 /F\")",
-      "Bash(python -c:*)"
+      "Bash(python -c:*)",
+      "Bash(npm run build:*)",
+      "Bash(pm2 list:*)",
+      "Bash(systemctl list-units:*)",
+      "Bash(ss:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker inspect:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(dig:*)",
+      "Bash(nslookup:*)",
+      "Bash(host:*)",
+      "Bash(getent:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker restart:*)",
+      "Bash(journalctl:*)",
+      "Bash(dmesg:*)",
+      "Bash(pkill:*)"
     ]
   }
 }
