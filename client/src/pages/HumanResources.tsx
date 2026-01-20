@@ -642,8 +642,8 @@ export default function HumanResources() {
 
   const handleComplete = () => {
     if (selectedApplication) {
-      if (!detailDiscordId || !detailDiscordUsername) {
-        toast.error('Discord-Daten sind erforderlich');
+      if (!detailDiscordId) {
+        toast.error('Discord ID ist erforderlich');
         return;
       }
       completeApplicationMutation.mutate(selectedApplication.id);

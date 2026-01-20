@@ -355,7 +355,7 @@ export default function Academy() {
   };
 
   const handleToggleModule = (employeeId: string, moduleId: string) => {
-    if (!canManage) return;
+    if (!canManage || toggleProgress.isPending) return;
     toggleProgress.mutate({ employeeId, moduleId });
   };
 
@@ -410,7 +410,8 @@ export default function Academy() {
           onClick={() => handleToggleModule(employeeId, module.id)}
           className={clsx(
             'flex items-center gap-3 p-2 rounded-lg transition-colors',
-            canManage ? 'cursor-pointer hover:bg-slate-700/50' : '',
+            canManage && !toggleProgress.isPending ? 'cursor-pointer hover:bg-slate-700/50' : '',
+            toggleProgress.isPending ? 'opacity-50 cursor-wait' : '',
             progress?.completed ? 'text-green-400' : 'text-slate-300'
           )}
         >

@@ -108,7 +108,9 @@
       "Bash(docker build:*)",
       "Bash(git checkout:*)",
       "Bash(find:*)",
-      "Bash(npx prisma migrate dev:*)"
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(docker stats:*)",
+      "Bash(ip addr:*)"
     ]
   }
 }
