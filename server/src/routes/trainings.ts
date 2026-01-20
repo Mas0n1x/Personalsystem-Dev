@@ -3,6 +3,7 @@ import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { triggerTrainingConducted, triggerTrainingParticipated, getEmployeeIdFromUserId } from '../services/bonusService.js';
 import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
+import { announceTraining } from '../services/discordAnnouncements.js';
 
 const router = Router();
 
@@ -265,6 +266,22 @@ router.post('/', requirePermission('academy.manage'), async (req: AuthRequest, r
 
     // Live-Update broadcast
     broadcastCreate('training', training);
+
+    // Discord-Ankündigung für neue Schulung
+    try {
+      await announceTraining({
+        trainingTitle: training.title,
+        trainingType: training.type.name,
+        scheduledAt: training.scheduledAt,
+        instructorName: training.instructor.displayName || training.instructor.username,
+        location: training.location,
+        maxParticipants: training.maxParticipants,
+        description: training.description,
+      });
+    } catch (error) {
+      console.error('Error announcing training:', error);
+      // Fehler bei Ankündigung nicht weiterleiten, Schulung wurde trotzdem erstellt
+    }
 
     res.status(201).json(training);
   } catch (error) {

@@ -218,6 +218,7 @@ export const sanctionsApi = {
   update: (id: string, data: Record<string, unknown>) => api.put(`/sanctions/${id}`, data),
   revoke: (id: string) => api.put(`/sanctions/${id}/revoke`),
   complete: (id: string) => api.put(`/sanctions/${id}/complete`),
+  toggleType: (id: string, type: 'warning' | 'fine' | 'measure') => api.put(`/sanctions/${id}/toggle-type`, { type }),
   delete: (id: string) => api.delete(`/sanctions/${id}`),
 };
 

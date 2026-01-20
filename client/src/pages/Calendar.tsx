@@ -181,8 +181,8 @@ export default function Calendar() {
   const { data: employeesData } = useQuery({
     queryKey: ['employees-list'],
     queryFn: async () => {
-      const res = await employeesApi.getAll();
-      return res.data as Employee[];
+      const res = await employeesApi.getAll({ status: 'ACTIVE' });
+      return res.data?.data as Employee[] || [];
     },
   });
 

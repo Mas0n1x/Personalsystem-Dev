@@ -2,10 +2,116 @@ import { Router, Response } from 'express';
 import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { triggerExamConducted, triggerRetrainingCompleted, triggerAcademyModuleCompleted, getEmployeeIdFromUserId } from '../services/bonusService.js';
+import { assignHireRoles } from '../services/discordBot.js';
+import { announceAcademyGraduation } from '../services/discordAnnouncements.js';
 
 const router = Router();
 
 router.use(authMiddleware);
+
+// ==================== HELPER FUNCTIONS ====================
+
+/**
+ * Prüft ob alle Module einer Kategorie abgeschlossen sind und weist ggf. Discord-Rolle zu
+ */
+async function checkAndAssignRankRole(employeeId: string, category: 'JUNIOR_OFFICER' | 'OFFICER'): Promise<void> {
+  try {
+    // Hole alle Module der Kategorie
+    const modules = await prisma.academyModule.findMany({
+      where: { category, isActive: true },
+    });
+
+    if (modules.length === 0) {
+      console.log(`Keine aktiven Module für Kategorie ${category}`);
+      return;
+    }
+
+    // Hole den Fortschritt des Mitarbeiters
+    const progress = await prisma.academyProgress.findMany({
+      where: {
+        employeeId,
+        moduleId: { in: modules.map(m => m.id) },
+        completed: true,
+      },
+    });
+
+    // Prüfe ob alle Module abgeschlossen sind
+    const allCompleted = progress.length === modules.length;
+
+    if (!allCompleted) {
+      console.log(`Nicht alle Module abgeschlossen für ${category}: ${progress.length}/${modules.length}`);
+      return;
+    }
+
+    console.log(`✅ Alle ${category} Module abgeschlossen! Weise Discord-Rolle zu...`);
+
+    // Hole den Employee mit Discord ID
+    const employee = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      include: {
+        user: {
+          select: { discordId: true, displayName: true, username: true },
+        },
+      },
+    });
+
+    if (!employee || !employee.user.discordId) {
+      console.error('Employee oder Discord ID nicht gefunden');
+      return;
+    }
+
+    // Bestimme welche Rolle zugewiesen werden soll
+    let roleToAssign: string | null = null;
+    let newRank: string | null = null;
+
+    if (category === 'JUNIOR_OFFICER') {
+      // Finde "Junior Officer" Rolle in der Datenbank
+      const juniorOfficerRole = await prisma.role.findFirst({
+        where: { name: { contains: 'Junior Officer' } },
+      });
+
+      if (juniorOfficerRole) {
+        roleToAssign = juniorOfficerRole.discordRoleId;
+        newRank = 'Junior Officer';
+      }
+    } else if (category === 'OFFICER') {
+      // Finde "Officer 1" Rolle in der Datenbank
+      const officer1Role = await prisma.role.findFirst({
+        where: { name: { contains: 'Officer 1' } },
+      });
+
+      if (officer1Role) {
+        roleToAssign = officer1Role.discordRoleId;
+        newRank = 'Officer 1';
+      }
+    }
+
+    if (!roleToAssign) {
+      console.error(`Keine passende Rolle in der Datenbank gefunden für ${category}`);
+      return;
+    }
+
+    // Weise Discord-Rolle zu
+    const result = await assignHireRoles(employee.user.discordId, [roleToAssign]);
+
+    if (result.success) {
+      console.log(`✅ Discord-Rolle erfolgreich zugewiesen für ${employee.user.displayName || employee.user.username}`);
+
+      // Update Rank in DB wenn erfolgreich
+      if (newRank) {
+        await prisma.employee.update({
+          where: { id: employeeId },
+          data: { rank: newRank },
+        });
+        console.log(`✅ Rang in DB aktualisiert: ${newRank}`);
+      }
+    } else {
+      console.error('Fehler beim Zuweisen der Discord-Rolle:', result.failed);
+    }
+  } catch (error) {
+    console.error('Error in checkAndAssignRankRole:', error);
+  }
+}
 
 // ==================== ACADEMY MODULES (Admin) ====================
 
@@ -246,6 +352,32 @@ router.post('/progress/toggle', requirePermission('academy.manage'), async (req:
         if (completedByEmployeeId) {
           await triggerAcademyModuleCompleted(completedByEmployeeId, updated.module.name, updated.id);
         }
+
+        // Discord-Ankündigung für abgeschlossenes Modul
+        const employee = await prisma.employee.findUnique({
+          where: { id: employeeId },
+          include: {
+            user: { select: { displayName: true, username: true } },
+          },
+        });
+
+        if (employee) {
+          console.log('[Academy] Sending graduation announcement for:', employee.user.displayName || employee.user.username, 'Module:', updated.module.name);
+          try {
+            await announceAcademyGraduation({
+              employeeName: employee.user.displayName || employee.user.username,
+              badgeNumber: employee.badgeNumber || 'N/A',
+              graduationType: updated.module.name,
+              completedBy: updated.completedBy?.displayName || updated.completedBy?.username || 'Academy',
+            });
+            console.log('[Academy] Graduation announcement sent successfully');
+          } catch (error) {
+            console.error('[Academy] Error sending graduation announcement:', error);
+          }
+        }
+
+        // Prüfe ob alle Module der Kategorie abgeschlossen sind und weise ggf. Rang-Rolle zu
+        await checkAndAssignRankRole(employeeId, updated.module.category as 'JUNIOR_OFFICER' | 'OFFICER');
       }
 
       res.json(updated);
@@ -272,6 +404,32 @@ router.post('/progress/toggle', requirePermission('academy.manage'), async (req:
       if (completedByEmployeeId) {
         await triggerAcademyModuleCompleted(completedByEmployeeId, created.module.name, created.id);
       }
+
+      // Discord-Ankündigung für abgeschlossenes Modul
+      const employee = await prisma.employee.findUnique({
+        where: { id: employeeId },
+        include: {
+          user: { select: { displayName: true, username: true } },
+        },
+      });
+
+      if (employee) {
+        console.log('[Academy] Sending graduation announcement for:', employee.user.displayName || employee.user.username, 'Module:', created.module.name);
+        try {
+          await announceAcademyGraduation({
+            employeeName: employee.user.displayName || employee.user.username,
+            badgeNumber: employee.badgeNumber || 'N/A',
+            graduationType: created.module.name,
+            completedBy: created.completedBy?.displayName || created.completedBy?.username || 'Academy',
+          });
+          console.log('[Academy] Graduation announcement sent successfully');
+        } catch (error) {
+          console.error('[Academy] Error sending graduation announcement:', error);
+        }
+      }
+
+      // Prüfe ob alle Module der Kategorie abgeschlossen sind und weise ggf. Rang-Rolle zu
+      await checkAndAssignRankRole(employeeId, created.module.category as 'JUNIOR_OFFICER' | 'OFFICER');
 
       res.json(created);
     }

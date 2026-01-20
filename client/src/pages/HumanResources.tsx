@@ -1682,8 +1682,20 @@ export default function HumanResources() {
                 <button type="button" onClick={closeBlacklistModal} className="btn-ghost px-5">
                   Abbrechen
                 </button>
-                <button type="submit" className="btn-primary px-5">
-                  {editingBlacklist ? 'Speichern' : 'Hinzufügen'}
+                <button
+                  type="submit"
+                  className="btn-primary px-5"
+                  disabled={
+                    createBlacklistMutation.isPending ||
+                    updateBlacklistMutation.isPending ||
+                    !reason.trim() ||
+                    (!editingBlacklist && !discordId.trim() && !username.trim())
+                  }
+                >
+                  {createBlacklistMutation.isPending || updateBlacklistMutation.isPending
+                    ? 'Wird gespeichert...'
+                    : editingBlacklist ? 'Speichern' : 'Hinzufügen'
+                  }
                 </button>
               </div>
             </form>

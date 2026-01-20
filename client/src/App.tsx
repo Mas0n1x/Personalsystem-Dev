@@ -27,6 +27,7 @@ const Backups = lazy(() => import('./pages/admin/Backups'));
 const BonusSettings = lazy(() => import('./pages/admin/BonusSettings'));
 const DiscordAnnouncements = lazy(() => import('./pages/admin/DiscordAnnouncements'));
 const UnitsAdmin = lazy(() => import('./pages/admin/UnitsAdmin'));
+const HRSettings = lazy(() => import('./pages/admin/HRSettings'));
 
 // Leadership - Lazy Loading
 const UnitsOverview = lazy(() => import('./pages/UnitsOverview'));
@@ -127,6 +128,7 @@ function App() {
         <Route path="admin/bonus" element={<Suspense fallback={<PageLoader />}><BonusSettings /></Suspense>} />
         <Route path="admin/discord-announcements" element={<Suspense fallback={<PageLoader />}><DiscordAnnouncements /></Suspense>} />
         <Route path="admin/units" element={<Suspense fallback={<PageLoader />}><UnitsAdmin /></Suspense>} />
+        <Route path="admin/hr-settings" element={<Suspense fallback={<PageLoader />}><HRSettings /></Suspense>} />
       </Route>
 
       {/* Fallback */}

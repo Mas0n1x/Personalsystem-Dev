@@ -190,6 +190,102 @@ router.get('/onboarding-checklist', authMiddleware, requirePermission('hr.view')
   }
 });
 
+// ==================== ONBOARDING-CHECKLISTE VERWALTUNG (Admin only) ====================
+
+// POST Neues Onboarding-Item erstellen
+router.post('/onboarding-checklist', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { text, sortOrder } = req.body;
+
+    if (!text || !text.trim()) {
+      res.status(400).json({ error: 'Text ist erforderlich' });
+      return;
+    }
+
+    // Finde höchste sortOrder wenn keine angegeben
+    const maxSort = await prisma.onboardingItem.findFirst({
+      orderBy: { sortOrder: 'desc' },
+      select: { sortOrder: true },
+    });
+
+    const newItem = await prisma.onboardingItem.create({
+      data: {
+        text: text.trim(),
+        sortOrder: sortOrder !== undefined ? sortOrder : (maxSort?.sortOrder || 0) + 1,
+      },
+    });
+
+    res.json(newItem);
+  } catch (error) {
+    console.error('Create onboarding item error:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen des Onboarding-Items' });
+  }
+});
+
+// PUT Onboarding-Item aktualisieren
+router.put('/onboarding-checklist/:id', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { text, sortOrder, isActive } = req.body;
+
+    const updateData: any = {};
+    if (text !== undefined) updateData.text = text.trim();
+    if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
+    if (isActive !== undefined) updateData.isActive = isActive;
+
+    const updated = await prisma.onboardingItem.update({
+      where: { id },
+      data: updateData,
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Update onboarding item error:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren des Onboarding-Items' });
+  }
+});
+
+// DELETE Onboarding-Item löschen
+router.delete('/onboarding-checklist/:id', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.onboardingItem.delete({
+      where: { id },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete onboarding item error:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen des Onboarding-Items' });
+  }
+});
+
+// POST Initialisiere Standard-Checkliste
+router.post('/onboarding-checklist/init', authMiddleware, requirePermission('admin.full'), async (_req: AuthRequest, res: Response) => {
+  try {
+    // Prüfe ob bereits Items existieren
+    const existing = await prisma.onboardingItem.count();
+    if (existing > 0) {
+      res.status(400).json({ error: 'Checkliste wurde bereits initialisiert' });
+      return;
+    }
+
+    // Erstelle Standard-Items
+    const items = await prisma.onboardingItem.createMany({
+      data: FALLBACK_ONBOARDING_CHECKLIST.map((item, index) => ({
+        text: item.text,
+        sortOrder: index + 1,
+      })),
+    });
+
+    res.json({ message: `${items.count} Standard-Items erstellt`, count: items.count });
+  } catch (error) {
+    console.error('Init onboarding checklist error:', error);
+    res.status(500).json({ error: 'Fehler beim Initialisieren der Checkliste' });
+  }
+});
+
 // POST Discord Einladungslink generieren
 router.post('/generate-invite', authMiddleware, requirePermission('hr.manage'), async (_req: AuthRequest, res: Response) => {
   try {

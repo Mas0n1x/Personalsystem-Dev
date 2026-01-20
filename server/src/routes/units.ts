@@ -193,6 +193,10 @@ router.get('/:id/members', authMiddleware, requirePermission('employees.view'), 
     // PERFORMANT: Alle Member-Rollen auf einmal laden
     const allMemberRoles = await getAllMembersWithRoles();
 
+    console.log(`[Units] Loaded ${allMemberRoles.size} Discord members with roles`);
+    console.log(`[Units] Active employees to check: ${employees.length}`);
+    console.log(`[Units] Unit roles to match: ${unitRoles.map(r => r.position).join(', ')}`);
+
     // Für jeden Employee prüfen, ob er eine der Unit-Rollen hat
     const membersWithRoles: Array<{
       employee: typeof employees[0];
@@ -202,6 +206,10 @@ router.get('/:id/members', authMiddleware, requirePermission('employees.view'), 
 
     for (const employee of employees) {
       const memberRoles = allMemberRoles.get(employee.user.discordId) || [];
+
+      if (memberRoles.length === 0) {
+        console.log(`[Units] No Discord roles found for employee: ${employee.user.displayName || employee.user.username} (${employee.user.discordId})`);
+      }
 
       // Finde die höchste Unit-Rolle die der Member hat
       let highestUnitRole: typeof unitRoles[0] | null = null;
@@ -220,8 +228,11 @@ router.get('/:id/members', authMiddleware, requirePermission('employees.view'), 
           unitRole: highestUnitRole,
           discordRoles: memberRoles,
         });
+        console.log(`[Units] ✅ Found member: ${employee.user.displayName || employee.user.username} - ${highestUnitRole.position}`);
       }
     }
+
+    console.log(`[Units] Total members found: ${membersWithRoles.length}`);
 
     // Sortieren nach Unit-Rolle (höchste zuerst)
     membersWithRoles.sort((a, b) => {

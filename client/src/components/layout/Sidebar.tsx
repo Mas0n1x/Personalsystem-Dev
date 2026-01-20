@@ -85,6 +85,7 @@ export default function Sidebar() {
         { name: 'Rollen', href: '/admin/roles', icon: Shield, permission: 'admin.full' },
         { name: 'Academy Module', href: '/admin/academy-modules', icon: GraduationCap, permission: 'admin.full' },
         { name: 'Fragen & Kriterien', href: '/admin/academy-settings', icon: HelpCircle, permission: 'admin.full' },
+        { name: 'HR Onboarding', href: '/admin/hr-settings', icon: UserX, permission: 'admin.full' },
         { name: 'IA-Kategorien', href: '/admin/ia-settings', icon: ShieldAlert, permission: 'admin.full' },
         { name: 'QA-Units', href: '/admin/qa-settings', icon: ClipboardCheck, permission: 'admin.full' },
         { name: 'Sonderzahlungen', href: '/admin/bonus', icon: DollarSign, permission: 'admin.full' },

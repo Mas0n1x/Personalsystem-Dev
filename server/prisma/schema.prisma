@@ -233,21 +233,24 @@ model TaskAssignee {
 
 // Sanktionen
 model Sanction {
-  id          String    @id @default(cuid())
-  employeeId  String
-  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  hasWarning  Boolean   @default(false) // Verwarnung
-  hasFine     Boolean   @default(false) // Geldstrafe
-  hasMeasure  Boolean   @default(false) // Maßnahme
-  reason      String
-  amount      BigInt?   // Für Geldstrafen (in Dollar) - BigInt für große Beträge
-  measure     String?   // Beschreibung der Maßnahme
-  issuedById  String
-  issuedBy    User      @relation(fields: [issuedById], references: [id])
-  status      String    @default("ACTIVE") // ACTIVE, REVOKED, EXPIRED
-  expiresAt   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  employeeId         String
+  employee           Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  hasWarning         Boolean   @default(false) // Verwarnung
+  hasFine            Boolean   @default(false) // Geldstrafe
+  hasMeasure         Boolean   @default(false) // Maßnahme
+  warningCompleted   Boolean   @default(false) // Verwarnung abgehakt
+  fineCompleted      Boolean   @default(false) // Geldstrafe abgehakt
+  measureCompleted   Boolean   @default(false) // Maßnahme abgehakt
+  reason             String
+  amount             BigInt?   // Für Geldstrafen (in Dollar) - BigInt für große Beträge
+  measure            String?   // Beschreibung der Maßnahme
+  issuedById         String
+  issuedBy           User      @relation(fields: [issuedById], references: [id])
+  status             String    @default("ACTIVE") // ACTIVE, REVOKED, EXPIRED, COMPLETED
+  expiresAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@index([employeeId])
   @@index([issuedById])

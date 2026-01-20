@@ -26,6 +26,7 @@ export type AnnouncementType =
   | 'UNIT_CHANGE'
   | 'UNIT_PROMOTION'
   | 'ACADEMY_GRADUATION'
+  | 'ACADEMY_TRAINING'
   | 'TERMINATION'
   | 'HIRE';
 
@@ -37,6 +38,7 @@ const COLORS = {
   UNIT_CHANGE: 0x8b5cf6,     // Lila
   UNIT_PROMOTION: 0x06b6d4,  // Cyan
   ACADEMY_GRADUATION: 0x3b82f6, // Blau
+  ACADEMY_TRAINING: 0x06b6d4,   // Cyan
   TERMINATION: 0x64748b,     // Grau
   HIRE: 0x10b981,            // Smaragd
 };
@@ -49,6 +51,7 @@ const EMOJIS = {
   UNIT_CHANGE: '🔄',
   UNIT_PROMOTION: '🌟',
   ACADEMY_GRADUATION: '🎓',
+  ACADEMY_TRAINING: '📚',
   TERMINATION: '👋',
   HIRE: '🆕',
 };
@@ -61,6 +64,7 @@ const TITLES = {
   UNIT_CHANGE: 'Unit-Wechsel',
   UNIT_PROMOTION: 'Unit-Beförderung',
   ACADEMY_GRADUATION: 'Ausbildung Abgeschlossen',
+  ACADEMY_TRAINING: 'Neue Schulung',
   TERMINATION: 'Kündigung',
   HIRE: 'Neueinstellung',
 };
@@ -587,4 +591,75 @@ export async function announceHire(data: HireData): Promise<boolean> {
     );
 
   return sendAnnouncementV2('HIRE', container);
+}
+
+// ==================== ACADEMY TRAINING ====================
+interface TrainingAnnouncementData {
+  trainingTitle: string;
+  trainingType: string;
+  scheduledAt: Date;
+  instructorName: string;
+  location?: string | null;
+  maxParticipants?: number | null;
+  description?: string | null;
+}
+
+export async function announceTraining(data: TrainingAnnouncementData): Promise<boolean> {
+  const formattedDate = data.scheduledAt.toLocaleDateString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const container = new ContainerBuilder()
+    .setAccentColor(COLORS.ACADEMY_TRAINING)
+    .addTextDisplayComponents(
+      (text) => text.setContent(`# ${EMOJIS.ACADEMY_TRAINING} ${TITLES.ACADEMY_TRAINING}`),
+    )
+    .addSeparatorComponents((sep) => sep.setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+    .addSectionComponents((section) =>
+      section
+        .addTextDisplayComponents(
+          (text) => text.setContent(`### ${data.trainingTitle}`),
+        )
+        .setButtonAccessory((btn) =>
+          btn.setCustomId('training_info')
+            .setLabel(data.trainingType)
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji({ name: '📖' })
+            .setDisabled(true)
+        )
+    )
+    .addSeparatorComponents((sep) => sep.setDivider(false).setSpacing(SeparatorSpacingSize.Small))
+    .addTextDisplayComponents(
+      (text) => text.setContent(
+        `📅 **Termin:** ${formattedDate}\n` +
+        `👨‍🏫 **Ausbilder:** ${data.instructorName}` +
+        (data.location ? `\n📍 **Ort:** ${data.location}` : '') +
+        (data.maxParticipants ? `\n👥 **Max. Teilnehmer:** ${data.maxParticipants}` : '')
+      ),
+    );
+
+  if (data.description) {
+    container.addSeparatorComponents((sep) => sep.setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+    container.addTextDisplayComponents(
+      (text) => text.setContent(`📝 **Beschreibung:**\n> ${data.description}`),
+    );
+  }
+
+  container.addSeparatorComponents((sep) => sep.setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(
+    (text) => text.setContent(
+      `> *Melde dich bei Interesse beim Ausbilder oder in der Police Academy!*`
+    ),
+  );
+
+  container.addSeparatorComponents((sep) => sep.setDivider(false).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(
+    (text) => text.setContent(`-# 🕐 ${getCurrentTimestamp()} • LSPD Personalsystem`),
+  );
+
+  return sendAnnouncementV2('ACADEMY_TRAINING', container);
 }

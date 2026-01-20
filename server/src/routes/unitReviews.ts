@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { triggerUnitReviewCompleted, getEmployeeIdFromUserId } from '../services/bonusService.js';
 
 const router = Router();
 
@@ -159,6 +160,12 @@ router.put('/:id', requirePermission('qa.manage'), async (req: AuthRequest, res:
     const { id } = req.params;
     const { unit, reviewDate, rating, findings, recommendations, status } = req.body;
 
+    // Hole vorherigen Status für Bonus-Trigger
+    const previousReview = await prisma.unitReview.findUnique({
+      where: { id },
+      select: { status: true, unit: true, reviewerId: true }
+    });
+
     const review = await prisma.unitReview.update({
       where: { id },
       data: {
@@ -175,6 +182,14 @@ router.put('/:id', requirePermission('qa.manage'), async (req: AuthRequest, res:
         }
       }
     });
+
+    // Bonus-Trigger wenn Review auf REVIEWED gesetzt wird (erstmalig)
+    if (status === 'REVIEWED' && previousReview?.status !== 'REVIEWED' && previousReview?.reviewerId) {
+      const employeeId = await getEmployeeIdFromUserId(previousReview.reviewerId);
+      if (employeeId) {
+        await triggerUnitReviewCompleted(employeeId, previousReview.unit, id);
+      }
+    }
 
     res.json(review);
   } catch (error) {

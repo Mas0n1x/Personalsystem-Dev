@@ -206,14 +206,106 @@ router.post('/', authMiddleware, requirePermission('sanctions.manage'), async (r
   }
 });
 
-// PUT Sanktion als erledigt markieren
+// PUT Einzelnen Sanktionstyp abhaken
+router.put('/:id/toggle-type', authMiddleware, requirePermission('sanctions.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { type } = req.body; // 'warning', 'fine', or 'measure'
+
+    if (!type || !['warning', 'fine', 'measure'].includes(type)) {
+      res.status(400).json({ error: 'Ungültiger Sanktionstyp' });
+      return;
+    }
+
+    // Hole aktuelle Sanktion
+    const current = await prisma.sanction.findUnique({ where: { id } });
+    if (!current) {
+      res.status(404).json({ error: 'Sanktion nicht gefunden' });
+      return;
+    }
+
+    // Toggle den entsprechenden Typ
+    const updateData: { warningCompleted?: boolean; fineCompleted?: boolean; measureCompleted?: boolean; status?: string } = {};
+
+    if (type === 'warning') {
+      updateData.warningCompleted = !current.warningCompleted;
+    } else if (type === 'fine') {
+      updateData.fineCompleted = !current.fineCompleted;
+    } else if (type === 'measure') {
+      updateData.measureCompleted = !current.measureCompleted;
+    }
+
+    // Prüfe ob alle aktiven Typen abgehakt sind -> dann COMPLETED
+    const newWarningCompleted = type === 'warning' ? updateData.warningCompleted : current.warningCompleted;
+    const newFineCompleted = type === 'fine' ? updateData.fineCompleted : current.fineCompleted;
+    const newMeasureCompleted = type === 'measure' ? updateData.measureCompleted : current.measureCompleted;
+
+    const allCompleted =
+      (!current.hasWarning || newWarningCompleted) &&
+      (!current.hasFine || newFineCompleted) &&
+      (!current.hasMeasure || newMeasureCompleted);
+
+    if (allCompleted && current.status === 'ACTIVE') {
+      updateData.status = 'COMPLETED';
+    } else if (!allCompleted && current.status === 'COMPLETED') {
+      updateData.status = 'ACTIVE';
+    }
+
+    const sanction = await prisma.sanction.update({
+      where: { id },
+      data: updateData,
+      include: {
+        employee: {
+          include: {
+            user: {
+              select: {
+                displayName: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        issuedBy: {
+          select: {
+            displayName: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    // Live-Update broadcast
+    broadcastUpdate('sanction', sanction);
+
+    res.json(sanction);
+  } catch (error) {
+    console.error('Toggle sanction type error:', error);
+    res.status(500).json({ error: 'Fehler beim Abhaken des Sanktionstyps' });
+  }
+});
+
+// PUT Sanktion als erledigt markieren (alle Typen auf einmal)
 router.put('/:id/complete', authMiddleware, requirePermission('sanctions.manage'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
+    // Hole aktuelle Sanktion
+    const current = await prisma.sanction.findUnique({ where: { id } });
+    if (!current) {
+      res.status(404).json({ error: 'Sanktion nicht gefunden' });
+      return;
+    }
+
     const sanction = await prisma.sanction.update({
       where: { id },
-      data: { status: 'COMPLETED' },
+      data: {
+        status: 'COMPLETED',
+        warningCompleted: current.hasWarning,
+        fineCompleted: current.hasFine,
+        measureCompleted: current.hasMeasure,
+      },
       include: {
         employee: {
           include: {

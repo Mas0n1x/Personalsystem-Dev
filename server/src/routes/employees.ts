@@ -713,6 +713,46 @@ router.post('/:id/uprank', authMiddleware, requirePermission('employees.edit'), 
       badgeNumber: updatedEmployee.badgeNumber,
     });
 
+    // Uprank-Sperre setzen nach jeder Beförderung
+    if (result.newTeam) {
+      // Berechne Sperrdauer basierend auf dem aktuellen Team
+      const TEAM_LOCK_DURATION: Record<string, number> = {
+        'Team Green': 1,
+        'Team Silver': 2,
+        'Team Gold': 4,
+        'Team Red': 0,      // Team Red hat keine Sperre
+        'Team White': 0,    // Team White hat keine Sperre
+      };
+
+      const weeks = TEAM_LOCK_DURATION[result.newTeam] || 0;
+
+      if (weeks > 0) {
+        const lockedUntil = new Date();
+        lockedUntil.setDate(lockedUntil.getDate() + weeks * 7);
+
+        // Deaktiviere alle alten Sperren für diesen Mitarbeiter
+        await prisma.uprankLock.updateMany({
+          where: { employeeId: employee.id, isActive: true },
+          data: { isActive: false },
+        });
+
+        // Erstelle neue Sperre
+        await prisma.uprankLock.create({
+          data: {
+            employeeId: employee.id,
+            team: result.newTeam,
+            lockedUntil,
+            reason: result.teamChanged
+              ? `Automatische Sperre nach Beförderung zu ${result.newTeam}`
+              : `Automatische Sperre nach Beförderung innerhalb ${result.newTeam}`,
+            createdById: req.user!.id,
+          },
+        });
+
+        console.log(`✅ Uprank-Sperre gesetzt für ${pureName} bis ${lockedUntil.toLocaleDateString('de-DE')} (${weeks} Wochen, Team: ${result.newTeam})`);
+      }
+    }
+
     // WebSocket Broadcast für Live-Updates
     broadcastUpdate('employee', { ...updatedEmployee, promoted: true, oldRank, newRank: result.newRank });
 

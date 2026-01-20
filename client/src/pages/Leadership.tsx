@@ -59,6 +59,9 @@ interface Sanction {
   hasWarning: boolean;
   hasFine: boolean;
   hasMeasure: boolean;
+  warningCompleted: boolean;
+  fineCompleted: boolean;
+  measureCompleted: boolean;
   reason: string;
   amount: number | null;
   measure: string | null;
@@ -713,7 +716,7 @@ function TasksWidget() {
   });
 
   const { data: tasksData } = useQuery({ queryKey: ['tasks'], queryFn: () => tasksApi.getAll() });
-  const { data: employeesData } = useQuery({ queryKey: ['employees-list'], queryFn: () => employeesApi.getAll({ limit: '100' }) });
+  const { data: employeesData } = useQuery({ queryKey: ['employees-list'], queryFn: () => employeesApi.getAll({ status: 'ACTIVE', limit: '500' }) });
 
   const tasks = (tasksData?.data || []) as Task[];
   const employees = (employeesData?.data?.data || []) as Employee[];
@@ -986,6 +989,12 @@ function SanctionsWidget() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['sanctions'] }); toast.success('Als erledigt markiert'); },
   });
 
+  const toggleTypeMutation = useMutation({
+    mutationFn: ({ id, type }: { id: string; type: 'warning' | 'fine' | 'measure' }) =>
+      sanctionsApi.toggleType(id, type),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['sanctions'] }); },
+  });
+
   const closeModal = () => {
     setShowModal(false);
     setHasWarning(false);
@@ -1047,21 +1056,48 @@ function SanctionsWidget() {
             return (
               <div key={s.id} className="bg-slate-700/30 rounded-lg p-3">
                 <div className="flex items-start gap-3">
-                  {/* Checkbox zum Abhaken */}
-                  <button
-                    onClick={() => setConfirmDialog({
-                      isOpen: true,
-                      title: 'Sanktion als erledigt markieren',
-                      message: 'Möchtest du diese Sanktion als erledigt markieren?',
-                      confirmText: 'Erledigt',
-                      variant: 'success',
-                      onConfirm: () => completeMutation.mutate(s.id),
-                    })}
-                    className="mt-1 h-5 w-5 rounded border-2 border-slate-500 hover:border-green-500 hover:bg-green-500/20 flex items-center justify-center transition-colors flex-shrink-0"
-                    title="Als erledigt markieren"
-                  >
-                    <Check className="h-3 w-3 text-transparent hover:text-green-400" />
-                  </button>
+                  {/* Checkboxen für jeden Typ */}
+                  <div className="flex flex-col gap-1.5 mt-0.5">
+                    {s.hasWarning && (
+                      <button
+                        onClick={() => toggleTypeMutation.mutate({ id: s.id, type: 'warning' })}
+                        className={`h-4 w-4 rounded border-2 flex items-center justify-center transition-colors ${
+                          s.warningCompleted
+                            ? 'border-yellow-500 bg-yellow-500/20'
+                            : 'border-slate-500 hover:border-yellow-500 hover:bg-yellow-500/10'
+                        }`}
+                        title="Verwarnung abhaken"
+                      >
+                        {s.warningCompleted && <Check className="h-3 w-3 text-yellow-400" />}
+                      </button>
+                    )}
+                    {s.hasFine && (
+                      <button
+                        onClick={() => toggleTypeMutation.mutate({ id: s.id, type: 'fine' })}
+                        className={`h-4 w-4 rounded border-2 flex items-center justify-center transition-colors ${
+                          s.fineCompleted
+                            ? 'border-red-500 bg-red-500/20'
+                            : 'border-slate-500 hover:border-red-500 hover:bg-red-500/10'
+                        }`}
+                        title="Geldstrafe abhaken"
+                      >
+                        {s.fineCompleted && <Check className="h-3 w-3 text-red-400" />}
+                      </button>
+                    )}
+                    {s.hasMeasure && (
+                      <button
+                        onClick={() => toggleTypeMutation.mutate({ id: s.id, type: 'measure' })}
+                        className={`h-4 w-4 rounded border-2 flex items-center justify-center transition-colors ${
+                          s.measureCompleted
+                            ? 'border-orange-500 bg-orange-500/20'
+                            : 'border-slate-500 hover:border-orange-500 hover:bg-orange-500/10'
+                        }`}
+                        title="Maßnahme abhaken"
+                      >
+                        {s.measureCompleted && <Check className="h-3 w-3 text-orange-400" />}
+                      </button>
+                    )}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       {types.map((t, i) => (
@@ -1083,7 +1119,7 @@ function SanctionsWidget() {
                     confirmText: 'Widerrufen',
                     variant: 'warning',
                     onConfirm: () => revokeMutation.mutate(s.id),
-                  })} className="text-xs bg-slate-600 hover:bg-slate-500 text-slate-300 px-2 py-1 rounded ml-2">
+                  })} className="text-xs bg-slate-600 hover:bg-slate-500 text-slate-300 px-2 py-1 rounded ml-2 flex-shrink-0">
                     Widerrufen
                   </button>
                 </div>

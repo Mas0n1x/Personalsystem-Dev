@@ -105,7 +105,10 @@
       "Bash(node --version:*)",
       "Bash(pm2 restart:*)",
       "Bash(docker system prune:*)",
-      "Bash(docker build:*)"
+      "Bash(docker build:*)",
+      "Bash(git checkout:*)",
+      "Bash(find:*)",
+      "Bash(npx prisma migrate dev:*)"
     ]
   }
 }

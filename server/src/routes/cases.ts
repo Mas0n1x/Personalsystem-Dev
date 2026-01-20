@@ -273,21 +273,27 @@ router.put('/folders/:id', authMiddleware, requirePermission('detectives.manage'
 // DELETE Ordner löschen (löscht auch alle Akten im Ordner)
 router.delete('/folders/:id', authMiddleware, requirePermission('detectives.manage'), async (req: AuthRequest, res: Response) => {
   try {
-    // Zuerst alle Bilder der Akten im Ordner löschen
+    // Zuerst alle Akten und ihre Bilder im Ordner löschen
     const cases = await prisma.case.findMany({
       where: { folderId: req.params.id },
       include: { images: true },
     });
 
+    // Lösche Dateien und Datenbank-Einträge für jede Akte
     for (const caseItem of cases) {
+      // Lösche Bilder vom Dateisystem
       for (const image of caseItem.images) {
         const filePath = path.join(uploadDir, image.imagePath);
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
         }
       }
+
+      // Lösche die Akte aus der Datenbank (inkl. aller Beziehungen)
+      await prisma.case.delete({ where: { id: caseItem.id } });
     }
 
+    // Jetzt kann der Ordner sicher gelöscht werden
     await prisma.detectiveFolder.delete({ where: { id: req.params.id } });
 
     res.json({ success: true });

@@ -899,7 +899,7 @@ async function updateTeamRoles(member: GuildMember, newTeamConfig: TeamConfig): 
 export async function changeRank(
   discordId: string,
   direction: 'up' | 'down'
-): Promise<{ success: boolean; newRank?: string; newLevel?: number; newBadgeNumber?: string; teamChanged?: boolean; error?: string }> {
+): Promise<{ success: boolean; newRank?: string; newLevel?: number; newBadgeNumber?: string; teamChanged?: boolean; newTeam?: string; error?: string }> {
   if (!guild) {
     return { success: false, error: 'Guild nicht verfügbar' };
   }
@@ -976,6 +976,7 @@ export async function changeRank(
       newLevel: newRankRole.level,
       newBadgeNumber,
       teamChanged,
+      newTeam: newTeamConfig.team,
     };
   } catch (error) {
     console.error(`Fehler bei Rang-Änderung für ${discordId}:`, error);
@@ -1079,11 +1080,28 @@ export async function getMemberRoles(discordId: string): Promise<{ id: string; n
 export async function getAllMembersWithRoles(): Promise<Map<string, { id: string; name: string }[]>> {
   const result = new Map<string, { id: string; name: string }[]>();
 
-  if (!guild) return result;
+  if (!client) {
+    console.error('[Discord] Client not available for getAllMembersWithRoles');
+    return result;
+  }
 
   try {
+    // Stelle sicher dass Guild geladen ist
+    if (!guild) {
+      console.log('[Discord] Guild not cached, fetching from Discord API...');
+      guild = await client.guilds.fetch(process.env.DISCORD_GUILD_ID!);
+      console.log(`[Discord] Guild loaded: ${guild.name}`);
+    }
+
+    if (!guild) {
+      console.error('[Discord] Failed to load guild');
+      return result;
+    }
+
+    console.log('[Discord] Fetching all guild members...');
     // Alle Members auf einmal laden (nutzt Discord.js Cache)
     const members = await guild.members.fetch();
+    console.log(`[Discord] Fetched ${members.size} members from guild`);
 
     for (const [, member] of members) {
       const roles = Array.from(member.roles.cache.values())
@@ -1092,8 +1110,11 @@ export async function getAllMembersWithRoles(): Promise<Map<string, { id: string
 
       result.set(member.id, roles);
     }
+
+    console.log(`[Discord] Built role map for ${result.size} members`);
   } catch (error) {
-    console.error('Fehler beim Batch-Abrufen der Member-Rollen:', error);
+    console.error('[Discord] Fehler beim Batch-Abrufen der Member-Rollen:', error);
+    console.error('[Discord] Error details:', error);
   }
 
   return result;

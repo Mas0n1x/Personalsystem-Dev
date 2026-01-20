@@ -248,11 +248,12 @@ router.get('/summary', authMiddleware, requirePermission('bonus.view'), async (r
       weekEnd = bounds.weekEnd;
     }
 
-    // Alle Zahlungen für diese Woche
+    // Alle Zahlungen für diese Woche (außer stornierte)
     const payments = await prisma.bonusPayment.findMany({
       where: {
         weekStart,
         weekEnd,
+        status: { not: 'CANCELLED' }, // Stornierte Zahlungen ausschließen
       },
       include: {
         config: true,
@@ -360,6 +361,7 @@ router.get('/my', authMiddleware, async (req: AuthRequest, res: Response) => {
         employeeId: employee.id,
         weekStart,
         weekEnd,
+        status: { not: 'CANCELLED' }, // Stornierte Zahlungen ausschließen
       },
       include: {
         config: true,
@@ -711,6 +713,91 @@ export async function createBonusPayment(
     }
 
     const { weekStart, weekEnd } = getWeekBounds();
+
+    // ==================== WÖCHENTLICHE CAPS PRÜFEN ====================
+
+    // Cap 1: Unit-Arbeit (PA, HR, IA, QA) - max. 60.000$ pro Woche
+    const UNIT_WORK_ACTIVITIES = [
+      // IA (Internal Affairs) & QA (Quality Assurance)
+      'UNIT_REVIEW_COMPLETED',
+      'INVESTIGATION_OPENED',
+      'INVESTIGATION_CLOSED',
+      // HR (Human Resources)
+      'APPLICATION_COMPLETED',
+      'APPLICATION_ONBOARDING',
+      // PA (Police Academy)
+      'ACADEMY_MODULE_COMPLETED',
+      'EXAM_CONDUCTED',
+      'RETRAINING_COMPLETED',
+      'TRAINING_CONDUCTED',
+      'TRAINING_PARTICIPATED',
+    ];
+    const UNIT_WORK_WEEKLY_CAP = 60000;
+
+    // Cap 2: Einsatzleitung/Verhandlungsführung - max. 60.000$ pro Woche
+    const OPERATION_ACTIVITIES = ['ROBBERY_LEADER', 'ROBBERY_NEGOTIATOR'];
+    const OPERATION_WEEKLY_CAP = 60000;
+
+    // Prüfe ob diese Aktivität einem Cap unterliegt
+    if (UNIT_WORK_ACTIVITIES.includes(activityType)) {
+      // Berechne bereits verdiente Summe für Unit-Arbeit diese Woche
+      const unitWorkPayments = await prisma.bonusPayment.findMany({
+        where: {
+          employeeId,
+          weekStart,
+          weekEnd,
+          status: { not: 'CANCELLED' },
+          config: {
+            activityType: { in: UNIT_WORK_ACTIVITIES },
+          },
+        },
+        include: { config: true },
+      });
+
+      const currentUnitWorkTotal = unitWorkPayments.reduce((sum, p) => sum + p.amount, 0);
+
+      if (currentUnitWorkTotal >= UNIT_WORK_WEEKLY_CAP) {
+        console.log(`Unit-Arbeit-Cap erreicht für Employee ${employeeId}: ${currentUnitWorkTotal}/${UNIT_WORK_WEEKLY_CAP}`);
+        return false; // Cap erreicht, keine weitere Zahlung
+      }
+
+      // Prüfe ob die neue Zahlung das Cap überschreiten würde
+      if (currentUnitWorkTotal + config.amount > UNIT_WORK_WEEKLY_CAP) {
+        console.log(`Unit-Arbeit-Cap würde überschritten: ${currentUnitWorkTotal} + ${config.amount} > ${UNIT_WORK_WEEKLY_CAP}`);
+        return false;
+      }
+    }
+
+    if (OPERATION_ACTIVITIES.includes(activityType)) {
+      // Berechne bereits verdiente Summe für Einsatzleitung/Verhandlung diese Woche
+      const operationPayments = await prisma.bonusPayment.findMany({
+        where: {
+          employeeId,
+          weekStart,
+          weekEnd,
+          status: { not: 'CANCELLED' },
+          config: {
+            activityType: { in: OPERATION_ACTIVITIES },
+          },
+        },
+        include: { config: true },
+      });
+
+      const currentOperationTotal = operationPayments.reduce((sum, p) => sum + p.amount, 0);
+
+      if (currentOperationTotal >= OPERATION_WEEKLY_CAP) {
+        console.log(`Einsatzleitung-Cap erreicht für Employee ${employeeId}: ${currentOperationTotal}/${OPERATION_WEEKLY_CAP}`);
+        return false; // Cap erreicht, keine weitere Zahlung
+      }
+
+      // Prüfe ob die neue Zahlung das Cap überschreiten würde
+      if (currentOperationTotal + config.amount > OPERATION_WEEKLY_CAP) {
+        console.log(`Einsatzleitung-Cap würde überschritten: ${currentOperationTotal} + ${config.amount} > ${OPERATION_WEEKLY_CAP}`);
+        return false;
+      }
+    }
+
+    // ==================== ZAHLUNG ERSTELLEN ====================
 
     // Erstelle die Zahlung
     await prisma.bonusPayment.create({
