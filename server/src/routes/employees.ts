@@ -15,7 +15,17 @@ import {
 } from '../services/discordBot.js';
 import { notifyPromotion, notifyDemotion, notifyUnitChange } from '../services/notificationService.js';
 import { announcePromotion, announceDemotion, announceUnitChange, announceTermination } from '../services/discordAnnouncements.js';
-import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
+import {
+  broadcastCreate,
+  broadcastUpdate,
+  broadcastDelete,
+  emitEmployeeTerminated,
+  emitEmployeePromoted,
+  emitEmployeeDemoted,
+  emitEmployeeUnitJoined,
+  emitEmployeeUnitLeft,
+  LeitstelleEmployeeData,
+} from '../services/socketService.js';
 
 const router = Router();
 
@@ -333,6 +343,33 @@ router.post('/:id/units', authMiddleware, requirePermission('employees.edit'), a
         newUnit: updatedEmployee.department || 'Keine Unit',
         badgeNumber: updatedEmployee.badgeNumber,
       });
+
+      // Leitstelle API Events: Unit Eintritt/Austritt
+      const oldUnits = oldDepartment?.split(',').map(d => d.trim()).filter(Boolean) || [];
+      const newUnits = updatedEmployee.department?.split(',').map(d => d.trim()).filter(Boolean) || [];
+
+      const leitstelleData: LeitstelleEmployeeData = {
+        id: updatedEmployee.id,
+        badgeNumber: updatedEmployee.badgeNumber,
+        name: pureName,
+        discordId: updatedEmployee.user.discordId,
+        rank: updatedEmployee.rank,
+        rankLevel: updatedEmployee.rankLevel,
+        units: newUnits,
+        status: updatedEmployee.status,
+      };
+
+      // Units die neu hinzugekommen sind
+      const joinedUnits = newUnits.filter(u => !oldUnits.includes(u));
+      for (const unit of joinedUnits) {
+        emitEmployeeUnitJoined(leitstelleData, unit);
+      }
+
+      // Units die verlassen wurden
+      const leftUnits = oldUnits.filter(u => !newUnits.includes(u));
+      for (const unit of leftUnits) {
+        emitEmployeeUnitLeft(leitstelleData, unit);
+      }
     }
 
     res.json({
@@ -756,6 +793,19 @@ router.post('/:id/uprank', authMiddleware, requirePermission('employees.edit'), 
     // WebSocket Broadcast für Live-Updates
     broadcastUpdate('employee', { ...updatedEmployee, promoted: true, oldRank, newRank: result.newRank });
 
+    // Leitstelle API Event: Uprank
+    const leitstelleData: LeitstelleEmployeeData = {
+      id: updatedEmployee.id,
+      badgeNumber: updatedEmployee.badgeNumber,
+      name: updatedEmployee.user.displayName || updatedEmployee.user.username,
+      discordId: updatedEmployee.user.discordId,
+      rank: result.newRank!,
+      rankLevel: result.newLevel!,
+      units: updatedEmployee.department?.split(',').map(d => d.trim()).filter(Boolean) || [],
+      status: updatedEmployee.status,
+    };
+    emitEmployeePromoted(leitstelleData, oldRank, oldRankLevel);
+
     res.json({
       success: true,
       employee: updatedEmployee,
@@ -859,6 +909,20 @@ router.post('/:id/downrank', authMiddleware, requirePermission('employees.edit')
     // WebSocket Broadcast für Live-Updates
     broadcastUpdate('employee', { ...updatedEmployee, demoted: true, oldRank, newRank: result.newRank });
 
+    // Leitstelle API Event: Downrank
+    const oldRankLevel = employee.rankLevel;
+    const leitstelleData: LeitstelleEmployeeData = {
+      id: updatedEmployee.id,
+      badgeNumber: updatedEmployee.badgeNumber,
+      name: updatedEmployee.user.displayName || updatedEmployee.user.username,
+      discordId: updatedEmployee.user.discordId,
+      rank: result.newRank!,
+      rankLevel: result.newLevel!,
+      units: updatedEmployee.department?.split(',').map(d => d.trim()).filter(Boolean) || [],
+      status: updatedEmployee.status,
+    };
+    emitEmployeeDemoted(leitstelleData, oldRank, oldRankLevel);
+
     res.json({
       success: true,
       employee: updatedEmployee,
@@ -945,6 +1009,19 @@ router.post('/:id/terminate', authMiddleware, requirePermission('employees.delet
 
     // WebSocket Broadcast für Live-Updates
     broadcastDelete('employee', employee.id);
+
+    // Leitstelle API Event: Kuendigung
+    const leitstelleData: LeitstelleEmployeeData = {
+      id: employee.id,
+      badgeNumber: employee.badgeNumber,
+      name: pureName,
+      discordId: employee.user.discordId,
+      rank: employee.rank,
+      rankLevel: employee.rankLevel,
+      units: employee.department?.split(',').map(d => d.trim()).filter(Boolean) || [],
+      status: 'TERMINATED',
+    };
+    emitEmployeeTerminated(leitstelleData, reason || terminationType);
 
     res.json({
       success: true,

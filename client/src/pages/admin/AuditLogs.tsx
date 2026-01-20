@@ -9,7 +9,7 @@ import { de } from 'date-fns/locale';
 import type { AuditLog, PaginatedResponse } from '../../types';
 
 // Übersetze Aktionen in lesbare Beschreibungen
-function getActionDescription(action: string, entity: string, details: string | null): string {
+function getActionDescription(action: string, entity: string, details: Record<string, unknown> | null): string {
   const method = action.split(' ')[0];
   const path = action.split(' ').slice(1).join(' ');
 
@@ -17,7 +17,8 @@ function getActionDescription(action: string, entity: string, details: string | 
   let parsedDetails: { body?: Record<string, unknown>; path?: string } = {};
   try {
     if (details) {
-      parsedDetails = JSON.parse(details);
+      // details ist bereits ein Objekt, kein String
+      parsedDetails = details as { body?: Record<string, unknown>; path?: string };
     }
   } catch {
     // Ignoriere Parse-Fehler
@@ -448,7 +449,7 @@ export default function AuditLogs() {
                 <div>
                   <label className="text-xs text-slate-500 uppercase">Details</label>
                   <pre className="mt-1 p-4 bg-slate-900/50 rounded-lg text-sm text-slate-300 overflow-x-auto whitespace-pre-wrap">
-                    {JSON.stringify(JSON.parse(selectedLog.details), null, 2)}
+                    {JSON.stringify(selectedLog.details, null, 2)}
                   </pre>
                 </div>
               )}

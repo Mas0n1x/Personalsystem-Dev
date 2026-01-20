@@ -99,6 +99,17 @@ interface TeamDistribution {
   count: number;
 }
 
+interface RecentActivity {
+  id: string;
+  type: string;
+  description: string;
+  timestamp: string;
+  user?: {
+    displayName: string | null;
+    username: string;
+  };
+}
+
 interface CalendarEvent {
   id: string;
   title: string;

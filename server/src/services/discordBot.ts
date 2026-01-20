@@ -1,6 +1,7 @@
 import { Client, GatewayIntentBits, EmbedBuilder, TextChannel, Guild, ChannelType, GuildMember } from 'discord.js';
 import { prisma } from '../prisma.js';
-import { setDiscordClient } from './discordAnnouncements.js';
+import { setDiscordClient, announceTermination } from './discordAnnouncements.js';
+import { emitEmployeeTerminated } from './socketService.js';
 
 let client: Client | null = null;
 let guild: Guild | null = null;
@@ -252,15 +253,91 @@ export async function initializeDiscordBot(): Promise<void> {
   });
 
   client.on('guildMemberRemove', async (member) => {
-    console.log(`Mitglied verlassen: ${member.user.tag}`);
-    // Benutzer in DB als inaktiv markieren
+    console.log(`[Discord] Mitglied verlassen: ${member.user.tag} (${member.id})`);
+
     try {
-      await prisma.user.updateMany({
+      // Finde den User und Employee
+      const user = await prisma.user.findUnique({
         where: { discordId: member.id },
+      });
+
+      if (!user) {
+        console.log(`[Discord] Kein User für Discord ID ${member.id} gefunden`);
+        return;
+      }
+
+      // User als inaktiv markieren
+      await prisma.user.update({
+        where: { id: user.id },
         data: { isActive: false },
       });
+
+      // Finde aktiven Employee
+      const employee = await prisma.employee.findUnique({
+        where: { userId: user.id },
+      });
+
+      if (!employee || employee.status !== 'ACTIVE') {
+        console.log(`[Discord] Kein aktiver Mitarbeiter für User ${user.username}`);
+        return;
+      }
+
+      // Mitarbeiter automatisch kündigen
+      await prisma.employee.update({
+        where: { id: employee.id },
+        data: {
+          status: 'TERMINATED',
+          terminationDate: new Date(),
+          terminationReason: 'Discord Server verlassen',
+        },
+      });
+
+      console.log(`[Discord] Mitarbeiter ${user.displayName || user.username} (${employee.badgeNumber}) automatisch gekündigt`);
+
+      // Archiv-Eintrag erstellen
+      await prisma.archive.create({
+        data: {
+          type: 'TERMINATION',
+          employeeId: employee.id,
+          data: JSON.stringify({
+            employeeName: user.displayName || user.username,
+            rank: employee.rank,
+            rankLevel: employee.rankLevel,
+            badgeNumber: employee.badgeNumber,
+            hireDate: employee.hireDate,
+            terminationDate: new Date(),
+            terminationReason: 'Discord Server verlassen',
+            terminationType: 'INACTIVE',
+            automatic: true,
+          }),
+        },
+      });
+
+      // Leitstelle API Event
+      emitEmployeeTerminated({
+        id: employee.id,
+        name: user.displayName || user.username,
+        badgeNumber: employee.badgeNumber,
+        rank: employee.rank,
+        discordId: user.discordId,
+      });
+
+      // Discord Benachrichtigung im Kündigungskanal
+      await announceTermination({
+        employeeName: user.displayName || user.username,
+        employeeAvatar: user.avatar,
+        rank: employee.rank,
+        terminationType: 'INACTIVE',
+        reason: 'Discord Server verlassen',
+        terminatedBy: 'System (Automatisch)',
+        badgeNumber: employee.badgeNumber,
+        hireDate: employee.hireDate,
+      });
+
+      console.log(`[Discord] Kündigungs-Benachrichtigung für ${user.displayName || user.username} gesendet`);
+
     } catch (error) {
-      console.error('Error updating user on leave:', error);
+      console.error('[Discord] Error bei automatischer Kündigung:', error);
     }
   });
 

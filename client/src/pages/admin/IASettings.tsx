@@ -447,7 +447,7 @@ export default function IASettings() {
           confirmDialog.onConfirm();
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         }}
-        onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+        onClose={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
       />
     </div>
   );

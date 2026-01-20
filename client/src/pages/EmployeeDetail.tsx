@@ -99,6 +99,8 @@ interface UnitStats {
       trainingsCompleted: number;
       trainingsParticipated: number;
       examsGiven: number;
+      modulesCompleted: number;
+      retrainingsCompleted: number;
       total: number;
     };
     internalAffairs: {

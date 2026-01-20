@@ -1,10 +1,10 @@
 import { Router, Response } from 'express';
 import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
-import { createInviteLink, updateDiscordNickname, assignHireRoles } from '../services/discordBot.js';
+import { createInviteLink, updateDiscordNickname, assignHireRoles, findFreeBadgeNumber, getTeamConfigForLevel } from '../services/discordBot.js';
 import { triggerApplicationCompleted, triggerApplicationOnboarding, triggerApplicationRejected, getEmployeeIdFromUserId } from '../services/bonusService.js';
 import { announceHire } from '../services/discordAnnouncements.js';
-import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
+import { broadcastCreate, broadcastUpdate, broadcastDelete, emitEmployeeHired } from '../services/socketService.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -44,6 +44,25 @@ const upload = multer({
 });
 
 const router = Router();
+
+// Rang zu Level Mapping
+const RANK_TO_LEVEL: Record<string, number> = {
+  'Cadet': 1,
+  'Officer I': 2,
+  'Officer II': 3,
+  'Officer III': 4,
+  'Senior Officer': 5,
+  'Corporal': 6,
+  'Sergeant I': 7,
+  'Sergeant II': 8,
+  'Lieutenant I': 9,
+  'Lieutenant II': 10,
+  'Captain': 11,
+  'Commander': 12,
+  'Deputy Chief': 13,
+  'Assistant Chief': 14,
+  'Chief of Police': 15,
+};
 
 // Fallback Onboarding-Checkliste falls keine in DB konfiguriert
 const FALLBACK_ONBOARDING_CHECKLIST = [
@@ -410,24 +429,37 @@ router.post('/', authMiddleware, requirePermission('hr.manage'), upload.single('
 
     // Blacklist-Check falls Discord-Daten angegeben wurden
     if (discordId || discordUsername) {
-      // Für SQLite: Hole alle Blacklist-Einträge und prüfe manuell (case-insensitive)
-      const blacklistEntries = await prisma.blacklist.findMany();
+      // Optimiert: Direkter DB-Query statt alle Eintraege laden
+      const whereConditions = [];
+      if (discordId) {
+        whereConditions.push({ discordId });
+      }
+      if (discordUsername) {
+        // SQLite case-insensitive Suche
+        whereConditions.push({ username: discordUsername });
+      }
 
-      const blacklistMatch = blacklistEntries.find(entry => {
-        if (discordId && entry.discordId === discordId) return true;
-        if (discordUsername && entry.username.toLowerCase() === discordUsername.toLowerCase()) return true;
-        return false;
+      const blacklistMatch = await prisma.blacklist.findFirst({
+        where: {
+          OR: whereConditions,
+        },
       });
 
       if (blacklistMatch) {
-        // Prüfe ob abgelaufen
-        if (!blacklistMatch.expiresAt || new Date(blacklistMatch.expiresAt) > new Date()) {
-          res.status(400).json({
-            error: 'BLACKLISTED',
-            message: `Bewerber ist auf der Blacklist: ${blacklistMatch.reason}`,
-            blacklistEntry: blacklistMatch,
-          });
-          return;
+        // Case-insensitive Vergleich fuer username im Nachhinein (SQLite)
+        const isMatch = (discordId && blacklistMatch.discordId === discordId) ||
+          (discordUsername && blacklistMatch.username.toLowerCase() === discordUsername.toLowerCase());
+
+        if (isMatch) {
+          // Pruefe ob abgelaufen
+          if (!blacklistMatch.expiresAt || new Date(blacklistMatch.expiresAt) > new Date()) {
+            res.status(400).json({
+              error: 'BLACKLISTED',
+              message: `Bewerber ist auf der Blacklist: ${blacklistMatch.reason}`,
+              blacklistEntry: blacklistMatch,
+            });
+            return;
+          }
         }
       }
     }
@@ -708,13 +740,38 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
       return;
     }
 
+    // Einstellungen fuer Start-Rang und Start-Abteilung laden
+    const [startRankSetting, startDepartmentSetting] = await Promise.all([
+      prisma.systemSetting.findUnique({ where: { key: 'hrStartingRank' } }),
+      prisma.systemSetting.findUnique({ where: { key: 'hrStartingDepartment' } }),
+    ]);
+
+    const startRank = startRankSetting?.value || 'Cadet';
+    const startDepartment = startDepartmentSetting?.value || 'Patrol';
+    const startRankLevel = RANK_TO_LEVEL[startRank] || 1;
+
+    // Dienstnummer basierend auf dem Team-Bereich generieren
+    const teamConfig = getTeamConfigForLevel(startRankLevel);
+    let badgeNumber: string | null = null;
+    try {
+      badgeNumber = await findFreeBadgeNumber(teamConfig.badgeMin, teamConfig.badgeMax, teamConfig.badgePrefix);
+      if (badgeNumber) {
+        console.log(`Dienstnummer ${badgeNumber} fuer neuen Mitarbeiter ${application.applicantName} vergeben`);
+      } else {
+        console.warn(`Keine freie Dienstnummer im Bereich ${teamConfig.badgePrefix}-${teamConfig.badgeMin} bis ${teamConfig.badgeMax}`);
+      }
+    } catch (badgeError) {
+      console.error('Fehler bei der Dienstnummer-Vergabe:', badgeError);
+    }
+
     // Mitarbeiter erstellen
     const employee = await prisma.employee.create({
       data: {
         userId: user.id,
-        rank: 'Cadet',
-        rankLevel: 1,
-        department: 'Patrol',
+        rank: startRank,
+        rankLevel: startRankLevel,
+        department: startDepartment,
+        badgeNumber: badgeNumber,
         status: 'ACTIVE',
       },
     });
@@ -751,12 +808,12 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
       await triggerApplicationOnboarding(processorEmployeeId, application.applicantName, id);
     }
 
-    // Discord Announcement für Neueinstellung senden
+    // Discord Announcement fuer Neueinstellung senden
     const hiredByName = updatedApplication.processedBy?.displayName || updatedApplication.processedBy?.username || 'Unbekannt';
     await announceHire({
       employeeName: application.applicantName,
-      employeeAvatar: null, // Avatar noch nicht verfügbar
-      rank: 'Cadet',
+      employeeAvatar: null, // Avatar noch nicht verfuegbar
+      rank: startRank,
       badgeNumber: employee.badgeNumber || 'Noch nicht zugewiesen',
       hiredBy: hiredByName,
     });
@@ -765,10 +822,22 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
     broadcastUpdate('application', updatedApplication);
     broadcastCreate('employee', employee);
 
+    // Leitstelle API Event: Einstellung
+    emitEmployeeHired({
+      id: employee.id,
+      badgeNumber: employee.badgeNumber,
+      name: application.applicantName,
+      discordId: application.discordId,
+      rank: startRank,
+      rankLevel: startRankLevel,
+      units: [],
+      status: 'ACTIVE',
+    });
+
     res.json({
       application: updatedApplication,
       employee,
-      message: `${application.applicantName} wurde als Cadet eingestellt`,
+      message: `${application.applicantName} wurde als ${startRank} eingestellt`,
     });
   } catch (error) {
     console.error('Complete application error:', error);

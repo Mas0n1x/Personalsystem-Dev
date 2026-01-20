@@ -651,6 +651,7 @@ model Investigation {
   @@index([status])
   @@index([caseNumber])
   @@index([accusedId])
+  @@index([status, createdAt])
   @@map("investigations")
 }
 
@@ -1012,6 +1013,7 @@ model Notification {
   @@index([userId])
   @@index([isRead])
   @@index([createdAt])
+  @@index([userId, isRead, createdAt])
   @@map("notifications")
 }
 

@@ -110,7 +110,15 @@
       "Bash(find:*)",
       "Bash(npx prisma migrate dev:*)",
       "Bash(docker stats:*)",
-      "Bash(ip addr:*)"
+      "Bash(ip addr:*)",
+      "Bash(docker network:*)",
+      "Bash(jq:*)",
+      "Bash(iptables:*)",
+      "Bash(docker port:*)",
+      "Bash(systemctl stop:*)",
+      "Bash(service nginx stop:*)",
+      "Bash(systemctl disable:*)",
+      "Bash(pgrep:*)"
     ]
   }
 }

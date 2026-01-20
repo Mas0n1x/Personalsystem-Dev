@@ -12,6 +12,7 @@ import {
   CheckCircle,
   XCircle,
   ChevronRight,
+  ChevronDown,
   X,
   User,
   ArrowUp,
@@ -240,6 +241,7 @@ export default function Management() {
   const [bonusFilter, setBonusFilter] = useState<'PENDING' | 'PAID' | 'all'>('PENDING');
   const [archiveTab, setArchiveTab] = useState<'promotions' | 'terminations' | 'applications'>('promotions');
   const [archiveAppFilter, setArchiveAppFilter] = useState<'ALL' | 'COMPLETED' | 'REJECTED'>('ALL');
+  const [expandedBonusEmployees, setExpandedBonusEmployees] = useState<Set<string>>(new Set());
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -409,6 +411,19 @@ export default function Management() {
     acc[key].total += payment.amount;
     return acc;
   }, {});
+
+  // Toggle expanded state for bonus employees
+  const toggleBonusExpanded = (employeeId: string) => {
+    setExpandedBonusEmployees((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(employeeId)) {
+        newSet.delete(employeeId);
+      } else {
+        newSet.add(employeeId);
+      }
+      return newSet;
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -886,89 +901,114 @@ export default function Management() {
                 Keine Sonderzahlungen gefunden
               </div>
             ) : (
-              Object.values(groupedBonuses).map(({ employee, payments, total }) => (
-                <div key={employee.id} className="card">
-                  <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden">
-                        {employee.user.avatar ? (
-                          <img src={employee.user.avatar} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <User className="h-6 w-6 text-slate-400" />
+              Object.values(groupedBonuses).map(({ employee, payments, total }) => {
+                const isExpanded = expandedBonusEmployees.has(employee.id);
+                return (
+                  <div key={employee.id} className="card">
+                    <div
+                      className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-700/30 transition-colors"
+                      onClick={() => toggleBonusExpanded(employee.id)}
+                    >
+                      <div className="flex items-center gap-4">
+                        <button
+                          className="p-1 hover:bg-slate-600 rounded transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleBonusExpanded(employee.id);
+                          }}
+                        >
+                          <ChevronDown
+                            className={clsx(
+                              'h-5 w-5 text-slate-400 transition-transform duration-200',
+                              !isExpanded && '-rotate-90'
+                            )}
+                          />
+                        </button>
+                        <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden">
+                          {employee.user.avatar ? (
+                            <img src={employee.user.avatar} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <User className="h-6 w-6 text-slate-400" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium text-white">
+                            {employee.user.displayName || employee.user.username}
+                          </p>
+                          <div className="flex items-center gap-2 text-sm text-slate-400">
+                            <span>{employee.rank}</span>
+                            {employee.badgeNumber && (
+                              <>
+                                <span>•</span>
+                                <span>#{employee.badgeNumber}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-xl font-bold text-yellow-400">${total.toLocaleString()}</p>
+                          <p className="text-sm text-slate-400">{payments.length} Tätigkeiten</p>
+                        </div>
+                        {bonusFilter === 'PENDING' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              payEmployeeBonuses.mutate(employee.id);
+                            }}
+                            className="btn-primary bg-green-600 hover:bg-green-700 flex items-center gap-2"
+                            disabled={payEmployeeBonuses.isPending}
+                          >
+                            <Check className="h-4 w-4" />
+                            Alle bezahlen
+                          </button>
                         )}
                       </div>
-                      <div>
-                        <p className="font-medium text-white">
-                          {employee.user.displayName || employee.user.username}
-                        </p>
-                        <div className="flex items-center gap-2 text-sm text-slate-400">
-                          <span>{employee.rank}</span>
-                          {employee.badgeNumber && (
-                            <>
-                              <span>•</span>
-                              <span>#{employee.badgeNumber}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-yellow-400">${total.toLocaleString()}</p>
-                        <p className="text-sm text-slate-400">{payments.length} Tätigkeiten</p>
+                    {isExpanded && (
+                      <div className="divide-y divide-slate-700/50 border-t border-slate-700">
+                        {payments.map((payment) => (
+                          <div key={payment.id} className="p-4 flex items-center justify-between">
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-white">{payment.config.displayName}</p>
+                              {payment.reason && (
+                                <p className="text-xs text-slate-400">{payment.reason}</p>
+                              )}
+                              <p className="text-xs text-slate-500 mt-1">
+                                {formatDateTime(payment.createdAt)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <span className={clsx(
+                                'px-2 py-0.5 rounded-full text-xs',
+                                payment.status === 'PENDING'
+                                  ? 'bg-yellow-500/20 text-yellow-400'
+                                  : 'bg-green-500/20 text-green-400'
+                              )}>
+                                {payment.status === 'PENDING' ? 'Offen' : 'Bezahlt'}
+                              </span>
+                              <span className="text-sm font-medium text-yellow-400">
+                                ${payment.amount.toLocaleString()}
+                              </span>
+                              {payment.status === 'PENDING' && (
+                                <button
+                                  onClick={() => payBonus.mutate(payment.id)}
+                                  className="p-1 hover:bg-green-500/20 rounded transition-colors"
+                                  title="Als bezahlt markieren"
+                                  disabled={payBonus.isPending}
+                                >
+                                  <Check className="h-4 w-4 text-green-400" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      {bonusFilter === 'PENDING' && (
-                        <button
-                          onClick={() => payEmployeeBonuses.mutate(employee.id)}
-                          className="btn-primary bg-green-600 hover:bg-green-700 flex items-center gap-2"
-                          disabled={payEmployeeBonuses.isPending}
-                        >
-                          <Check className="h-4 w-4" />
-                          Alle bezahlen
-                        </button>
-                      )}
-                    </div>
+                    )}
                   </div>
-                  <div className="divide-y divide-slate-700/50">
-                    {payments.map((payment) => (
-                      <div key={payment.id} className="p-4 flex items-center justify-between">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-white">{payment.config.displayName}</p>
-                          {payment.reason && (
-                            <p className="text-xs text-slate-400">{payment.reason}</p>
-                          )}
-                          <p className="text-xs text-slate-500 mt-1">
-                            {formatDateTime(payment.createdAt)}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <span className={clsx(
-                            'px-2 py-0.5 rounded-full text-xs',
-                            payment.status === 'PENDING'
-                              ? 'bg-yellow-500/20 text-yellow-400'
-                              : 'bg-green-500/20 text-green-400'
-                          )}>
-                            {payment.status === 'PENDING' ? 'Offen' : 'Bezahlt'}
-                          </span>
-                          <span className="text-sm font-medium text-yellow-400">
-                            ${payment.amount.toLocaleString()}
-                          </span>
-                          {payment.status === 'PENDING' && (
-                            <button
-                              onClick={() => payBonus.mutate(payment.id)}
-                              className="p-1 hover:bg-green-500/20 rounded transition-colors"
-                              title="Als bezahlt markieren"
-                              disabled={payBonus.isPending}
-                            >
-                              <Check className="h-4 w-4 text-green-400" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </>

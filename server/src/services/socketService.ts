@@ -5,6 +5,8 @@ import { JwtPayload } from '../types/index.js';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
+  isExternalApi?: boolean;
+  externalApiName?: string;
   user?: {
     id: string;
     username: string;
@@ -23,7 +25,26 @@ export function initializeSocket(socketIo: Server): void {
   // Authentifizierung Middleware
   io.use(async (socket: AuthenticatedSocket, next) => {
     try {
-      // Token aus auth oder Cookie extrahieren
+      // Option 1: Externe API mit API-Key
+      const apiKey = socket.handshake.auth.apiKey || socket.handshake.query.api_key;
+      if (apiKey) {
+        const apiKeySetting = await prisma.systemSetting.findUnique({
+          where: { key: 'leitstelleExternalApiKey' },
+        });
+
+        if (apiKeySetting?.value && apiKey === apiKeySetting.value) {
+          socket.isExternalApi = true;
+          socket.externalApiName = 'leitstelle-external';
+          socket.userId = 'external-api-leitstelle';
+          console.log('[Socket] External API connected: leitstelle-external');
+          return next();
+        } else {
+          console.error('[Socket] Invalid external API key');
+          return next(new Error('Ungueltiger API-Key'));
+        }
+      }
+
+      // Option 2: Token aus auth oder Cookie extrahieren (normale User)
       let token = socket.handshake.auth.token;
 
       if (!token && socket.handshake.headers.cookie) {
@@ -70,6 +91,32 @@ export function initializeSocket(socketIo: Server): void {
   });
 
   io.on('connection', (socket: AuthenticatedSocket) => {
+    // Externe API Verbindung
+    if (socket.isExternalApi) {
+      console.log(`[Socket] External API connected: ${socket.externalApiName}`);
+
+      // Automatisch dem Leitstelle-Raum beitreten
+      if (socket.externalApiName === 'leitstelle-external') {
+        socket.join('leitstelle-external');
+        console.log(`[Socket] External API joined room: leitstelle-external`);
+
+        // Bestaetigung senden
+        socket.emit('connected', {
+          status: 'ok',
+          room: 'leitstelle-external',
+          events: [
+            'leitstelle:event - Alle Mitarbeiter-Events (hired, terminated, promoted, demoted, unit_joined, unit_left)',
+          ],
+        });
+      }
+
+      socket.on('disconnect', () => {
+        console.log(`[Socket] External API disconnected: ${socket.externalApiName}`);
+      });
+
+      return; // Keine weiteren Handler fuer externe APIs
+    }
+
     console.log(`Socket connected: ${socket.userId} (${socket.user?.username})`);
 
     // Benutzer als online markieren
@@ -169,4 +216,120 @@ export function broadcastNotification(
   notification: { title: string; message: string; type: 'info' | 'success' | 'warning' | 'error' }
 ): void {
   emitToAll('notification', notification);
+}
+
+// =====================================================
+// LEITSTELLE EXTERNAL API - Live Events
+// =====================================================
+
+export interface LeitstelleEmployeeData {
+  id: string;
+  badgeNumber: string | null;
+  name: string;
+  discordId: string;
+  rank: string;
+  rankLevel: number;
+  units: string[];
+  status: string;
+}
+
+// Event-Typen fuer Leitstelle
+export type LeitstelleEventType =
+  | 'employee:hired'      // Einstellung
+  | 'employee:terminated' // Kuendigung
+  | 'employee:promoted'   // Uprank
+  | 'employee:demoted'    // Downrank
+  | 'employee:unit_joined'  // Unit Eintritt
+  | 'employee:unit_left';   // Unit Austritt
+
+export interface LeitstelleEvent {
+  type: LeitstelleEventType;
+  employee: LeitstelleEmployeeData;
+  details?: {
+    previousRank?: string;
+    newRank?: string;
+    previousRankLevel?: number;
+    newRankLevel?: number;
+    unit?: string;
+    reason?: string;
+  };
+  timestamp: string;
+}
+
+// Broadcast an Leitstelle-Raum
+export function broadcastLeitstelleEvent(event: LeitstelleEvent): void {
+  emitToRoom('leitstelle-external', 'leitstelle:event', event);
+  console.log(`[Leitstelle API] Event: ${event.type} - ${event.employee.name}`);
+}
+
+// Einzelne Event-Helper
+export function emitEmployeeHired(employee: LeitstelleEmployeeData): void {
+  broadcastLeitstelleEvent({
+    type: 'employee:hired',
+    employee,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+export function emitEmployeeTerminated(employee: LeitstelleEmployeeData, reason?: string): void {
+  broadcastLeitstelleEvent({
+    type: 'employee:terminated',
+    employee,
+    details: { reason },
+    timestamp: new Date().toISOString(),
+  });
+}
+
+export function emitEmployeePromoted(
+  employee: LeitstelleEmployeeData,
+  previousRank: string,
+  previousRankLevel: number
+): void {
+  broadcastLeitstelleEvent({
+    type: 'employee:promoted',
+    employee,
+    details: {
+      previousRank,
+      newRank: employee.rank,
+      previousRankLevel,
+      newRankLevel: employee.rankLevel,
+    },
+    timestamp: new Date().toISOString(),
+  });
+}
+
+export function emitEmployeeDemoted(
+  employee: LeitstelleEmployeeData,
+  previousRank: string,
+  previousRankLevel: number
+): void {
+  broadcastLeitstelleEvent({
+    type: 'employee:demoted',
+    employee,
+    details: {
+      previousRank,
+      newRank: employee.rank,
+      previousRankLevel,
+      newRankLevel: employee.rankLevel,
+    },
+    timestamp: new Date().toISOString(),
+  });
+}
+
+export function emitEmployeeUnitJoined(employee: LeitstelleEmployeeData, unit: string): void {
+  broadcastLeitstelleEvent({
+    type: 'employee:unit_joined',
+    employee,
+    details: { unit },
+    timestamp: new Date().toISOString(),
+  });
+}
+
+export function emitEmployeeUnitLeft(employee: LeitstelleEmployeeData, unit: string): void {
+  broadcastLeitstelleEvent({
+    type: 'employee:unit_left',
+    employee,
+    details: { unit },
+    timestamp: new Date().toISOString(),
+  });
 }

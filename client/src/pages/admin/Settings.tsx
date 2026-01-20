@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../services/api';
-import { Settings as SettingsIcon, RefreshCw, Database, Bot, Save, UserPlus, X } from 'lucide-react';
+import { Settings as SettingsIcon, RefreshCw, Database, Bot, Save, UserPlus, X, Key, Copy, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface DiscordInfo {
@@ -14,6 +14,7 @@ interface DiscordInfo {
 export default function Settings() {
   const queryClient = useQueryClient();
   const [settings, setSettings] = useState<Record<string, string>>({});
+  const [showApiKey, setShowApiKey] = useState(false);
 
   const { isLoading: settingsLoading } = useQuery({
     queryKey: ['settings'],
@@ -220,7 +221,84 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* HR Onboarding Rollen */}
+      {/* HR Onboarding Einstellungen */}
+      <div className="card">
+        <div className="card-header flex items-center gap-2">
+          <UserPlus className="h-5 w-5 text-green-400" />
+          <h2 className="font-semibold text-white">HR Onboarding - Einstellungen</h2>
+        </div>
+        <div className="card-body space-y-4">
+          <p className="text-sm text-slate-400">
+            Konfiguriere die Standardwerte fuer neue Mitarbeiter bei der Einstellung.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Start-Rang</label>
+              <select
+                className="input"
+                value={settings.hrStartingRank || 'Cadet'}
+                onChange={(e) => setSettings({ ...settings, hrStartingRank: e.target.value })}
+              >
+                <option value="Cadet">Cadet</option>
+                <option value="Officer I">Officer I</option>
+                <option value="Officer II">Officer II</option>
+                <option value="Officer III">Officer III</option>
+                <option value="Senior Officer">Senior Officer</option>
+                <option value="Corporal">Corporal</option>
+                <option value="Sergeant I">Sergeant I</option>
+                <option value="Sergeant II">Sergeant II</option>
+                <option value="Lieutenant I">Lieutenant I</option>
+                <option value="Lieutenant II">Lieutenant II</option>
+                <option value="Captain">Captain</option>
+                <option value="Commander">Commander</option>
+                <option value="Deputy Chief">Deputy Chief</option>
+                <option value="Assistant Chief">Assistant Chief</option>
+                <option value="Chief of Police">Chief of Police</option>
+              </select>
+              <p className="text-xs text-slate-500 mt-1">
+                Rang der bei neuen Mitarbeitern vergeben wird
+              </p>
+            </div>
+
+            <div>
+              <label className="label">Start-Abteilung</label>
+              <select
+                className="input"
+                value={settings.hrStartingDepartment || 'Patrol'}
+                onChange={(e) => setSettings({ ...settings, hrStartingDepartment: e.target.value })}
+              >
+                <option value="Patrol">Patrol</option>
+                <option value="SWAT">SWAT</option>
+                <option value="Detective">Detective</option>
+                <option value="Traffic">Traffic</option>
+                <option value="Academy">Academy</option>
+                <option value="Administration">Administration</option>
+              </select>
+              <p className="text-xs text-slate-500 mt-1">
+                Abteilung die bei neuen Mitarbeitern vergeben wird
+              </p>
+            </div>
+          </div>
+
+          <div className="p-3 bg-blue-900/20 border border-blue-700/30 rounded-lg">
+            <p className="text-xs text-blue-400">
+              Bei der Einstellung wird automatisch eine Dienstnummer aus dem entsprechenden Team-Bereich vergeben.
+            </p>
+          </div>
+
+          <button
+            onClick={handleSave}
+            disabled={updateSettingsMutation.isPending}
+            className="btn-primary w-full"
+          >
+            <Save className="h-4 w-4" />
+            Einstellungen speichern
+          </button>
+        </div>
+      </div>
+
+      {/* HR Onboarding Discord Rollen */}
       <div className="card">
         <div className="card-header flex items-center gap-2">
           <UserPlus className="h-5 w-5 text-green-400" />
@@ -229,11 +307,11 @@ export default function Settings() {
         <div className="card-body space-y-4">
           <p className="text-sm text-slate-400">
             Diese Rollen werden bei der Einstellung neuer Mitarbeiter automatisch vergeben.
-            Gib die Discord Rollen-IDs ein (kommasepariert für mehrere Rollen).
+            Gib die Discord Rollen-IDs ein (kommasepariert fuer mehrere Rollen).
           </p>
 
           <div>
-            <label className="label">Rollen-IDs für neue Cadets</label>
+            <label className="label">Rollen-IDs fuer neue Mitarbeiter</label>
             <input
               className="input"
               value={settings.hrOnboardingRoleIds || ''}
@@ -319,6 +397,93 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* Leitstelle External API */}
+      <div className="card">
+        <div className="card-header flex items-center gap-2">
+          <Key className="h-5 w-5 text-yellow-400" />
+          <h2 className="font-semibold text-white">Leitstelle External API</h2>
+        </div>
+        <div className="card-body space-y-4">
+          <p className="text-sm text-slate-400">
+            API-Key fuer externe Systeme (z.B. Leitstelle von Paul Stevens).
+            Diese API liefert Mitarbeiterdaten und Live-Updates via WebSocket.
+          </p>
+
+          <div>
+            <label className="label">API-Key</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type={showApiKey ? 'text' : 'password'}
+                  className="input pr-10 font-mono text-sm"
+                  value={settings.leitstelleExternalApiKey || ''}
+                  onChange={(e) => setSettings({ ...settings, leitstelleExternalApiKey: e.target.value })}
+                  placeholder="API-Key eingeben oder generieren"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                >
+                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const newKey = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+                  setSettings({ ...settings, leitstelleExternalApiKey: newKey });
+                  toast.success('Neuer API-Key generiert');
+                }}
+                className="btn-secondary"
+              >
+                Generieren
+              </button>
+              {settings.leitstelleExternalApiKey && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(settings.leitstelleExternalApiKey || '');
+                    toast.success('API-Key kopiert');
+                  }}
+                  className="btn-secondary"
+                >
+                  <Copy className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Dieser Key wird benoetigt um auf die externe API zuzugreifen.
+            </p>
+          </div>
+
+          <div className="p-3 bg-slate-700/50 rounded-lg space-y-2">
+            <p className="text-xs text-slate-400 font-medium">API Endpunkte:</p>
+            <div className="text-xs font-mono text-slate-300 space-y-1">
+              <p>GET /api/leitstelle-external/status</p>
+              <p>GET /api/leitstelle-external/employees</p>
+              <p>GET /api/leitstelle-external/employees/:id</p>
+              <p className="text-blue-400">WS  /socket.io (Room: leitstelle-external)</p>
+            </div>
+          </div>
+
+          <div className="p-3 bg-blue-900/20 border border-blue-700/30 rounded-lg">
+            <p className="text-xs text-blue-400">
+              <strong>Authentifizierung:</strong> Header <code className="bg-slate-700 px-1 rounded">X-API-Key: [key]</code> oder Query <code className="bg-slate-700 px-1 rounded">?api_key=[key]</code>
+            </p>
+          </div>
+
+          <button
+            onClick={handleSave}
+            disabled={updateSettingsMutation.isPending}
+            className="btn-primary w-full"
+          >
+            <Save className="h-4 w-4" />
+            API-Einstellungen speichern
+          </button>
+        </div>
+      </div>
+
       {/* Danger Zone */}
       <div className="card border-red-900/50">
         <div className="card-header border-red-900/50">
@@ -326,14 +491,14 @@ export default function Settings() {
         </div>
         <div className="card-body">
           <p className="text-slate-400 text-sm mb-4">
-            Diese Aktionen können nicht rückgängig gemacht werden. Bitte sei vorsichtig.
+            Diese Aktionen koennen nicht rueckgaengig gemacht werden. Bitte sei vorsichtig.
           </p>
           <div className="flex gap-4">
             <button className="btn-danger" disabled>
-              Datenbank zurücksetzen
+              Datenbank zuruecksetzen
             </button>
             <button className="btn-danger" disabled>
-              Alle Audit-Logs löschen
+              Alle Audit-Logs loeschen
             </button>
           </div>
         </div>

@@ -33,9 +33,11 @@ export interface Permission {
 export interface Absence {
   id: string;
   type: 'ABSENCE' | 'DAY_OFF';
-  reason?: string;
+  status?: string;
+  reason?: string | null;
   startDate: string;
   endDate: string;
+  createdAt?: string;
 }
 
 export interface Employee {
@@ -94,12 +96,3 @@ export interface Evaluation {
   createdAt: string;
 }
 
-export interface Absence {
-  id: string;
-  type: string;
-  status: string;
-  startDate: string;
-  endDate: string;
-  reason: string | null;
-  createdAt: string;
-}
