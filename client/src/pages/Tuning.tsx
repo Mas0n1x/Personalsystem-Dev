@@ -38,7 +38,7 @@ interface Stats {
 }
 
 export default function Tuning() {
-  const { user } = useAuth();
+  const { user, hasAnyPermission } = useAuth();
   const queryClient = useQueryClient();
   useLiveUpdates();
   const [showModal, setShowModal] = useState(false);
@@ -163,9 +163,7 @@ export default function Tuning() {
     new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
 
   // Check if user can manage (has permission)
-  const canManage = user?.role?.permissions?.some(
-    (p: { name: string }) => p.name === 'tuning.manage' || p.name === 'admin.full'
-  );
+  const canManage = hasAnyPermission('tuning.manage', 'admin.full');
 
   return (
     <div className="space-y-6">

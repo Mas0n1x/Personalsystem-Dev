@@ -92,7 +92,7 @@ interface Case {
 }
 
 export default function Detectives() {
-  const { user } = useAuth();
+  const { user, hasAnyPermission } = useAuth();
   const queryClient = useQueryClient();
 
   // View State
@@ -463,9 +463,7 @@ export default function Detectives() {
   const getDetectiveName = (folder: DetectiveFolder) => folder.detective.user.displayName || folder.detective.user.username;
 
   // Permission checks
-  const canManage = user?.role?.permissions?.some(
-    (p: { name: string }) => p.name === 'detectives.manage' || p.name === 'admin.full'
-  );
+  const canManage = hasAnyPermission('detectives.manage', 'admin.full');
 
   // Render folder view (list of cases in a folder)
   if (selectedFolder) {

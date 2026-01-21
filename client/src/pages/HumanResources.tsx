@@ -84,7 +84,7 @@ type Tab = 'applications' | 'blacklist';
 // Fallback-Kriterien wurden auf den Server verschoben (/api/applications/criteria)
 
 export default function HumanResources() {
-  const { user } = useAuth();
+  const { user, hasAnyPermission } = useAuth();
   const queryClient = useQueryClient();
   useLiveUpdates();
   const [activeTab, setActiveTab] = useState<Tab>('applications');
@@ -717,13 +717,8 @@ export default function HumanResources() {
   };
 
   // Permission checks
-  const canManageBlacklist = user?.role?.permissions?.some(
-    (p: { name: string }) => p.name === 'blacklist.manage' || p.name === 'admin.full'
-  );
-
-  const canManageHR = user?.role?.permissions?.some(
-    (p: { name: string }) => p.name === 'hr.manage' || p.name === 'admin.full'
-  );
+  const canManageBlacklist = hasAnyPermission('blacklist.manage', 'admin.full');
+  const canManageHR = hasAnyPermission('hr.manage', 'admin.full');
 
   // Sync selectedApplication when data changes
   useEffect(() => {

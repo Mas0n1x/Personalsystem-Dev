@@ -62,7 +62,7 @@ interface Stats {
 }
 
 export default function Robbery() {
-  const { user } = useAuth();
+  const { user, hasAnyPermission } = useAuth();
   const queryClient = useQueryClient();
   useLiveUpdates();
   const [showModal, setShowModal] = useState(false);
@@ -214,14 +214,10 @@ export default function Robbery() {
   };
 
   // Check if user can manage (has permission)
-  const canManage = user?.role?.permissions?.some(
-    (p: { name: string }) => p.name === 'robbery.manage' || p.name === 'admin.full'
-  );
+  const canManage = hasAnyPermission('robbery.manage', 'admin.full');
 
   // Check if user can create
-  const canCreate = user?.role?.permissions?.some(
-    (p: { name: string }) => p.name === 'robbery.create' || p.name === 'robbery.manage' || p.name === 'admin.full'
-  );
+  const canCreate = hasAnyPermission('robbery.create', 'robbery.manage', 'admin.full');
 
   const getEmployeeName = (emp: Employee) => emp.user.displayName || emp.user.username;
 

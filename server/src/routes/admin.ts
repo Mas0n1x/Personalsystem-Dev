@@ -87,6 +87,112 @@ router.delete('/roles/:id', authMiddleware, requirePermission('admin.full'), asy
   }
 });
 
+// Fügt eine Permission zu einer Rolle hinzu (ohne bestehende zu entfernen)
+router.post('/roles/:id/permissions', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { permissionId, permissionName } = req.body;
+
+    // Permission kann per ID oder Name angegeben werden
+    let permission;
+    if (permissionId) {
+      permission = await prisma.permission.findUnique({ where: { id: permissionId } });
+    } else if (permissionName) {
+      permission = await prisma.permission.findUnique({ where: { name: permissionName } });
+    }
+
+    if (!permission) {
+      res.status(404).json({ error: 'Permission nicht gefunden' });
+      return;
+    }
+
+    const role = await prisma.role.update({
+      where: { id: req.params.id },
+      data: {
+        permissions: { connect: { id: permission.id } },
+      },
+      include: { permissions: true },
+    });
+
+    res.json(role);
+  } catch (error) {
+    console.error('Add permission to role error:', error);
+    res.status(500).json({ error: 'Fehler beim Hinzufügen der Berechtigung zur Rolle' });
+  }
+});
+
+// Entfernt eine Permission von einer Rolle
+router.delete('/roles/:id/permissions/:permissionId', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const role = await prisma.role.update({
+      where: { id: req.params.id },
+      data: {
+        permissions: { disconnect: { id: req.params.permissionId } },
+      },
+      include: { permissions: true },
+    });
+
+    res.json(role);
+  } catch (error) {
+    console.error('Remove permission from role error:', error);
+    res.status(500).json({ error: 'Fehler beim Entfernen der Berechtigung von der Rolle' });
+  }
+});
+
+// Fügt Permissions zu einer Rolle nach Rollennamen hinzu (bequeme Variante)
+router.post('/roles/by-name/:roleName/permissions', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { permissionNames } = req.body;
+
+    if (!permissionNames || !Array.isArray(permissionNames) || permissionNames.length === 0) {
+      res.status(400).json({ error: 'permissionNames Array erforderlich' });
+      return;
+    }
+
+    // Finde die Rolle
+    const role = await prisma.role.findFirst({
+      where: {
+        OR: [
+          { name: req.params.roleName },
+          { displayName: req.params.roleName }
+        ]
+      },
+    });
+
+    if (!role) {
+      res.status(404).json({ error: `Rolle "${req.params.roleName}" nicht gefunden` });
+      return;
+    }
+
+    // Finde alle Permissions
+    const permissions = await prisma.permission.findMany({
+      where: { name: { in: permissionNames } },
+    });
+
+    if (permissions.length === 0) {
+      res.status(404).json({ error: 'Keine der angegebenen Permissions gefunden' });
+      return;
+    }
+
+    // Füge Permissions hinzu
+    const updatedRole = await prisma.role.update({
+      where: { id: role.id },
+      data: {
+        permissions: { connect: permissions.map(p => ({ id: p.id })) },
+      },
+      include: { permissions: true },
+    });
+
+    res.json({
+      role: updatedRole,
+      addedPermissions: permissions.map(p => p.name),
+      notFound: permissionNames.filter(name => !permissions.find(p => p.name === name)),
+    });
+  } catch (error) {
+    console.error('Add permissions to role by name error:', error);
+    res.status(500).json({ error: 'Fehler beim Hinzufügen der Berechtigungen zur Rolle' });
+  }
+});
+
 // ==================== FIX PERMISSIONS (für eingeloggten User - ohne vorherige Berechtigungsprüfung) ====================
 
 router.post('/fix-permissions', authMiddleware, async (req: AuthRequest, res: Response) => {
@@ -290,9 +396,11 @@ router.post('/setup', async (req, res: Response) => {
       // Academy Permissions
       { name: 'academy.view', description: 'Schulungen anzeigen', category: 'academy' },
       { name: 'academy.manage', description: 'Schulungen verwalten', category: 'academy' },
+      { name: 'academy.teach', description: 'Schulungen durchführen', category: 'academy' },
       // Internal Affairs Permissions
       { name: 'ia.view', description: 'Interne Ermittlungen anzeigen', category: 'ia' },
       { name: 'ia.manage', description: 'Interne Ermittlungen verwalten', category: 'ia' },
+      { name: 'ia.investigate', description: 'Ermittlungen durchführen', category: 'ia' },
       // Quality Assurance Permissions
       { name: 'qa.view', description: 'Unit-Reviews anzeigen', category: 'qa' },
       { name: 'qa.manage', description: 'Unit-Reviews verwalten', category: 'qa' },
@@ -414,9 +522,11 @@ router.post('/permissions/seed', authMiddleware, requirePermission('admin.full')
       // Academy Permissions
       { name: 'academy.view', description: 'Schulungen anzeigen', category: 'academy' },
       { name: 'academy.manage', description: 'Schulungen verwalten', category: 'academy' },
+      { name: 'academy.teach', description: 'Schulungen durchführen', category: 'academy' },
       // Internal Affairs Permissions
       { name: 'ia.view', description: 'Interne Ermittlungen anzeigen', category: 'ia' },
       { name: 'ia.manage', description: 'Interne Ermittlungen verwalten', category: 'ia' },
+      { name: 'ia.investigate', description: 'Ermittlungen durchführen', category: 'ia' },
       // Quality Assurance Permissions
       { name: 'qa.view', description: 'Unit-Reviews anzeigen', category: 'qa' },
       { name: 'qa.manage', description: 'Unit-Reviews verwalten', category: 'qa' },

@@ -164,12 +164,12 @@ router.post('/discord/callback', async (req: Request, res: Response) => {
       select: { id: true, displayName: true, roles: { select: { id: true } } },
     });
 
-    // Wenn User keine Rollen hat, versuche sie aus Discord zuzuweisen
+    // Synchronisiere Rollen aus Discord bei JEDEM Login
     const existingRoleIds = existingUser?.roles?.map(r => r.id) || [];
-    let roleIdsToAssign: string[] = existingRoleIds;
-    if (roleIdsToAssign.length === 0) {
-      roleIdsToAssign = await assignRolesFromDiscord(discordUser.id);
-    }
+    const discordRoleIds = await assignRolesFromDiscord(discordUser.id);
+
+    // Kombiniere bestehende Rollen mit Discord-Rollen (ohne Duplikate)
+    const roleIdsToAssign = [...new Set([...existingRoleIds, ...discordRoleIds])];
 
     // Versuche den Server-Nickname aus Discord zu holen (falls verfügbar)
     let serverNickname: string | null = null;
@@ -215,10 +215,8 @@ router.post('/discord/callback', async (req: Request, res: Response) => {
         avatar: avatarUrl,
         email: discordUser.email,
         lastLogin: new Date(),
-        // Rollen nur aktualisieren wenn noch keine gesetzt sind
-        ...(existingRoleIds.length > 0 ? {} : {
-          roles: roleIdsToAssign.length > 0 ? { connect: roleIdsToAssign.map(id => ({ id })) } : undefined,
-        }),
+        // Rollen bei jedem Login mit Discord synchronisieren
+        roles: roleIdsToAssign.length > 0 ? { set: roleIdsToAssign.map(id => ({ id })) } : undefined,
       },
       include: {
         roles: {
