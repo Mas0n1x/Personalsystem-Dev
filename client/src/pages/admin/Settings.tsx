@@ -232,53 +232,33 @@ export default function Settings() {
             Konfiguriere die Standardwerte fuer neue Mitarbeiter bei der Einstellung.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Start-Rang</label>
-              <select
-                className="input"
-                value={settings.hrStartingRank || 'Cadet'}
-                onChange={(e) => setSettings({ ...settings, hrStartingRank: e.target.value })}
-              >
-                <option value="Cadet">Cadet</option>
-                <option value="Officer I">Officer I</option>
-                <option value="Officer II">Officer II</option>
-                <option value="Officer III">Officer III</option>
-                <option value="Senior Officer">Senior Officer</option>
-                <option value="Corporal">Corporal</option>
-                <option value="Sergeant I">Sergeant I</option>
-                <option value="Sergeant II">Sergeant II</option>
-                <option value="Lieutenant I">Lieutenant I</option>
-                <option value="Lieutenant II">Lieutenant II</option>
-                <option value="Captain">Captain</option>
-                <option value="Commander">Commander</option>
-                <option value="Deputy Chief">Deputy Chief</option>
-                <option value="Assistant Chief">Assistant Chief</option>
-                <option value="Chief of Police">Chief of Police</option>
-              </select>
-              <p className="text-xs text-slate-500 mt-1">
-                Rang der bei neuen Mitarbeitern vergeben wird
-              </p>
-            </div>
-
-            <div>
-              <label className="label">Start-Abteilung</label>
-              <select
-                className="input"
-                value={settings.hrStartingDepartment || 'Patrol'}
-                onChange={(e) => setSettings({ ...settings, hrStartingDepartment: e.target.value })}
-              >
-                <option value="Patrol">Patrol</option>
-                <option value="SWAT">SWAT</option>
-                <option value="Detective">Detective</option>
-                <option value="Traffic">Traffic</option>
-                <option value="Academy">Academy</option>
-                <option value="Administration">Administration</option>
-              </select>
-              <p className="text-xs text-slate-500 mt-1">
-                Abteilung die bei neuen Mitarbeitern vergeben wird
-              </p>
-            </div>
+          <div>
+            <label className="label">Start-Rang</label>
+            <select
+              className="input"
+              value={settings.hrStartingRank || 'Recruit'}
+              onChange={(e) => setSettings({ ...settings, hrStartingRank: e.target.value })}
+            >
+              <option value="Recruit">Recruit</option>
+              <option value="Cadet">Cadet</option>
+              <option value="Officer I">Officer I</option>
+              <option value="Officer II">Officer II</option>
+              <option value="Officer III">Officer III</option>
+              <option value="Senior Officer">Senior Officer</option>
+              <option value="Corporal">Corporal</option>
+              <option value="Sergeant I">Sergeant I</option>
+              <option value="Sergeant II">Sergeant II</option>
+              <option value="Lieutenant I">Lieutenant I</option>
+              <option value="Lieutenant II">Lieutenant II</option>
+              <option value="Captain">Captain</option>
+              <option value="Commander">Commander</option>
+              <option value="Deputy Chief">Deputy Chief</option>
+              <option value="Assistant Chief">Assistant Chief</option>
+              <option value="Chief of Police">Chief of Police</option>
+            </select>
+            <p className="text-xs text-slate-500 mt-1">
+              Rang der bei neuen Mitarbeitern vergeben wird
+            </p>
           </div>
 
           <div className="p-3 bg-blue-900/20 border border-blue-700/30 rounded-lg">
@@ -302,87 +282,56 @@ export default function Settings() {
       <div className="card">
         <div className="card-header flex items-center gap-2">
           <UserPlus className="h-5 w-5 text-green-400" />
-          <h2 className="font-semibold text-white">HR Onboarding - Discord Rollen</h2>
+          <h2 className="font-semibold text-white">Discord Rollen bei Einstellung</h2>
         </div>
         <div className="card-body space-y-4">
           <p className="text-sm text-slate-400">
-            Diese Rollen werden bei der Einstellung neuer Mitarbeiter automatisch vergeben.
-            Gib die Discord Rollen-IDs ein (kommasepariert fuer mehrere Rollen).
+            Waehle die Discord-Rollen aus, die neuen Mitarbeitern bei der Einstellung automatisch zugewiesen werden.
           </p>
 
-          <div>
-            <label className="label">Rollen-IDs fuer neue Mitarbeiter</label>
-            <input
-              className="input"
-              value={settings.hrOnboardingRoleIds || ''}
-              onChange={(e) => setSettings({ ...settings, hrOnboardingRoleIds: e.target.value })}
-              placeholder="z.B. 123456789012345678, 987654321098765432"
-            />
-            <p className="text-xs text-slate-500 mt-1">
-              Mehrere Rollen-IDs mit Komma trennen. Diese Rollen werden beim Abschluss des Onboardings vergeben.
-            </p>
-          </div>
-
           {discordInfo && (
-            <div className="p-3 bg-slate-700/50 rounded-lg">
-              <p className="text-xs text-slate-400 mb-2">Verfügbare Rollen (klicken zum Hinzufügen):</p>
-              <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
-                {discordInfo.roles.map((role) => (
-                  <button
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {discordInfo.roles.map((role) => {
+                const currentIds = settings.hrOnboardingRoleIds?.split(',').map(id => id.trim()).filter(Boolean) || [];
+                const isSelected = currentIds.includes(role.id);
+                return (
+                  <label
                     key={role.id}
-                    onClick={() => {
-                      const currentIds = settings.hrOnboardingRoleIds?.split(',').map(id => id.trim()).filter(Boolean) || [];
-                      if (!currentIds.includes(role.id)) {
-                        const newIds = [...currentIds, role.id].join(', ');
-                        setSettings({ ...settings, hrOnboardingRoleIds: newIds });
-                      }
-                    }}
-                    className="px-2 py-0.5 rounded text-xs hover:opacity-80 transition-opacity"
-                    style={{ backgroundColor: role.color + '20', color: role.color || '#fff' }}
-                    title={`ID: ${role.id}`}
+                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                      isSelected ? 'bg-green-900/30 border border-green-700/50' : 'bg-slate-700/30 hover:bg-slate-700/50'
+                    }`}
                   >
-                    {role.name}
-                  </button>
-                ))}
-              </div>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => {
+                        if (isSelected) {
+                          const newIds = currentIds.filter(id => id !== role.id).join(', ');
+                          setSettings({ ...settings, hrOnboardingRoleIds: newIds || '' });
+                        } else {
+                          const newIds = [...currentIds, role.id].join(', ');
+                          setSettings({ ...settings, hrOnboardingRoleIds: newIds });
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-slate-500 text-green-500 focus:ring-green-500 bg-slate-700"
+                    />
+                    <span
+                      className="px-2 py-0.5 rounded text-sm font-medium"
+                      style={{ backgroundColor: role.color + '20', color: role.color || '#fff' }}
+                    >
+                      {role.name}
+                    </span>
+                  </label>
+                );
+              })}
             </div>
           )}
 
           {settings.hrOnboardingRoleIds && (
             <div className="p-3 bg-green-900/20 border border-green-700/30 rounded-lg">
-              <p className="text-xs text-green-400 mb-2">Ausgewählte Rollen:</p>
-              <div className="flex flex-wrap gap-2">
-                {settings.hrOnboardingRoleIds.split(',').map((id, idx) => {
-                  const roleId = id.trim();
-                  if (!roleId) return null;
-                  const role = discordInfo?.roles.find(r => r.id === roleId);
-                  return (
-                    <span
-                      key={idx}
-                      className="px-2 py-1 rounded text-xs flex items-center gap-1"
-                      style={{
-                        backgroundColor: role?.color ? role.color + '20' : '#374151',
-                        color: role?.color || '#9CA3AF'
-                      }}
-                    >
-                      {role?.name || roleId}
-                      <button
-                        onClick={() => {
-                          const newIds = settings.hrOnboardingRoleIds
-                            ?.split(',')
-                            .map(i => i.trim())
-                            .filter(i => i !== roleId)
-                            .join(', ');
-                          setSettings({ ...settings, hrOnboardingRoleIds: newIds || '' });
-                        }}
-                        className="hover:text-red-400 transition-colors"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  );
-                })}
-              </div>
+              <p className="text-xs text-green-400">
+                {settings.hrOnboardingRoleIds.split(',').filter(id => id.trim()).length} Rolle(n) ausgewaehlt
+              </p>
             </div>
           )}
 

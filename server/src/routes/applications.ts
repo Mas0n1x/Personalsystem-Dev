@@ -766,14 +766,12 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
       return;
     }
 
-    // Einstellungen fuer Start-Rang und Start-Abteilung laden
-    const [startRankSetting, startDepartmentSetting] = await Promise.all([
-      prisma.systemSetting.findUnique({ where: { key: 'hrStartingRank' } }),
-      prisma.systemSetting.findUnique({ where: { key: 'hrStartingDepartment' } }),
-    ]);
+    // Einstellung fuer Start-Rang laden
+    const startRankSetting = await prisma.systemSetting.findUnique({
+      where: { key: 'hrStartingRank' }
+    });
 
     const startRank = startRankSetting?.value || 'Recruit';
-    const startDepartment = startDepartmentSetting?.value || 'Patrol';
     const startRankLevel = RANK_TO_LEVEL[startRank] || 1;
 
     // Dienstnummer basierend auf dem Team-Bereich generieren
@@ -790,13 +788,12 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
       console.error('Fehler bei der Dienstnummer-Vergabe:', badgeError);
     }
 
-    // Mitarbeiter erstellen
+    // Mitarbeiter erstellen (department verwendet Prisma Default 'Patrol')
     const employee = await prisma.employee.create({
       data: {
         userId: user.id,
         rank: startRank,
         rankLevel: startRankLevel,
-        department: startDepartment,
         badgeNumber: badgeNumber,
         status: 'ACTIVE',
       },

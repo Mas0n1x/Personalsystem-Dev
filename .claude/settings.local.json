@@ -120,7 +120,9 @@
       "Bash(systemctl disable:*)",
       "Bash(pgrep:*)",
       "Bash(systemctl restart:*)",
-      "Bash(pm2 logs:*)"
+      "Bash(pm2 logs:*)",
+      "Bash(docker volume:*)",
+      "Bash(docker cp:*)"
     ]
   }
 }
