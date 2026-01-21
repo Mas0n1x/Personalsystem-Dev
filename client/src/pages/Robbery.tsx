@@ -114,8 +114,18 @@ export default function Robbery() {
       closeModal();
       toast.success('Raub eingetragen');
     },
-    onError: () => {
-      toast.error('Fehler beim Eintragen');
+    onError: (error: unknown) => {
+      // Bessere Fehlermeldung anzeigen
+      const axiosError = error as { response?: { data?: { error?: string }; status?: number } };
+      if (axiosError.response?.status === 403) {
+        toast.error('Keine Berechtigung zum Eintragen');
+      } else if (axiosError.response?.status === 413) {
+        toast.error('Bild ist zu groß (max. 10MB)');
+      } else if (axiosError.response?.data?.error) {
+        toast.error(axiosError.response.data.error);
+      } else {
+        toast.error('Fehler beim Eintragen - bitte erneut versuchen');
+      }
     },
   });
 
@@ -150,6 +160,24 @@ export default function Robbery() {
       setSelectedFile(file);
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          setSelectedFile(file);
+          const url = URL.createObjectURL(file);
+          setPreviewUrl(url);
+          e.preventDefault();
+          break;
+        }
+      }
     }
   };
 
@@ -367,7 +395,7 @@ export default function Robbery() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            <form onSubmit={handleSubmit} onPaste={handlePaste} className="p-6 space-y-5">
               {/* Leader Selection */}
               <div>
                 <label className="label">Einsatzleitung *</label>
@@ -441,7 +469,7 @@ export default function Robbery() {
                     <div className="py-4">
                       <Upload className="h-10 w-10 text-slate-500 mx-auto mb-2" />
                       <p className="text-slate-400">Klicken um Bild auszuwählen</p>
-                      <p className="text-xs text-slate-500 mt-1">JPEG, PNG, GIF, WebP (max. 10MB)</p>
+                      <p className="text-xs text-slate-500 mt-1">JPEG, PNG, GIF, WebP (max. 10MB) • Strg+V zum Einfügen</p>
                     </div>
                   )}
                 </div>

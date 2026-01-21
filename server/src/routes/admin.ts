@@ -182,21 +182,29 @@ router.post('/fix-permissions', authMiddleware, async (req: AuthRequest, res: Re
       },
     });
 
-    // Benutzer der Admin-Rolle zuweisen
+    // Benutzer der Admin-Rolle zuweisen (Multi-Role: connectOrCreate)
     await prisma.user.update({
       where: { id: userId },
-      data: { roleId: adminRole.id },
+      data: { roles: { connect: { id: adminRole.id } } },
     });
 
     // Aktualisierte User-Daten laden
     const updatedUser = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        role: {
+        roles: {
           include: { permissions: true },
         },
       },
     });
+
+    // Sammle alle Permissions aus allen Rollen
+    const allPermissions = new Set<string>();
+    for (const role of updatedUser?.roles || []) {
+      for (const perm of role.permissions) {
+        allPermissions.add(perm.name);
+      }
+    }
 
     res.json({
       success: true,
@@ -204,8 +212,8 @@ router.post('/fix-permissions', authMiddleware, async (req: AuthRequest, res: Re
       user: {
         id: updatedUser?.id,
         username: updatedUser?.username,
-        role: updatedUser?.role?.name,
-        permissions: updatedUser?.role?.permissions.map(p => p.name),
+        roles: updatedUser?.roles?.map(r => r.name),
+        permissions: Array.from(allPermissions),
       },
       permissionsCreated: defaultPermissions.length,
     });
@@ -333,7 +341,7 @@ router.post('/setup', async (req, res: Response) => {
 
     await prisma.user.update({
       where: { id: userId },
-      data: { roleId: adminRole.id },
+      data: { roles: { connect: { id: adminRole.id } } },
     });
 
     res.json({ success: true, message: 'Setup abgeschlossen. Du bist jetzt Administrator.' });

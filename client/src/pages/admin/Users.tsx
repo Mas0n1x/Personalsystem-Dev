@@ -91,15 +91,19 @@ export default function Users() {
     },
     {
       key: 'role',
-      header: 'Rolle',
+      header: 'Rollen',
       render: (user: User) =>
-        user.role ? (
-          <div className="flex items-center gap-2">
-            <Shield className="h-4 w-4" style={{ color: user.role.color }} />
-            <span style={{ color: user.role.color }}>{user.role.displayName}</span>
+        user.roles && user.roles.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {user.roles.map((role) => (
+              <div key={role.id} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs" style={{ backgroundColor: role.color + '20' }}>
+                <Shield className="h-3 w-3" style={{ color: role.color }} />
+                <span style={{ color: role.color }}>{role.displayName}</span>
+              </div>
+            ))}
           </div>
         ) : (
-          <span className="text-slate-500">Keine Rolle</span>
+          <span className="text-slate-500">Keine Rollen</span>
         ),
     },
     {

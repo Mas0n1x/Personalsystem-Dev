@@ -84,7 +84,6 @@ router.post('/config/init', authMiddleware, requirePermission('admin.full'), asy
     if (newConfigs.length > 0) {
       await prisma.bonusConfig.createMany({
         data: newConfigs,
-        skipDuplicates: true,
       });
     }
 

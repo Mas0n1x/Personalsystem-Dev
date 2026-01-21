@@ -361,13 +361,16 @@ router.delete('/:id', requirePermission('teamlead.manage'), async (req: AuthRequ
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        role: {
+        roles: {
           include: { permissions: true }
         }
       }
     });
 
-    const isAdmin = user?.role?.permissions.some(p => p.name === 'admin.full');
+    // Prüfe alle Rollen des Users auf admin.full Permission
+    const isAdmin = user?.roles?.some(role =>
+      role.permissions.some((p: { name: string }) => p.name === 'admin.full')
+    );
     const isCreator = request.requestedById === userId;
 
     if (!isAdmin && !isCreator) {

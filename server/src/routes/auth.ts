@@ -29,36 +29,37 @@ async function getSystemRoles() {
   return systemRolesCache;
 }
 
-// Funktion um System-Rolle basierend auf Discord-Rollen zuzuweisen
-async function assignRoleFromDiscord(discordId: string): Promise<string | null> {
+// Funktion um System-Rollen basierend auf Discord-Rollen zuzuweisen (Multi-Role)
+async function assignRolesFromDiscord(discordId: string): Promise<string[]> {
   try {
     const client = await getDiscordClient();
-    if (!client || !process.env.DISCORD_GUILD_ID) return null;
+    if (!client || !process.env.DISCORD_GUILD_ID) return [];
 
     const guild = client.guilds.cache.get(process.env.DISCORD_GUILD_ID);
-    if (!guild) return null;
+    if (!guild) return [];
 
     // Nutze Cache statt fetch wenn möglich
     let member = guild.members.cache.get(discordId);
     if (!member) {
       member = await guild.members.fetch(discordId).catch(() => undefined);
     }
-    if (!member) return null;
+    if (!member) return [];
 
     // Hole gecachte System-Rollen
     const systemRoles = await getSystemRoles();
 
-    // Finde die höchste System-Rolle, deren Discord-Rolle der Benutzer hat
+    // Finde ALLE System-Rollen, deren Discord-Rolle der Benutzer hat
+    const matchedRoleIds: string[] = [];
     for (const sysRole of systemRoles) {
       if (sysRole.discordRoleId && member.roles.cache.has(sysRole.discordRoleId)) {
-        return sysRole.id;
+        matchedRoleIds.push(sysRole.id);
       }
     }
 
-    return null;
+    return matchedRoleIds;
   } catch (error) {
-    console.error('Error assigning role from Discord:', error);
-    return null;
+    console.error('Error assigning roles from Discord:', error);
+    return [];
   }
 }
 
@@ -160,13 +161,14 @@ router.post('/discord/callback', async (req: Request, res: Response) => {
     // Prüfe ob User bereits existiert und hole den displayName
     const existingUser = await prisma.user.findUnique({
       where: { discordId: discordUser.id },
-      select: { id: true, roleId: true, displayName: true },
+      select: { id: true, displayName: true, roles: { select: { id: true } } },
     });
 
-    // Wenn User keine Rolle hat, versuche sie aus Discord zuzuweisen
-    let roleIdToAssign: string | null = existingUser?.roleId || null;
-    if (!roleIdToAssign) {
-      roleIdToAssign = await assignRoleFromDiscord(discordUser.id);
+    // Wenn User keine Rollen hat, versuche sie aus Discord zuzuweisen
+    const existingRoleIds = existingUser?.roles?.map(r => r.id) || [];
+    let roleIdsToAssign: string[] = existingRoleIds;
+    if (roleIdsToAssign.length === 0) {
+      roleIdsToAssign = await assignRolesFromDiscord(discordUser.id);
     }
 
     // Versuche den Server-Nickname aus Discord zu holen (falls verfügbar)
@@ -204,7 +206,7 @@ router.post('/discord/callback', async (req: Request, res: Response) => {
         avatar: avatarUrl,
         email: discordUser.email,
         lastLogin: new Date(),
-        roleId: roleIdToAssign,
+        roles: roleIdsToAssign.length > 0 ? { connect: roleIdsToAssign.map(id => ({ id })) } : undefined,
       },
       update: {
         username: discordUser.username,
@@ -213,11 +215,13 @@ router.post('/discord/callback', async (req: Request, res: Response) => {
         avatar: avatarUrl,
         email: discordUser.email,
         lastLogin: new Date(),
-        // Rolle nur aktualisieren wenn noch keine gesetzt ist
-        ...(existingUser?.roleId ? {} : { roleId: roleIdToAssign }),
+        // Rollen nur aktualisieren wenn noch keine gesetzt sind
+        ...(existingRoleIds.length > 0 ? {} : {
+          roles: roleIdsToAssign.length > 0 ? { connect: roleIdsToAssign.map(id => ({ id })) } : undefined,
+        }),
       },
       include: {
-        role: {
+        roles: {
           include: {
             permissions: true,
           },
@@ -244,6 +248,14 @@ router.post('/discord/callback', async (req: Request, res: Response) => {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 Tage
     });
 
+    // Berechne zusammengefasste Permissions aus allen Rollen
+    const allPermissions = new Set<string>();
+    for (const role of user.roles) {
+      for (const perm of role.permissions) {
+        allPermissions.add(perm.name);
+      }
+    }
+
     res.json({
       success: true,
       user: {
@@ -252,7 +264,8 @@ router.post('/discord/callback', async (req: Request, res: Response) => {
         username: user.username,
         displayName: user.displayName,
         avatar: user.avatar,
-        role: user.role,
+        roles: user.roles,
+        permissions: Array.from(allPermissions),
       },
     });
   } catch (error) {
@@ -267,7 +280,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
     const user = await prisma.user.findUnique({
       where: { id: req.user!.id },
       include: {
-        role: {
+        roles: {
           include: {
             permissions: true,
           },
@@ -281,6 +294,14 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    // Berechne zusammengefasste Permissions aus allen Rollen
+    const allPermissions = new Set<string>();
+    for (const role of user.roles) {
+      for (const perm of role.permissions) {
+        allPermissions.add(perm.name);
+      }
+    }
+
     res.json({
       id: user.id,
       discordId: user.discordId,
@@ -288,9 +309,9 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
       displayName: user.displayName,
       avatar: user.avatar,
       email: user.email,
-      role: user.role,
+      roles: user.roles,
       employee: user.employee,
-      permissions: user.role?.permissions.map(p => p.name) || [],
+      permissions: Array.from(allPermissions),
     });
   } catch (error) {
     console.error('Get me error:', error);

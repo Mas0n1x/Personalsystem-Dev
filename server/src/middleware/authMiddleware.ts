@@ -10,14 +10,49 @@ export interface AuthRequest extends Request {
     username: string;
     displayName: string | null;
     avatar: string | null;
-    roleId: string | null;
-    role?: {
+    roles?: {
       id: string;
       name: string;
       level: number;
       permissions: { name: string }[];
-    } | null;
+    }[];
+    // Zusammengefasste Permissions aus allen Rollen
+    allPermissions?: string[];
+    // Höchstes Level aus allen Rollen
+    maxLevel?: number;
   };
+}
+
+// User-Cache für schnellere Auth-Checks (30 Sekunden TTL)
+interface CachedUser {
+  user: AuthRequest['user'];
+  timestamp: number;
+}
+const userCache = new Map<string, CachedUser>();
+const USER_CACHE_TTL = 30 * 1000; // 30 Sekunden
+
+function getCachedUser(userId: string): AuthRequest['user'] | null {
+  const cached = userCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < USER_CACHE_TTL) {
+    return cached.user;
+  }
+  if (cached) {
+    userCache.delete(userId);
+  }
+  return null;
+}
+
+function setCachedUser(userId: string, user: AuthRequest['user']): void {
+  userCache.set(userId, { user, timestamp: Date.now() });
+}
+
+// Cache invalidieren wenn nötig (z.B. bei Rollenänderung)
+export function invalidateUserCache(userId?: string): void {
+  if (userId) {
+    userCache.delete(userId);
+  } else {
+    userCache.clear();
+  }
 }
 
 export async function authMiddleware(
@@ -35,20 +70,46 @@ export async function authMiddleware(
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      include: {
-        role: {
-          include: {
-            permissions: true,
+    // Versuche erst aus dem Cache zu laden
+    let user = getCachedUser(decoded.userId);
+
+    if (!user) {
+      // Cache miss - aus DB laden
+      const dbUser = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        include: {
+          roles: {
+            include: {
+              permissions: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    if (!user || !user.isActive) {
-      res.status(401).json({ error: 'Benutzer nicht gefunden oder deaktiviert' });
-      return;
+      if (!dbUser || !dbUser.isActive) {
+        res.status(401).json({ error: 'Benutzer nicht gefunden oder deaktiviert' });
+        return;
+      }
+
+      // Berechne zusammengefasste Permissions und maxLevel aus allen Rollen
+      const allPermissions = new Set<string>();
+      let maxLevel = 0;
+
+      for (const role of dbUser.roles) {
+        if (role.level > maxLevel) {
+          maxLevel = role.level;
+        }
+        for (const perm of role.permissions) {
+          allPermissions.add(perm.name);
+        }
+      }
+
+      user = {
+        ...dbUser,
+        allPermissions: Array.from(allPermissions),
+        maxLevel,
+      };
+      setCachedUser(decoded.userId, user);
     }
 
     req.user = user;
@@ -62,19 +123,15 @@ export async function authMiddleware(
 export function requirePermission(...requiredPermissions: string[]) {
   return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     if (!req.user) {
-      console.log('[AUTH] No user in request');
       res.status(401).json({ error: 'Nicht autorisiert' });
       return;
     }
 
-    const userPermissions = req.user.role?.permissions.map(p => p.name) || [];
-
-    console.log(`[AUTH] User: ${req.user.username}, Role: ${req.user.role?.name}, Permissions: ${userPermissions.join(', ')}`);
-    console.log(`[AUTH] Required: ${requiredPermissions.join(', ')}`);
+    // Nutze die zusammengefassten Permissions aus allen Rollen
+    const userPermissions = req.user.allPermissions || [];
 
     // Admin hat immer alle Rechte
     if (userPermissions.includes('admin.full')) {
-      console.log('[AUTH] Admin access granted');
       next();
       return;
     }
@@ -82,7 +139,6 @@ export function requirePermission(...requiredPermissions: string[]) {
     const hasPermission = requiredPermissions.some(perm => userPermissions.includes(perm));
 
     if (!hasPermission) {
-      console.log(`[AUTH] DENIED - User ${req.user.username} lacks permissions`);
       res.status(403).json({ error: 'Keine Berechtigung für diese Aktion' });
       return;
     }
@@ -98,9 +154,11 @@ export function requireRole(...allowedRoles: string[]) {
       return;
     }
 
-    const userRole = req.user.role?.name;
+    // Prüfe ob der User mindestens eine der erlaubten Rollen hat
+    const userRoleNames = req.user.roles?.map(r => r.name) || [];
+    const hasRole = allowedRoles.some(role => userRoleNames.includes(role));
 
-    if (!userRole || !allowedRoles.includes(userRole)) {
+    if (!hasRole) {
       res.status(403).json({ error: 'Keine Berechtigung für diese Aktion' });
       return;
     }
@@ -116,7 +174,8 @@ export function requireMinLevel(minLevel: number) {
       return;
     }
 
-    const userLevel = req.user.role?.level || 0;
+    // Nutze das höchste Level aus allen Rollen
+    const userLevel = req.user.maxLevel || 0;
 
     if (userLevel < minLevel) {
       res.status(403).json({ error: 'Keine Berechtigung für diese Aktion' });

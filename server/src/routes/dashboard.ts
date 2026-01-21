@@ -191,7 +191,7 @@ router.get('/online-users', authMiddleware, async (_req: AuthRequest, res: Respo
         username: true,
         displayName: true,
         avatar: true,
-        role: true,
+        roles: true,
       },
     });
 

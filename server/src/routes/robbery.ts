@@ -11,6 +11,24 @@ import cron from 'node-cron';
 
 const router = Router();
 
+// ==================== EMPLOYEE CACHE ====================
+// Cache für Mitarbeiter-Dropdown (60 Sekunden TTL)
+interface EmployeeCache {
+  data: unknown[];
+  timestamp: number;
+}
+let employeeCache: EmployeeCache | null = null;
+const EMPLOYEE_CACHE_TTL = 60 * 1000; // 60 Sekunden
+
+function isEmployeeCacheValid(): boolean {
+  return employeeCache !== null && (Date.now() - employeeCache.timestamp) < EMPLOYEE_CACHE_TTL;
+}
+
+// Cache invalidieren (z.B. bei Mitarbeiteränderungen)
+export function invalidateEmployeeCache(): void {
+  employeeCache = null;
+}
+
 // Setup für Datei-Upload
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,16 +66,24 @@ const upload = multer({
 cron.schedule('59 23 * * 0', async () => {
   console.log('Cron-Job: Lösche alle Räube der Woche...');
   try {
-    // Hole alle Räube um ihre Bilder zu löschen
-    const robberies = await prisma.robbery.findMany();
+    // Hole nur imagePath für effizientes Löschen der Bilder
+    const robberies = await prisma.robbery.findMany({
+      select: { imagePath: true },
+    });
 
-    // Lösche alle Bilder
-    for (const robbery of robberies) {
-      const imagePath = path.join(uploadDir, robbery.imagePath);
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-      }
-    }
+    // Lösche alle Bilder (parallel für bessere Performance)
+    await Promise.all(
+      robberies.map(async (robbery) => {
+        const imagePath = path.join(uploadDir, robbery.imagePath);
+        try {
+          if (fs.existsSync(imagePath)) {
+            fs.unlinkSync(imagePath);
+          }
+        } catch (err) {
+          console.error(`Fehler beim Löschen von ${imagePath}:`, err);
+        }
+      })
+    );
 
     // Lösche alle Räube aus der Datenbank
     const deleted = await prisma.robbery.deleteMany();
@@ -175,14 +201,21 @@ router.get('/image/:filename', authMiddleware, (req: AuthRequest, res: Response)
   res.sendFile(filePath);
 });
 
-// GET alle Mitarbeiter für Dropdown
+// GET alle Mitarbeiter für Dropdown (mit Caching)
 router.get('/employees', authMiddleware, requirePermission('robbery.view'), async (_req: AuthRequest, res: Response) => {
   try {
+    // Aus Cache laden wenn gültig
+    if (isEmployeeCacheValid() && employeeCache) {
+      return res.json(employeeCache.data);
+    }
+
     const employees = await prisma.employee.findMany({
       where: {
         status: 'ACTIVE',
       },
-      include: {
+      select: {
+        id: true,
+        rank: true,
         user: {
           select: {
             displayName: true,
@@ -196,6 +229,9 @@ router.get('/employees', authMiddleware, requirePermission('robbery.view'), asyn
         { user: { displayName: 'asc' } },
       ],
     });
+
+    // In Cache speichern
+    employeeCache = { data: employees, timestamp: Date.now() };
 
     res.json(employees);
   } catch (error) {
@@ -269,14 +305,18 @@ router.post('/', authMiddleware, requirePermission('robbery.create'), upload.sin
       },
     });
 
-    // Bonus-Trigger für Einsatzleitung und Verhandlungsführung
-    await triggerRobberyLeader(leaderId, robbery.id);
-    await triggerRobberyNegotiator(negotiatorId, robbery.id);
+    // Response sofort senden für schnelle UX
+    res.status(201).json(robbery);
 
-    // Live-Update broadcast
+    // Live-Update broadcast (async)
     broadcastCreate('robbery', robbery);
 
-    res.status(201).json(robbery);
+    // Bonus-Trigger für Einsatzleitung und Verhandlungsführung (async, non-blocking)
+    // Diese laufen im Hintergrund und blockieren nicht die Response
+    Promise.all([
+      triggerRobberyLeader(leaderId, robbery.id),
+      triggerRobberyNegotiator(negotiatorId, robbery.id),
+    ]).catch((err) => console.error('Bonus trigger error:', err));
   } catch (error) {
     console.error('Create robbery error:', error);
     res.status(500).json({ error: 'Fehler beim Erstellen des Raubs' });

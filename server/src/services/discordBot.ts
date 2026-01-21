@@ -474,20 +474,26 @@ export async function syncAllRoles(): Promise<void> {
 
   const users = await prisma.user.findMany({
     where: { isActive: true },
-    include: { role: true },
+    include: { roles: true },
   });
 
   for (const user of users) {
-    if (!user.role?.discordRoleId) continue;
+    // Mit Multi-Role: Sync alle Rollen des Users
+    if (!user.roles || user.roles.length === 0) continue;
 
     try {
       const member = await guild.members.fetch(user.discordId);
       if (!member) continue;
 
-      // Prüfen ob Rolle bereits vorhanden
-      if (!member.roles.cache.has(user.role.discordRoleId)) {
-        await member.roles.add(user.role.discordRoleId);
-        console.log(`Rolle ${user.role.name} zu ${user.username} hinzugefügt`);
+      // Alle Rollen des Users synchronisieren
+      for (const role of user.roles) {
+        if (!role.discordRoleId) continue;
+
+        // Prüfen ob Rolle bereits vorhanden
+        if (!member.roles.cache.has(role.discordRoleId)) {
+          await member.roles.add(role.discordRoleId);
+          console.log(`Rolle ${role.name} zu ${user.username} hinzugefügt`);
+        }
       }
     } catch (error) {
       console.error(`Error syncing roles for ${user.username}:`, error);
@@ -632,11 +638,11 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
       orderBy: { level: 'desc' },
     });
 
-    // Alle bestehenden User mit discordId laden für schnellen Lookup
+    // Alle bestehenden User mit discordId und Rollen laden für schnellen Lookup
     const existingUsers = await prisma.user.findMany({
-      select: { discordId: true, roleId: true },
+      select: { discordId: true, roles: { select: { id: true } } },
     });
-    const existingUserMap = new Map(existingUsers.map(u => [u.discordId, u.roleId]));
+    const existingUserMap = new Map(existingUsers.map(u => [u.discordId, u.roles.map(r => r.id)]));
 
     for (const [, member] of members) {
       // Bots überspringen
@@ -666,23 +672,20 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
       const department = departments.join(', ');
 
       try {
-        // Finde die höchste System-Rolle, deren Discord-Rolle der Benutzer hat
-        let assignedRoleId: string | null = null;
+        // Finde ALLE System-Rollen, deren Discord-Rolle der Benutzer hat (Multi-Role Support)
+        const matchedRoleIds: string[] = [];
         for (const sysRole of systemRoles) {
           if (sysRole.discordRoleId && member.roles.cache.has(sysRole.discordRoleId)) {
-            assignedRoleId = sysRole.id;
-            break; // Höchste Rolle gefunden (sortiert nach level desc)
+            matchedRoleIds.push(sysRole.id);
           }
         }
 
         // User erstellen/aktualisieren
-        // WICHTIG: Bestehende roleId nicht überschreiben wenn bereits gesetzt (z.B. manuell als Admin)
-        const existingRoleId = existingUserMap.get(member.id);
+        // WICHTIG: Bestehende Rollen nicht überschreiben wenn bereits gesetzt (z.B. manuell als Admin)
+        const existingRoleIds = existingUserMap.get(member.id) || [];
 
-        // Nur roleId setzen wenn:
-        // 1. Es einen neuen assignedRoleId gibt (basierend auf Discord-Rollen), ODER
-        // 2. Der User noch keine roleId hat
-        const newRoleId = assignedRoleId || existingRoleId || null;
+        // Merge: Bestehende Rollen behalten, neue hinzufügen
+        const allRoleIds = [...new Set([...existingRoleIds, ...matchedRoleIds])];
 
         const user = await prisma.user.upsert({
           where: { discordId: member.id },
@@ -692,16 +695,17 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
             displayName: member.displayName || member.user.globalName || null,
             avatar: member.user.avatarURL() || null,
             isActive: true,
-            roleId: assignedRoleId,
+            roles: matchedRoleIds.length > 0 ? { connect: matchedRoleIds.map(id => ({ id })) } : undefined,
           },
           update: {
             username: member.user.username,
             displayName: member.displayName || member.user.globalName || null,
             avatar: member.user.avatarURL() || null,
             isActive: true,
-            // Nur roleId aktualisieren wenn es eine neue Discord-basierte Rolle gibt
-            // ODER wenn der User noch keine Rolle hat
-            ...(assignedRoleId ? { roleId: assignedRoleId } : {}),
+            // Rollen nur hinzufügen (nicht ersetzen) wenn es neue Discord-basierte Rollen gibt
+            ...(matchedRoleIds.length > 0 && existingRoleIds.length === 0 ? {
+              roles: { connect: matchedRoleIds.map(id => ({ id })) },
+            } : {}),
           },
         });
 

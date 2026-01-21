@@ -214,8 +214,8 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
 
     // Prüfe ob User Berechtigung hat oder eigene Rechnung
     const isOwner = invoice.submittedById === req.user!.id;
-    const hasPermission = req.user!.role?.permissions?.some(
-      (p: { name: string }) => p.name === 'tuning.manage' || p.name === 'admin.full'
+    const hasPermission = req.user!.allPermissions?.some(
+      (p: string) => p === 'tuning.manage' || p === 'admin.full'
     );
 
     if (!isOwner && !hasPermission) {

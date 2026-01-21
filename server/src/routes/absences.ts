@@ -228,11 +228,14 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
     // Prüfen ob eigene Abmeldung oder Admin
     const user = await prisma.user.findUnique({
       where: { id: req.user!.id },
-      include: { employee: true, role: { include: { permissions: true } } },
+      include: { employee: true, roles: { include: { permissions: true } } },
     });
 
     const isOwnAbsence = user?.employee?.id === absence.employeeId;
-    const hasEditPermission = user?.role?.permissions.some(p => p.name === 'employees.edit' || p.name === 'admin.full');
+    // Prüfe alle Rollen des Users auf die nötigen Permissions
+    const hasEditPermission = user?.roles?.some(role =>
+      role.permissions.some((p: { name: string }) => p.name === 'employees.edit' || p.name === 'admin.full')
+    );
 
     if (!isOwnAbsence && !hasEditPermission) {
       res.status(403).json({ error: 'Keine Berechtigung zum Löschen dieser Abmeldung' });

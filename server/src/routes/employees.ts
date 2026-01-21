@@ -149,7 +149,7 @@ router.get('/', authMiddleware, requirePermission('employees.view'), async (req:
         include: {
           user: {
             include: {
-              role: true,
+              roles: true,
             },
           },
           // Aktuelle Abwesenheiten einschließen
@@ -248,7 +248,7 @@ router.post('/', authMiddleware, requirePermission('employees.edit'), async (req
       include: {
         user: {
           include: {
-            role: true,
+            roles: true,
           },
         },
       },
@@ -1059,7 +1059,7 @@ router.get('/:id', authMiddleware, requirePermission('employees.view'), async (r
       include: {
         user: {
           include: {
-            role: true,
+            roles: true,
           },
         },
         absences: {
@@ -1137,7 +1137,7 @@ router.put('/:id', authMiddleware, requirePermission('employees.edit'), async (r
       include: {
         user: {
           include: {
-            role: true,
+            roles: true,
           },
         },
       },
@@ -1169,7 +1169,7 @@ router.put('/:id', authMiddleware, requirePermission('employees.edit'), async (r
       include: {
         user: {
           include: {
-            role: true,
+            roles: true,
           },
         },
       },

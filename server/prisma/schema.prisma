@@ -16,8 +16,7 @@ model User {
   displayName   String?
   avatar        String?
   email         String?
-  roleId        String?
-  role          Role?    @relation(fields: [roleId], references: [id])
+  roles         Role[]   // Many-to-Many: User kann mehrere Rollen haben
   isActive      Boolean  @default(true)
   lastLogin     DateTime?
   createdAt     DateTime @default(now())
@@ -72,7 +71,7 @@ model Role {
   discordRoleId String?
   level         Int      @default(0)
   permissions   Permission[]
-  users         User[]
+  users         User[]   // Many-to-Many: Rolle kann mehrere User haben
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

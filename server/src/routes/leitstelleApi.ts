@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma.js';
-import { getAllMembersWithRoles } from '../services/discordBot.js';
+import { getAllMembersWithRoles, getMemberRoles } from '../services/discordBot.js';
 
 const router = Router();
 

@@ -5,9 +5,9 @@ export interface User {
   displayName: string | null;
   avatar: string | null;
   email: string | null;
-  role: Role | null;
+  roles: Role[];  // Geändert: User kann mehrere Rollen haben
   employee: Employee | null;
-  permissions: string[];
+  permissions: string[];  // Zusammengefasste Permissions aus allen Rollen
   isActive: boolean;
   lastLogin: string | null;
   createdAt: string;

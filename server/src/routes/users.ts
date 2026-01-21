@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { prisma } from '../prisma.js';
-import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { authMiddleware, AuthRequest, requirePermission, invalidateUserCache } from '../middleware/authMiddleware.js';
 
 const router = Router();
 
@@ -11,8 +11,8 @@ router.get('/', authMiddleware, requirePermission('users.view'), async (req: Aut
 
     const where: {
       isActive?: boolean;
-      roleId?: string;
-      OR?: Array<{ username?: { contains: string; mode: 'insensitive' }; displayName?: { contains: string; mode: 'insensitive' } }>;
+      roles?: { some: { id: string } };
+      OR?: Array<{ username?: { contains: string }; displayName?: { contains: string } }>;
     } = {};
 
     if (isActive !== undefined) {
@@ -20,13 +20,13 @@ router.get('/', authMiddleware, requirePermission('users.view'), async (req: Aut
     }
 
     if (roleId) {
-      where.roleId = roleId as string;
+      where.roles = { some: { id: roleId as string } };
     }
 
     if (search) {
       where.OR = [
-        { username: { contains: search as string, mode: 'insensitive' } },
-        { displayName: { contains: search as string, mode: 'insensitive' } },
+        { username: { contains: search as string } },
+        { displayName: { contains: search as string } },
       ];
     }
 
@@ -36,7 +36,7 @@ router.get('/', authMiddleware, requirePermission('users.view'), async (req: Aut
       prisma.user.findMany({
         where,
         include: {
-          role: true,
+          roles: true,
           employee: true,
         },
         skip,
@@ -65,7 +65,7 @@ router.get('/:id', authMiddleware, requirePermission('users.view'), async (req: 
     const user = await prisma.user.findUnique({
       where: { id: req.params.id },
       include: {
-        role: {
+        roles: {
           include: {
             permissions: true,
           },
@@ -89,18 +89,24 @@ router.get('/:id', authMiddleware, requirePermission('users.view'), async (req: 
 // Benutzer aktualisieren
 router.put('/:id', authMiddleware, requirePermission('users.edit'), async (req: AuthRequest, res: Response) => {
   try {
-    const { roleId, isActive } = req.body;
+    const { roleIds, isActive } = req.body;
 
     const user = await prisma.user.update({
       where: { id: req.params.id },
       data: {
-        roleId,
-        isActive,
+        // Setze die Rollen auf die übergebenen IDs (ersetzt alle bisherigen)
+        ...(roleIds !== undefined ? {
+          roles: { set: roleIds.map((id: string) => ({ id })) },
+        } : {}),
+        ...(isActive !== undefined ? { isActive } : {}),
       },
       include: {
-        role: true,
+        roles: true,
       },
     });
+
+    // Cache invalidieren damit neue Permissions sofort wirksam werden
+    invalidateUserCache(req.params.id);
 
     res.json(user);
   } catch (error) {
@@ -117,6 +123,9 @@ router.delete('/:id', authMiddleware, requirePermission('users.delete'), async (
       where: { id: req.params.id },
       data: { isActive: false },
     });
+
+    // Cache invalidieren
+    invalidateUserCache(req.params.id);
 
     res.json({ success: true });
   } catch (error) {

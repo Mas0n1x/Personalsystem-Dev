@@ -334,7 +334,9 @@ export default function Header() {
                 {user?.displayName || user?.username}
               </p>
               <p className="text-xs text-slate-400">
-                {user?.role?.displayName || 'Kein Rang'}
+                {user?.roles && user.roles.length > 0
+                  ? user.roles.map(r => r.displayName).join(', ')
+                  : 'Keine Rollen'}
               </p>
             </div>
             <ChevronDown className={clsx(
