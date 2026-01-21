@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { blacklistApi, applicationApi, adminApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -147,6 +147,35 @@ export default function HumanResources() {
 
   // Reject State
   const [rejectionReason, setRejectionReason] = useState('');
+
+  // STRG+V Paste Handler für Bilder
+  const handlePaste = useCallback((e: ClipboardEvent) => {
+    if (!showCreateModal) return;
+
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          // Erstelle einen aussagekräftigen Dateinamen
+          const extension = item.type.split('/')[1] || 'png';
+          const renamedFile = new File([file], `personalausweis-${Date.now()}.${extension}`, { type: file.type });
+          setIdCardFile(renamedFile);
+          toast.success('Bild aus Zwischenablage eingefügt');
+          e.preventDefault();
+          return;
+        }
+      }
+    }
+  }, [showCreateModal]);
+
+  // Paste Event Listener registrieren
+  useEffect(() => {
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [handlePaste]);
   const [addToBlacklist, setAddToBlacklist] = useState(false);
   const [blacklistReason, setBlacklistReason] = useState('');
   const [blacklistExpires, setBlacklistExpires] = useState('');
@@ -1119,6 +1148,7 @@ export default function HumanResources() {
                         <span className="text-sm text-slate-400">{idCardFile.name}</span>
                       )}
                     </div>
+                    <p className="text-xs text-slate-500 mt-1">Tipp: STRG+V zum Einfügen aus der Zwischenablage</p>
                   </div>
                 </div>
               </div>

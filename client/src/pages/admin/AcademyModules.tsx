@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { academyApi } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -13,6 +13,23 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface AcademyModule {
   id: string;
@@ -21,6 +38,89 @@ interface AcademyModule {
   category: 'JUNIOR_OFFICER' | 'OFFICER';
   sortOrder: number;
   isActive: boolean;
+}
+
+// Sortable Module Item Component
+interface SortableModuleItemProps {
+  module: AcademyModule;
+  onEdit: (module: AcademyModule) => void;
+  onDelete: (id: string, name: string) => void;
+  onToggleActive: (module: AcademyModule) => void;
+}
+
+function SortableModuleItem({ module, onEdit, onDelete, onToggleActive }: SortableModuleItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: module.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={clsx(
+        'p-4 flex items-center gap-4 transition-colors bg-slate-800',
+        !module.isActive && 'opacity-50',
+        isDragging && 'z-10 shadow-lg'
+      )}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        className="touch-none cursor-grab active:cursor-grabbing"
+      >
+        <GripVertical className="h-5 w-5 text-slate-600 hover:text-slate-400" />
+      </button>
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <h3 className="font-medium text-white">{module.name}</h3>
+          {!module.isActive && (
+            <span className="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-400">
+              Deaktiviert
+            </span>
+          )}
+        </div>
+        {module.description && (
+          <p className="text-sm text-slate-400 mt-1">{module.description}</p>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onToggleActive(module)}
+          className={clsx(
+            'px-3 py-1 rounded text-sm transition-colors',
+            module.isActive
+              ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+              : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+          )}
+        >
+          {module.isActive ? 'Aktiv' : 'Inaktiv'}
+        </button>
+        <button
+          onClick={() => onEdit(module)}
+          className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => onDelete(module.id, module.name)}
+          className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function AcademyModules() {
@@ -93,6 +193,29 @@ export default function AcademyModules() {
     },
   });
 
+  const reorderModules = useMutation({
+    mutationFn: academyApi.reorderModules,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['academy-modules'] });
+      toast.success('Reihenfolge gespeichert');
+    },
+    onError: () => {
+      toast.error('Fehler beim Speichern der Reihenfolge');
+    },
+  });
+
+  // Sensors for drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newModule.name.trim()) {
@@ -137,10 +260,42 @@ export default function AcademyModules() {
     });
   };
 
-  const juniorOfficerModules = modules.filter((m: AcademyModule) => m.category === 'JUNIOR_OFFICER');
-  const officerModules = modules.filter((m: AcademyModule) => m.category === 'OFFICER');
+  const juniorOfficerModules = useMemo(
+    () => modules
+      .filter((m: AcademyModule) => m.category === 'JUNIOR_OFFICER')
+      .sort((a: AcademyModule, b: AcademyModule) => a.sortOrder - b.sortOrder),
+    [modules]
+  );
+  const officerModules = useMemo(
+    () => modules
+      .filter((m: AcademyModule) => m.category === 'OFFICER')
+      .sort((a: AcademyModule, b: AcademyModule) => a.sortOrder - b.sortOrder),
+    [modules]
+  );
 
-  const renderModuleList = (moduleList: AcademyModule[], category: string, title: string, emoji: string, color: string) => (
+  const handleDragEnd = (event: DragEndEvent, category: 'JUNIOR_OFFICER' | 'OFFICER') => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    const moduleList = category === 'JUNIOR_OFFICER' ? juniorOfficerModules : officerModules;
+    const oldIndex = moduleList.findIndex(m => m.id === active.id);
+    const newIndex = moduleList.findIndex(m => m.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = arrayMove(moduleList, oldIndex, newIndex);
+
+    // Update sortOrder for all modules in this category
+    const reorderedModules = newOrder.map((module, index) => ({
+      id: module.id,
+      sortOrder: index,
+    }));
+
+    reorderModules.mutate(reorderedModules);
+  };
+
+  const renderModuleList = (moduleList: AcademyModule[], category: 'JUNIOR_OFFICER' | 'OFFICER', title: string, emoji: string, color: string) => (
     <div className="card">
       <div className="p-4 border-b border-slate-700 flex items-center justify-between">
         <h2 className={clsx('text-lg font-semibold flex items-center gap-2', color)}>
@@ -149,62 +304,33 @@ export default function AcademyModules() {
         </h2>
         <span className="text-sm text-slate-400">{moduleList.length} Module</span>
       </div>
-      <div className="divide-y divide-slate-700">
-        {moduleList.map((module) => (
-          <div
-            key={module.id}
-            className={clsx(
-              'p-4 flex items-center gap-4 transition-colors',
-              !module.isActive && 'opacity-50'
-            )}
-          >
-            <GripVertical className="h-5 w-5 text-slate-600 cursor-move" />
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-medium text-white">{module.name}</h3>
-                {!module.isActive && (
-                  <span className="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-400">
-                    Deaktiviert
-                  </span>
-                )}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={(event) => handleDragEnd(event, category)}
+      >
+        <SortableContext
+          items={moduleList.map(m => m.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="divide-y divide-slate-700">
+            {moduleList.map((module) => (
+              <SortableModuleItem
+                key={module.id}
+                module={module}
+                onEdit={setEditingModule}
+                onDelete={handleDelete}
+                onToggleActive={handleToggleActive}
+              />
+            ))}
+            {moduleList.length === 0 && (
+              <div className="p-8 text-center text-slate-500">
+                Keine Module in dieser Kategorie
               </div>
-              {module.description && (
-                <p className="text-sm text-slate-400 mt-1">{module.description}</p>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleToggleActive(module)}
-                className={clsx(
-                  'px-3 py-1 rounded text-sm transition-colors',
-                  module.isActive
-                    ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                    : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                )}
-              >
-                {module.isActive ? 'Aktiv' : 'Inaktiv'}
-              </button>
-              <button
-                onClick={() => setEditingModule(module)}
-                className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => handleDelete(module.id, module.name)}
-                className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
+            )}
           </div>
-        ))}
-        {moduleList.length === 0 && (
-          <div className="p-8 text-center text-slate-500">
-            Keine Module in dieser Kategorie
-          </div>
-        )}
-      </div>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 

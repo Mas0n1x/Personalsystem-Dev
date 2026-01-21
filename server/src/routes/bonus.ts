@@ -29,6 +29,7 @@ const DEFAULT_BONUS_CONFIGS = [
   // HR
   { activityType: 'APPLICATION_COMPLETED', displayName: 'Bewerbung abgeschlossen', category: 'HR', amount: 0 },
   { activityType: 'APPLICATION_ONBOARDING', displayName: 'Onboarding durchgeführt', category: 'HR', amount: 0 },
+  { activityType: 'APPLICATION_REJECTED', displayName: 'Bewerbung abgelehnt', category: 'HR', amount: 0 },
 
   // Academy
   { activityType: 'TRAINING_CONDUCTED', displayName: 'Schulung durchgeführt', category: 'ACADEMY', amount: 0 },
@@ -68,25 +69,26 @@ router.get('/config', authMiddleware, requirePermission('bonus.view'), async (_r
   }
 });
 
-// POST Initialisiere Standard-Konfigurationen (falls nicht vorhanden)
+// POST Initialisiere Standard-Konfigurationen (falls nicht vorhanden) - OPTIMIERT
 router.post('/config/init', authMiddleware, requirePermission('admin.full'), async (_req: AuthRequest, res: Response) => {
   try {
-    let created = 0;
+    // Hole alle existierenden activityTypes in einer Query
+    const existingConfigs = await prisma.bonusConfig.findMany({
+      select: { activityType: true },
+    });
+    const existingTypes = new Set(existingConfigs.map(c => c.activityType));
 
-    for (const config of DEFAULT_BONUS_CONFIGS) {
-      const existing = await prisma.bonusConfig.findUnique({
-        where: { activityType: config.activityType },
+    // Filtere nur die neuen Configs
+    const newConfigs = DEFAULT_BONUS_CONFIGS.filter(c => !existingTypes.has(c.activityType));
+
+    if (newConfigs.length > 0) {
+      await prisma.bonusConfig.createMany({
+        data: newConfigs,
+        skipDuplicates: true,
       });
-
-      if (!existing) {
-        await prisma.bonusConfig.create({
-          data: config,
-        });
-        created++;
-      }
     }
 
-    res.json({ message: `${created} Bonus-Konfigurationen erstellt`, created });
+    res.json({ message: `${newConfigs.length} Bonus-Konfigurationen erstellt`, created: newConfigs.length });
   } catch (error) {
     console.error('Init bonus configs error:', error);
     res.status(500).json({ error: 'Fehler beim Initialisieren der Bonus-Konfiguration' });
@@ -336,6 +338,84 @@ router.get('/summary', authMiddleware, requirePermission('bonus.view'), async (r
   } catch (error) {
     console.error('Get bonus summary error:', error);
     res.status(500).json({ error: 'Fehler beim Laden der Bonus-Zusammenfassung' });
+  }
+});
+
+// GET Mein Cap-Status (für Dashboard)
+router.get('/my/caps', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    const employee = await prisma.employee.findUnique({
+      where: { userId },
+    });
+
+    if (!employee) {
+      res.json({
+        unitWork: { current: 0, cap: 60000, remaining: 60000 },
+        operations: { current: 0, cap: 60000, remaining: 60000 },
+        total: { current: 0, cap: 120000, remaining: 120000 },
+      });
+      return;
+    }
+
+    const { weekStart, weekEnd } = getWeekBounds();
+
+    // Unit-Arbeit Aktivitäten
+    const UNIT_WORK_ACTIVITIES = [
+      'UNIT_REVIEW_COMPLETED', 'INVESTIGATION_OPENED', 'INVESTIGATION_CLOSED',
+      'APPLICATION_COMPLETED', 'APPLICATION_ONBOARDING', 'APPLICATION_REJECTED',
+      'ACADEMY_MODULE_COMPLETED', 'EXAM_CONDUCTED', 'RETRAINING_COMPLETED',
+      'TRAINING_CONDUCTED', 'TRAINING_PARTICIPATED',
+    ];
+
+    // Einsatzleitung Aktivitäten
+    const OPERATION_ACTIVITIES = ['ROBBERY_LEADER', 'ROBBERY_NEGOTIATOR'];
+
+    // Alle Zahlungen diese Woche abrufen
+    const allPayments = await prisma.bonusPayment.findMany({
+      where: {
+        employeeId: employee.id,
+        weekStart,
+        weekEnd,
+        status: { not: 'CANCELLED' },
+      },
+      include: { config: true },
+    });
+
+    // Berechne Summen
+    const unitWorkTotal = allPayments
+      .filter(p => UNIT_WORK_ACTIVITIES.includes(p.config.activityType))
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    const operationsTotal = allPayments
+      .filter(p => OPERATION_ACTIVITIES.includes(p.config.activityType))
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    const totalAmount = allPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    res.json({
+      unitWork: {
+        current: unitWorkTotal,
+        cap: 60000,
+        remaining: Math.max(0, 60000 - unitWorkTotal),
+      },
+      operations: {
+        current: operationsTotal,
+        cap: 60000,
+        remaining: Math.max(0, 60000 - operationsTotal),
+      },
+      total: {
+        current: totalAmount,
+        cap: 120000,
+        remaining: Math.max(0, 120000 - totalAmount),
+      },
+      weekStart,
+      weekEnd,
+    });
+  } catch (error) {
+    console.error('Get my caps error:', error);
+    res.status(500).json({ error: 'Fehler beim Laden der Cap-Informationen' });
   }
 });
 
@@ -725,6 +805,7 @@ export async function createBonusPayment(
       // HR (Human Resources)
       'APPLICATION_COMPLETED',
       'APPLICATION_ONBOARDING',
+      'APPLICATION_REJECTED',
       // PA (Police Academy)
       'ACADEMY_MODULE_COMPLETED',
       'EXAM_CONDUCTED',
@@ -737,6 +818,9 @@ export async function createBonusPayment(
     // Cap 2: Einsatzleitung/Verhandlungsführung - max. 60.000$ pro Woche
     const OPERATION_ACTIVITIES = ['ROBBERY_LEADER', 'ROBBERY_NEGOTIATOR'];
     const OPERATION_WEEKLY_CAP = 60000;
+
+    // Cap 3: Gesamt-Cap über alle Aktivitäten - max. 120.000$ pro Woche
+    const TOTAL_WEEKLY_CAP = 120000;
 
     // Prüfe ob diese Aktivität einem Cap unterliegt
     if (UNIT_WORK_ACTIVITIES.includes(activityType)) {
@@ -795,6 +879,29 @@ export async function createBonusPayment(
         console.log(`Einsatzleitung-Cap würde überschritten: ${currentOperationTotal} + ${config.amount} > ${OPERATION_WEEKLY_CAP}`);
         return false;
       }
+    }
+
+    // ==================== GESAMT-CAP PRÜFEN ====================
+    // Berechne gesamte Sonderzahlungen diese Woche (alle Aktivitäten)
+    const allPayments = await prisma.bonusPayment.findMany({
+      where: {
+        employeeId,
+        weekStart,
+        weekEnd,
+        status: { not: 'CANCELLED' },
+      },
+    });
+
+    const currentTotalAmount = allPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    if (currentTotalAmount >= TOTAL_WEEKLY_CAP) {
+      console.log(`Gesamt-Cap erreicht für Employee ${employeeId}: ${currentTotalAmount}/${TOTAL_WEEKLY_CAP}`);
+      return false;
+    }
+
+    if (currentTotalAmount + config.amount > TOTAL_WEEKLY_CAP) {
+      console.log(`Gesamt-Cap würde überschritten: ${currentTotalAmount} + ${config.amount} > ${TOTAL_WEEKLY_CAP}`);
+      return false;
     }
 
     // ==================== ZAHLUNG ERSTELLEN ====================

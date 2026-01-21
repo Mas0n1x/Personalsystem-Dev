@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { casesApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -147,6 +147,35 @@ export default function Detectives() {
     variant: 'danger',
     onConfirm: () => {},
   });
+
+  // STRG+V Paste Handler für Bilder
+  const handlePaste = useCallback((e: ClipboardEvent) => {
+    if (!selectedCase) return;
+
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          // Erstelle einen aussagekräftigen Dateinamen
+          const extension = item.type.split('/')[1] || 'png';
+          const renamedFile = new File([file], `fall-bild-${Date.now()}.${extension}`, { type: file.type });
+          setImageFile(renamedFile);
+          toast.success('Bild aus Zwischenablage eingefügt');
+          e.preventDefault();
+          return;
+        }
+      }
+    }
+  }, [selectedCase]);
+
+  // Paste Event Listener registrieren
+  useEffect(() => {
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [handlePaste]);
 
   // Queries
   const { data: foldersData, isLoading: foldersLoading } = useQuery({
@@ -837,6 +866,7 @@ export default function Detectives() {
                         />
                       </label>
                     )}
+                    <span className="text-xs text-slate-500">STRG+V zum Einfügen</span>
                   </div>
 
                   {imageFile && (

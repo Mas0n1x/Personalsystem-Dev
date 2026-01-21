@@ -14,7 +14,7 @@ import {
   getTeamConfigForLevel
 } from '../services/discordBot.js';
 import { notifyPromotion, notifyDemotion, notifyUnitChange } from '../services/notificationService.js';
-import { announcePromotion, announceDemotion, announceUnitChange, announceTermination } from '../services/discordAnnouncements.js';
+import { announcePromotion, announceDemotion, announceUnitChange, announceTermination, announceEmployeeChange } from '../services/discordAnnouncements.js';
 import {
   broadcastCreate,
   broadcastUpdate,
@@ -226,11 +226,22 @@ router.post('/', authMiddleware, requirePermission('employees.edit'), async (req
       return;
     }
 
+    // Prüfe auf doppelte Dienstnummer
+    if (badgeNumber) {
+      const badgeExists = await prisma.employee.findFirst({
+        where: { badgeNumber },
+      });
+      if (badgeExists) {
+        res.status(400).json({ error: `Dienstnummer ${badgeNumber} ist bereits vergeben` });
+        return;
+      }
+    }
+
     const employee = await prisma.employee.create({
       data: {
         userId,
         badgeNumber,
-        rank: rank || 'Cadet',
+        rank: rank || 'Recruit',
         department: department || '',
         status: status || 'ACTIVE',
       },
@@ -652,7 +663,7 @@ router.get('/:id/unit-stats', authMiddleware, requirePermission('employees.view'
 });
 
 // Uprank - Rang erhöhen
-router.post('/:id/uprank', authMiddleware, requirePermission('employees.edit'), async (req: AuthRequest, res: Response) => {
+router.post('/:id/uprank', authMiddleware, requirePermission('employees.rank'), async (req: AuthRequest, res: Response) => {
   try {
     const employee = await prisma.employee.findUnique({
       where: { id: req.params.id },
@@ -821,7 +832,7 @@ router.post('/:id/uprank', authMiddleware, requirePermission('employees.edit'), 
 });
 
 // Downrank - Rang verringern
-router.post('/:id/downrank', authMiddleware, requirePermission('employees.edit'), async (req: AuthRequest, res: Response) => {
+router.post('/:id/downrank', authMiddleware, requirePermission('employees.rank'), async (req: AuthRequest, res: Response) => {
   try {
     const employee = await prisma.employee.findUnique({
       where: { id: req.params.id },
@@ -1167,6 +1178,30 @@ router.put('/:id', authMiddleware, requirePermission('employees.edit'), async (r
     // WebSocket Broadcast für Live-Updates
     if (updatedEmployee) {
       broadcastUpdate('employee', updatedEmployee);
+    }
+
+    // Discord-Ankündigung bei Dienstnummer oder Namensänderung
+    const oldBadgeNumber = existingEmployee.badgeNumber;
+    const oldDisplayName = cleanName(existingEmployee.user.displayName) || existingEmployee.user.username;
+    const badgeChanged = oldBadgeNumber !== finalBadgeNumber;
+    const nameChanged = displayName && oldDisplayName !== pureName;
+
+    if (badgeChanged || nameChanged) {
+      const changedByUser = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: { displayName: true, username: true },
+      });
+      const changedByName = changedByUser?.displayName || changedByUser?.username || 'Unbekannt';
+
+      await announceEmployeeChange({
+        employeeName: pureName,
+        employeeAvatar: existingEmployee.user.avatar,
+        badgeNumber: finalBadgeNumber,
+        oldBadgeNumber: oldBadgeNumber,
+        oldName: badgeChanged && nameChanged ? oldDisplayName : undefined,
+        changedBy: changedByName,
+        changeType: badgeChanged && nameChanged ? 'BOTH' : badgeChanged ? 'BADGE_NUMBER' : 'NAME',
+      });
     }
 
     res.json(updatedEmployee);

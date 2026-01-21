@@ -132,11 +132,16 @@ router.get('/:id', requirePermission('teamlead.view'), async (req: AuthRequest, 
 // Create uprank request (Teamleiter)
 router.post('/', requirePermission('teamlead.manage'), async (req: AuthRequest, res: Response) => {
   try {
-    const { employeeId, targetRank, reason, achievements } = req.body;
+    const { employeeId, targetRank, reason, achievements, interviewCompleted, interviewNotes, interviewDate } = req.body;
     const userId = req.user!.id;
 
     if (!employeeId || !targetRank || !reason) {
       return res.status(400).json({ error: 'Employee, target rank and reason are required' });
+    }
+
+    // Bewerbungsgespräch ist erforderlich
+    if (!interviewCompleted) {
+      return res.status(400).json({ error: 'Ein Bewerbungsgespräch mit dem Mitarbeiter muss vor dem Uprank-Antrag durchgeführt werden' });
     }
 
     // Get employee current rank
@@ -183,6 +188,9 @@ router.post('/', requirePermission('teamlead.manage'), async (req: AuthRequest, 
         targetRank,
         reason,
         achievements,
+        interviewCompleted: true,
+        interviewNotes: interviewNotes || null,
+        interviewDate: interviewDate ? new Date(interviewDate) : new Date(),
         requestedById: userId,
       },
       include: {

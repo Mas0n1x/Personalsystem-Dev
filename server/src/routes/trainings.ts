@@ -336,7 +336,7 @@ router.put('/:id', requirePermission('academy.manage'), async (req: AuthRequest,
       }
     });
 
-    // Bonus-Trigger wenn Training abgeschlossen wird
+    // Bonus-Trigger wenn Training abgeschlossen wird - OPTIMIERT mit Promise.all
     if (status === 'COMPLETED' && previousTraining?.status !== 'COMPLETED') {
       // Bonus für Instructor
       const instructorEmployeeId = await getEmployeeIdFromUserId(training.instructorId);
@@ -344,11 +344,12 @@ router.put('/:id', requirePermission('academy.manage'), async (req: AuthRequest,
         await triggerTrainingConducted(instructorEmployeeId, training.title, id);
       }
 
-      // Bonus für alle Teilnehmer die teilgenommen haben
-      for (const participant of training.participants) {
-        if (participant.status === 'ATTENDED') {
-          await triggerTrainingParticipated(participant.employeeId, training.title, id);
-        }
+      // Bonus für alle Teilnehmer die teilgenommen haben - parallel
+      const attendedParticipants = training.participants.filter(p => p.status === 'ATTENDED');
+      if (attendedParticipants.length > 0) {
+        await Promise.all(
+          attendedParticipants.map(p => triggerTrainingParticipated(p.employeeId, training.title, id))
+        );
       }
     }
 

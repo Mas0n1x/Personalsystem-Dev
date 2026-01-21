@@ -115,6 +115,32 @@ async function checkAndAssignRankRole(employeeId: string, category: 'JUNIOR_OFFI
 
 // ==================== ACADEMY MODULES (Admin) ====================
 
+// Reorder modules (Admin) - MUSS VOR /modules/:id kommen!
+router.put('/modules/reorder', requirePermission('academy.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { modules } = req.body; // Array of { id, sortOrder }
+
+    if (!Array.isArray(modules)) {
+      res.status(400).json({ error: 'Module-Array erforderlich' });
+      return;
+    }
+
+    await prisma.$transaction(
+      modules.map((m: { id: string; sortOrder: number }) =>
+        prisma.academyModule.update({
+          where: { id: m.id },
+          data: { sortOrder: m.sortOrder },
+        })
+      )
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error reordering modules:', error);
+    res.status(500).json({ error: 'Fehler beim Neuordnen der Module' });
+  }
+});
+
 // Get all modules
 router.get('/modules', requirePermission('academy.view'), async (_req: AuthRequest, res: Response) => {
   try {
@@ -197,32 +223,6 @@ router.delete('/modules/:id', requirePermission('academy.manage'), async (req: A
   } catch (error) {
     console.error('Error deleting academy module:', error);
     res.status(500).json({ error: 'Fehler beim Löschen des Moduls' });
-  }
-});
-
-// Reorder modules (Admin)
-router.put('/modules/reorder', requirePermission('academy.manage'), async (req: AuthRequest, res: Response) => {
-  try {
-    const { modules } = req.body; // Array of { id, sortOrder }
-
-    if (!Array.isArray(modules)) {
-      res.status(400).json({ error: 'Module-Array erforderlich' });
-      return;
-    }
-
-    await Promise.all(
-      modules.map((m: { id: string; sortOrder: number }) =>
-        prisma.academyModule.update({
-          where: { id: m.id },
-          data: { sortOrder: m.sortOrder },
-        })
-      )
-    );
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error reordering modules:', error);
-    res.status(500).json({ error: 'Fehler beim Neuordnen der Module' });
   }
 });
 

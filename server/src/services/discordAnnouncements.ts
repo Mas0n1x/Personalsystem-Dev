@@ -593,6 +593,64 @@ export async function announceHire(data: HireData): Promise<boolean> {
   return sendAnnouncementV2('HIRE', container);
 }
 
+// ==================== DIENSTNUMMER/NAMEN ÄNDERUNG ====================
+interface EmployeeChangeData {
+  employeeName: string;
+  employeeAvatar?: string | null;
+  badgeNumber?: string | null;
+  oldBadgeNumber?: string | null;
+  oldName?: string | null;
+  changedBy: string;
+  changeType: 'BADGE_NUMBER' | 'NAME' | 'BOTH';
+}
+
+export async function announceEmployeeChange(data: EmployeeChangeData): Promise<boolean> {
+  const emoji = data.changeType === 'BADGE_NUMBER' ? '🔢' : data.changeType === 'NAME' ? '📝' : '✏️';
+  const title = data.changeType === 'BADGE_NUMBER' ? 'Dienstnummer geändert' :
+                data.changeType === 'NAME' ? 'Name geändert' : 'Daten geändert';
+
+  const container = new ContainerBuilder()
+    .setAccentColor(0x3b82f6) // Blau
+    .addTextDisplayComponents(
+      (text) => text.setContent(`# ${emoji} ${title}`),
+    )
+    .addSeparatorComponents((sep) => sep.setDivider(true).setSpacing(SeparatorSpacingSize.Small))
+    .addSectionComponents((section) =>
+      section
+        .addTextDisplayComponents(
+          (text) => text.setContent(`### **${data.employeeName}**`),
+        )
+        .setButtonAccessory((btn) =>
+          btn.setCustomId('change_info')
+            .setLabel('Änderung')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji({ name: '📋' })
+            .setDisabled(true)
+        )
+    )
+    .addSeparatorComponents((sep) => sep.setDivider(false).setSpacing(SeparatorSpacingSize.Small));
+
+  let changeDetails = '';
+  if (data.changeType === 'BADGE_NUMBER' || data.changeType === 'BOTH') {
+    changeDetails += `🔢 **Dienstnummer:** \`${data.oldBadgeNumber || 'Keine'}\` ➜ \`${data.badgeNumber || 'Keine'}\`\n`;
+  }
+  if (data.changeType === 'NAME' || data.changeType === 'BOTH') {
+    changeDetails += `📝 **Name:** \`${data.oldName || 'Unbekannt'}\` ➜ \`${data.employeeName}\`\n`;
+  }
+  changeDetails += `👤 **Geändert von:** ${data.changedBy}`;
+
+  container.addTextDisplayComponents(
+    (text) => text.setContent(changeDetails),
+  );
+
+  container.addSeparatorComponents((sep) => sep.setDivider(false).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(
+    (text) => text.setContent(`-# 🕐 ${getCurrentTimestamp()} • LSPD Personalsystem`),
+  );
+
+  return sendAnnouncementV2('PROMOTION', container); // Nutze PROMOTION-Kanal für diese Ankündigungen
+}
+
 // ==================== ACADEMY TRAINING ====================
 interface TrainingAnnouncementData {
   trainingTitle: string;

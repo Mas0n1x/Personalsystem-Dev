@@ -234,11 +234,22 @@ router.post('/folders', authMiddleware, requirePermission('detectives.manage'), 
 // PUT Ordner aktualisieren
 router.put('/folders/:id', authMiddleware, requirePermission('detectives.manage'), async (req: AuthRequest, res: Response) => {
   try {
-    const { description } = req.body;
+    const { description, status } = req.body;
+
+    const updateData: Record<string, unknown> = {};
+    if (description !== undefined) updateData.description = description;
+    if (status !== undefined) {
+      updateData.status = status;
+      if (status === 'CLOSED') {
+        updateData.closedAt = new Date();
+      } else if (status === 'OPEN') {
+        updateData.closedAt = null;
+      }
+    }
 
     const folder = await prisma.detectiveFolder.update({
       where: { id: req.params.id },
-      data: { description },
+      data: updateData,
       include: {
         detective: {
           include: {
@@ -270,7 +281,7 @@ router.put('/folders/:id', authMiddleware, requirePermission('detectives.manage'
   }
 });
 
-// DELETE Ordner löschen (löscht auch alle Akten im Ordner)
+// DELETE Ordner löschen (löscht auch alle Akten im Ordner) - OPTIMIERT
 router.delete('/folders/:id', authMiddleware, requirePermission('detectives.manage'), async (req: AuthRequest, res: Response) => {
   try {
     // Zuerst alle Akten und ihre Bilder im Ordner löschen
@@ -279,18 +290,21 @@ router.delete('/folders/:id', authMiddleware, requirePermission('detectives.mana
       include: { images: true },
     });
 
-    // Lösche Dateien und Datenbank-Einträge für jede Akte
+    // Lösche Bilder vom Dateisystem (synchron ist hier ok, da Dateisystem)
     for (const caseItem of cases) {
-      // Lösche Bilder vom Dateisystem
       for (const image of caseItem.images) {
         const filePath = path.join(uploadDir, image.imagePath);
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
         }
       }
+    }
 
-      // Lösche die Akte aus der Datenbank (inkl. aller Beziehungen)
-      await prisma.case.delete({ where: { id: caseItem.id } });
+    // OPTIMIERT: Lösche alle Akten auf einmal statt in einer Schleife
+    if (cases.length > 0) {
+      await prisma.case.deleteMany({
+        where: { folderId: req.params.id },
+      });
     }
 
     // Jetzt kann der Ordner sicher gelöscht werden

@@ -222,17 +222,10 @@ export async function initializeDiscordBot(): Promise<void> {
             unmapped.forEach(r => console.log(`   - "${r.name}"`));
           }
 
-          // Periodischer Sync alle 5 Minuten
-          const SYNC_INTERVAL = 5 * 60 * 1000; // 5 Minuten
+          // Periodischer Sync alle 10 Minuten (erhöht um Rate-Limits zu vermeiden)
+          const SYNC_INTERVAL = 10 * 60 * 1000; // 10 Minuten
           setInterval(async () => {
-            try {
-              // Cache periodisch aktualisieren
-              if (guild) {
-                await guild.members.fetch();
-              }
-            } catch (e) {
-              // Ignorieren, nutze bestehenden Cache
-            }
+            // Nutze bestehenden Cache statt fetch() um Rate-Limits zu vermeiden
             const result = await syncDiscordMembers();
             if (result.created > 0 || result.updated > 0) {
               console.log(`Discord-Sync: ${result.created} erstellt, ${result.updated} aktualisiert`);
@@ -287,31 +280,10 @@ export async function initializeDiscordBot(): Promise<void> {
         where: { id: employee.id },
         data: {
           status: 'TERMINATED',
-          terminationDate: new Date(),
-          terminationReason: 'Discord Server verlassen',
         },
       });
 
       console.log(`[Discord] Mitarbeiter ${user.displayName || user.username} (${employee.badgeNumber}) automatisch gekündigt`);
-
-      // Archiv-Eintrag erstellen
-      await prisma.archive.create({
-        data: {
-          type: 'TERMINATION',
-          employeeId: employee.id,
-          data: JSON.stringify({
-            employeeName: user.displayName || user.username,
-            rank: employee.rank,
-            rankLevel: employee.rankLevel,
-            badgeNumber: employee.badgeNumber,
-            hireDate: employee.hireDate,
-            terminationDate: new Date(),
-            terminationReason: 'Discord Server verlassen',
-            terminationType: 'INACTIVE',
-            automatic: true,
-          }),
-        },
-      });
 
       // Leitstelle API Event
       emitEmployeeTerminated({
@@ -319,6 +291,9 @@ export async function initializeDiscordBot(): Promise<void> {
         name: user.displayName || user.username,
         badgeNumber: employee.badgeNumber,
         rank: employee.rank,
+        rankLevel: employee.rankLevel,
+        units: employee.department?.split(',').map(d => d.trim()).filter(Boolean) || [],
+        status: 'TERMINATED',
         discordId: user.discordId,
       });
 
@@ -651,6 +626,18 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
     }
     console.log(`[Discord-Sync] ${members.size} Mitglieder zur Verarbeitung`);
 
+    // PERFORMANCE: System-Rollen und bestehende User EINMAL laden statt pro Member
+    const systemRoles = await prisma.role.findMany({
+      where: { discordRoleId: { not: null } },
+      orderBy: { level: 'desc' },
+    });
+
+    // Alle bestehenden User mit discordId laden für schnellen Lookup
+    const existingUsers = await prisma.user.findMany({
+      select: { discordId: true, roleId: true },
+    });
+    const existingUserMap = new Map(existingUsers.map(u => [u.discordId, u.roleId]));
+
     for (const [, member] of members) {
       // Bots überspringen
       if (member.user.bot) continue;
@@ -679,13 +666,6 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
       const department = departments.join(', ');
 
       try {
-        // System-Rolle basierend auf Discord-Rollen finden
-        // Hole alle System-Rollen die eine Discord-Rolle zugewiesen haben
-        const systemRoles = await prisma.role.findMany({
-          where: { discordRoleId: { not: null } },
-          orderBy: { level: 'desc' },
-        });
-
         // Finde die höchste System-Rolle, deren Discord-Rolle der Benutzer hat
         let assignedRoleId: string | null = null;
         for (const sysRole of systemRoles) {
@@ -697,15 +677,12 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
 
         // User erstellen/aktualisieren
         // WICHTIG: Bestehende roleId nicht überschreiben wenn bereits gesetzt (z.B. manuell als Admin)
-        const existingUser = await prisma.user.findUnique({
-          where: { discordId: member.id },
-          select: { roleId: true },
-        });
+        const existingRoleId = existingUserMap.get(member.id);
 
         // Nur roleId setzen wenn:
         // 1. Es einen neuen assignedRoleId gibt (basierend auf Discord-Rollen), ODER
         // 2. Der User noch keine roleId hat
-        const newRoleId = assignedRoleId || existingUser?.roleId || null;
+        const newRoleId = assignedRoleId || existingRoleId || null;
 
         const user = await prisma.user.upsert({
           where: { discordId: member.id },
@@ -786,39 +763,28 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
       }
     }
 
-    // Alle User/Employees aus der Datenbank holen (auch inaktive, um sie zu löschen)
+    // PERFORMANCE: Nur discordIds und IDs laden, nicht alle Daten
     const allUsers = await prisma.user.findMany({
-      include: { employee: true },
+      select: { id: true, discordId: true, username: true, employee: { select: { id: true } } },
     });
 
-    let removed = 0;
-    for (const user of allUsers) {
-      // Wenn der User nicht mehr auf dem Discord ist
-      if (!currentDiscordIds.has(user.discordId)) {
-        const username = user.username;
+    // User die nicht mehr auf Discord sind sammeln
+    const usersToRemove = allUsers.filter(u => !currentDiscordIds.has(u.discordId));
 
-        // Employee komplett löschen falls vorhanden
-        if (user.employee) {
-          await prisma.employee.delete({
-            where: { id: user.employee.id },
-          });
-        }
+    if (usersToRemove.length > 0) {
+      // PERFORMANCE: Batch-Delete statt einzelne Deletes
+      const employeeIds = usersToRemove.filter(u => u.employee).map(u => u.employee!.id);
+      const userIds = usersToRemove.map(u => u.id);
 
-        // User komplett löschen
-        await prisma.user.delete({
-          where: { id: user.id },
-        });
-
-        removed++;
-        console.log(`[Discord-Sync] Gelöscht: ${username} (nicht mehr auf Discord)`);
+      if (employeeIds.length > 0) {
+        await prisma.employee.deleteMany({ where: { id: { in: employeeIds } } });
       }
+      await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+
+      console.log(`Discord-Sync: ${usersToRemove.length} Mitarbeiter entfernt (nicht mehr auf Discord)`);
     }
 
-    if (removed > 0) {
-      console.log(`Discord-Sync: ${removed} Mitarbeiter entfernt (nicht mehr auf Discord)`);
-    }
-
-    result.removed = removed;
+    result.removed = usersToRemove.length;
   } catch (error) {
     result.errors.push(`Cleanup Fehler: ${error}`);
   }
@@ -1132,12 +1098,23 @@ export async function kickMember(
   }
 }
 
-// Member Rollen abrufen
+// Member Rollen abrufen - OPTIMIERT: Nutzt Cache wenn vorhanden
 export async function getMemberRoles(discordId: string): Promise<{ id: string; name: string }[]> {
   if (!guild) return [];
 
   try {
-    const member = await guild.members.fetch(discordId);
+    // Prüfe erst den Batch-Cache (wenn vorhanden)
+    if (memberRolesCache && (Date.now() - memberRolesCacheTime) < MEMBER_ROLES_CACHE_TTL) {
+      const cached = memberRolesCache.get(discordId);
+      if (cached) return cached;
+    }
+
+    // Versuche erst aus dem Guild-Cache zu lesen (kein API-Call)
+    let member = guild.members.cache.get(discordId);
+    if (!member) {
+      // Nur wenn nicht im Cache, dann API-Call
+      member = await guild.members.fetch(discordId);
+    }
     if (!member) return [];
 
     return Array.from(member.roles.cache.values())
@@ -1153,8 +1130,19 @@ export async function getMemberRoles(discordId: string): Promise<{ id: string; n
   }
 }
 
-// Batch-Funktion: Alle Member-Rollen auf einmal abrufen (performant!)
+// CACHE für Member-Rollen (30 Sekunden TTL)
+let memberRolesCache: Map<string, { id: string; name: string }[]> | null = null;
+let memberRolesCacheTime = 0;
+const MEMBER_ROLES_CACHE_TTL = 30000; // 30 Sekunden
+
+// Batch-Funktion: Alle Member-Rollen auf einmal abrufen (performant mit Cache!)
 export async function getAllMembersWithRoles(): Promise<Map<string, { id: string; name: string }[]>> {
+  // Prüfe Cache
+  const now = Date.now();
+  if (memberRolesCache && (now - memberRolesCacheTime) < MEMBER_ROLES_CACHE_TTL) {
+    return memberRolesCache;
+  }
+
   const result = new Map<string, { id: string; name: string }[]>();
 
   if (!client) {
@@ -1175,10 +1163,12 @@ export async function getAllMembersWithRoles(): Promise<Map<string, { id: string
       return result;
     }
 
-    console.log('[Discord] Fetching all guild members...');
-    // Alle Members auf einmal laden (nutzt Discord.js Cache)
-    const members = await guild.members.fetch();
-    console.log(`[Discord] Fetched ${members.size} members from guild`);
+    // Nutze den bereits geladenen Cache wenn möglich
+    let members = guild.members.cache;
+    if (members.size === 0) {
+      console.log('[Discord] Cache leer, fetche Members...');
+      members = await guild.members.fetch();
+    }
 
     for (const [, member] of members) {
       const roles = Array.from(member.roles.cache.values())
@@ -1188,10 +1178,11 @@ export async function getAllMembersWithRoles(): Promise<Map<string, { id: string
       result.set(member.id, roles);
     }
 
-    console.log(`[Discord] Built role map for ${result.size} members`);
+    // Cache aktualisieren
+    memberRolesCache = result;
+    memberRolesCacheTime = now;
   } catch (error) {
     console.error('[Discord] Fehler beim Batch-Abrufen der Member-Rollen:', error);
-    console.error('[Discord] Error details:', error);
   }
 
   return result;
@@ -1305,7 +1296,7 @@ export async function createInviteLink(maxAge: number = 86400, maxUses: number =
       maxAge: maxAge, // Standard: 24 Stunden
       maxUses: maxUses, // Standard: 1 Verwendung
       unique: true,
-      reason: 'HR Onboarding - Neuer Cadet',
+      reason: 'HR Onboarding - Neuer Recruit',
     });
 
     return {
@@ -1315,6 +1306,75 @@ export async function createInviteLink(maxAge: number = 86400, maxUses: number =
   } catch (error) {
     console.error('Fehler beim Erstellen der Einladung:', error);
     return { success: false, error: String(error) };
+  }
+}
+
+// Discord-Mitglied nach Username oder ID suchen
+export async function findDiscordMember(query: string): Promise<{ found: boolean; discordId?: string; username?: string; displayName?: string; avatar?: string; error?: string }> {
+  if (!client || !guild) {
+    return { found: false, error: 'Discord nicht verbunden' };
+  }
+
+  try {
+    // Wenn es wie eine Discord-ID aussieht (nur Zahlen, 17-20 Zeichen)
+    if (/^\d{17,20}$/.test(query)) {
+      try {
+        const member = await guild.members.fetch(query);
+        if (member) {
+          return {
+            found: true,
+            discordId: member.id,
+            username: member.user.username,
+            displayName: member.displayName,
+            avatar: member.user.avatarURL() || undefined,
+          };
+        }
+      } catch {
+        // Member nicht gefunden per ID
+      }
+    }
+
+    // Suche nach Username (mit oder ohne Discriminator)
+    const members = await guild.members.fetch();
+    const searchLower = query.toLowerCase().replace(/^@/, ''); // Entferne führendes @
+
+    for (const [, member] of members) {
+      // Prüfe Username
+      if (member.user.username.toLowerCase() === searchLower) {
+        return {
+          found: true,
+          discordId: member.id,
+          username: member.user.username,
+          displayName: member.displayName,
+          avatar: member.user.avatarURL() || undefined,
+        };
+      }
+      // Prüfe Nickname auf dem Server
+      if (member.nickname && member.nickname.toLowerCase() === searchLower) {
+        return {
+          found: true,
+          discordId: member.id,
+          username: member.user.username,
+          displayName: member.displayName,
+          avatar: member.user.avatarURL() || undefined,
+        };
+      }
+      // Prüfe globalName (neues Discord-Feature)
+      if (member.user.globalName && member.user.globalName.toLowerCase() === searchLower) {
+        return {
+          found: true,
+          discordId: member.id,
+          username: member.user.username,
+          displayName: member.displayName,
+          avatar: member.user.avatarURL() || undefined,
+        };
+      }
+    }
+
+    return { found: false, error: 'Mitglied nicht gefunden' };
+  } catch (error) {
+    console.error('Fehler bei Discord-Mitgliedsuche:', error);
+    return { found: false, error: String(error) };
   }
 }
 

@@ -102,6 +102,7 @@ router.post('/fix-permissions', authMiddleware, async (req: AuthRequest, res: Re
       { name: 'users.delete', description: 'Benutzer löschen', category: 'users' },
       { name: 'employees.view', description: 'Mitarbeiter anzeigen', category: 'employees' },
       { name: 'employees.edit', description: 'Mitarbeiter bearbeiten', category: 'employees' },
+      { name: 'employees.rank', description: 'Mitarbeiter upranken/downranken', category: 'employees' },
       { name: 'employees.delete', description: 'Mitarbeiter entlassen', category: 'employees' },
       { name: 'audit.view', description: 'Audit-Logs anzeigen', category: 'audit' },
       { name: 'backup.manage', description: 'Backups verwalten', category: 'backup' },
@@ -130,8 +131,10 @@ router.post('/fix-permissions', authMiddleware, async (req: AuthRequest, res: Re
       { name: 'detectives.manage', description: 'Ermittlungsakten verwalten', category: 'detectives' },
       { name: 'academy.view', description: 'Schulungen anzeigen', category: 'academy' },
       { name: 'academy.manage', description: 'Schulungen verwalten', category: 'academy' },
+      { name: 'academy.teach', description: 'Schulungen durchführen', category: 'academy' },
       { name: 'ia.view', description: 'Interne Ermittlungen anzeigen', category: 'ia' },
       { name: 'ia.manage', description: 'Interne Ermittlungen verwalten', category: 'ia' },
+      { name: 'ia.investigate', description: 'Ermittlungen durchführen', category: 'ia' },
       { name: 'qa.view', description: 'Unit-Reviews anzeigen', category: 'qa' },
       { name: 'qa.manage', description: 'Unit-Reviews verwalten', category: 'qa' },
       { name: 'teamlead.view', description: 'Uprank-Anträge anzeigen', category: 'teamlead' },
@@ -144,16 +147,22 @@ router.post('/fix-permissions', authMiddleware, async (req: AuthRequest, res: Re
       { name: 'bonus.pay', description: 'Sonderzahlungen auszahlen', category: 'bonus' },
       // Admin Settings Permissions
       { name: 'admin.settings', description: 'System-Einstellungen verwalten', category: 'admin' },
+      // Announcements Permissions
+      { name: 'announcements.view', description: 'Ankündigungen anzeigen', category: 'announcements' },
+      { name: 'announcements.create', description: 'Ankündigungen erstellen', category: 'announcements' },
+      { name: 'announcements.publish', description: 'Ankündigungen veröffentlichen', category: 'announcements' },
     ];
 
-    // Alle Berechtigungen erstellen/aktualisieren
-    for (const perm of defaultPermissions) {
-      await prisma.permission.upsert({
-        where: { name: perm.name },
-        update: perm,
-        create: perm,
-      });
-    }
+    // Alle Berechtigungen erstellen/aktualisieren - OPTIMIERT mit Transaction
+    await prisma.$transaction(
+      defaultPermissions.map((perm) =>
+        prisma.permission.upsert({
+          where: { name: perm.name },
+          update: perm,
+          create: perm,
+        })
+      )
+    );
 
     // Admin-Berechtigung holen
     const adminPerm = await prisma.permission.findUnique({ where: { name: 'admin.full' } });
@@ -234,6 +243,7 @@ router.post('/setup', async (req, res: Response) => {
       { name: 'users.delete', description: 'Benutzer löschen', category: 'users' },
       { name: 'employees.view', description: 'Mitarbeiter anzeigen', category: 'employees' },
       { name: 'employees.edit', description: 'Mitarbeiter bearbeiten', category: 'employees' },
+      { name: 'employees.rank', description: 'Mitarbeiter upranken/downranken', category: 'employees' },
       { name: 'employees.delete', description: 'Mitarbeiter entlassen', category: 'employees' },
       { name: 'audit.view', description: 'Audit-Logs anzeigen', category: 'audit' },
       { name: 'backup.manage', description: 'Backups verwalten', category: 'backup' },
@@ -290,15 +300,22 @@ router.post('/setup', async (req, res: Response) => {
       { name: 'bonus.pay', description: 'Sonderzahlungen auszahlen', category: 'bonus' },
       // Admin Settings Permissions
       { name: 'admin.settings', description: 'System-Einstellungen verwalten', category: 'admin' },
+      // Announcements Permissions
+      { name: 'announcements.view', description: 'Ankündigungen anzeigen', category: 'announcements' },
+      { name: 'announcements.create', description: 'Ankündigungen erstellen', category: 'announcements' },
+      { name: 'announcements.publish', description: 'Ankündigungen veröffentlichen', category: 'announcements' },
     ];
 
-    for (const perm of defaultPermissions) {
-      await prisma.permission.upsert({
-        where: { name: perm.name },
-        update: perm,
-        create: perm,
-      });
-    }
+    // OPTIMIERT: Alle Permissions in einer Transaction
+    await prisma.$transaction(
+      defaultPermissions.map((perm) =>
+        prisma.permission.upsert({
+          where: { name: perm.name },
+          update: perm,
+          create: perm,
+        })
+      )
+    );
 
     const adminPerm = await prisma.permission.findUnique({ where: { name: 'admin.full' } });
 
@@ -350,6 +367,7 @@ router.post('/permissions/seed', authMiddleware, requirePermission('admin.full')
       { name: 'users.delete', description: 'Benutzer löschen', category: 'users' },
       { name: 'employees.view', description: 'Mitarbeiter anzeigen', category: 'employees' },
       { name: 'employees.edit', description: 'Mitarbeiter bearbeiten', category: 'employees' },
+      { name: 'employees.rank', description: 'Mitarbeiter upranken/downranken', category: 'employees' },
       { name: 'employees.delete', description: 'Mitarbeiter entlassen', category: 'employees' },
       { name: 'audit.view', description: 'Audit-Logs anzeigen', category: 'audit' },
       { name: 'backup.manage', description: 'Backups verwalten', category: 'backup' },
@@ -406,15 +424,22 @@ router.post('/permissions/seed', authMiddleware, requirePermission('admin.full')
       { name: 'bonus.pay', description: 'Sonderzahlungen auszahlen', category: 'bonus' },
       // Admin Settings Permissions
       { name: 'admin.settings', description: 'System-Einstellungen verwalten', category: 'admin' },
+      // Announcements Permissions
+      { name: 'announcements.view', description: 'Ankündigungen anzeigen', category: 'announcements' },
+      { name: 'announcements.create', description: 'Ankündigungen erstellen', category: 'announcements' },
+      { name: 'announcements.publish', description: 'Ankündigungen veröffentlichen', category: 'announcements' },
     ];
 
-    for (const perm of defaultPermissions) {
-      await prisma.permission.upsert({
-        where: { name: perm.name },
-        update: perm,
-        create: perm,
-      });
-    }
+    // OPTIMIERT: Alle Permissions in einer Transaction
+    await prisma.$transaction(
+      defaultPermissions.map((perm) =>
+        prisma.permission.upsert({
+          where: { name: perm.name },
+          update: perm,
+          create: perm,
+        })
+      )
+    );
 
     res.json({ success: true, count: defaultPermissions.length });
   } catch (error) {
@@ -634,17 +659,24 @@ router.post('/backups', authMiddleware, requirePermission('backup.manage'), asyn
   }
 });
 
-// Backup-Stats (MUSS vor /:id Routen stehen!)
+// Backup-Stats (MUSS vor /:id Routen stehen!) - OPTIMIERT mit Promise.all und Aggregation
 router.get('/backups/stats', authMiddleware, requirePermission('backup.manage'), async (_req: AuthRequest, res: Response) => {
   try {
-    const backups = await prisma.backup.findMany();
-    const totalSize = backups.reduce((sum, b) => sum + b.size, 0);
-    const latestBackup = await prisma.backup.findFirst({
-      orderBy: { createdAt: 'desc' },
-    });
+    const [aggregation, latestBackup] = await Promise.all([
+      prisma.backup.aggregate({
+        _count: true,
+        _sum: { size: true },
+      }),
+      prisma.backup.findFirst({
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    const totalSize = aggregation._sum.size || 0;
 
     res.json({
-      totalBackups: backups.length,
+      totalBackups: aggregation._count,
       totalSize,
       totalSizeFormatted: formatBytes(totalSize),
       latestBackup: latestBackup?.createdAt || null,
@@ -883,17 +915,19 @@ router.delete('/academy-questions/:id', authMiddleware, requirePermission('admin
   }
 });
 
-// Reihenfolge aktualisieren (Bulk-Update)
+// Reihenfolge aktualisieren (Bulk-Update) - OPTIMIERT mit Transaction
 router.put('/academy-questions/reorder', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
   try {
     const { items } = req.body; // Array von { id, sortOrder }
 
-    for (const item of items) {
-      await prisma.academyQuestion.update({
-        where: { id: item.id },
-        data: { sortOrder: item.sortOrder },
-      });
-    }
+    await prisma.$transaction(
+      items.map((item: { id: string; sortOrder: number }) =>
+        prisma.academyQuestion.update({
+          where: { id: item.id },
+          data: { sortOrder: item.sortOrder },
+        })
+      )
+    );
 
     res.json({ success: true });
   } catch (error) {
@@ -994,17 +1028,19 @@ router.delete('/academy-criteria/:id', authMiddleware, requirePermission('admin.
   }
 });
 
-// Reihenfolge aktualisieren (Bulk-Update)
+// Reihenfolge aktualisieren (Bulk-Update) - OPTIMIERT mit Transaction
 router.put('/academy-criteria/reorder', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
   try {
     const { items } = req.body; // Array von { id, sortOrder }
 
-    for (const item of items) {
-      await prisma.academyCriterion.update({
-        where: { id: item.id },
-        data: { sortOrder: item.sortOrder },
-      });
-    }
+    await prisma.$transaction(
+      items.map((item: { id: string; sortOrder: number }) =>
+        prisma.academyCriterion.update({
+          where: { id: item.id },
+          data: { sortOrder: item.sortOrder },
+        })
+      )
+    );
 
     res.json({ success: true });
   } catch (error) {
@@ -1105,17 +1141,19 @@ router.delete('/onboarding-items/:id', authMiddleware, requirePermission('admin.
   }
 });
 
-// Onboarding-Items neu ordnen
+// Onboarding-Items neu ordnen - OPTIMIERT mit Transaction
 router.put('/onboarding-items/reorder', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
   try {
     const { items } = req.body; // Array mit { id, sortOrder }
 
-    for (const item of items) {
-      await prisma.onboardingItem.update({
-        where: { id: item.id },
-        data: { sortOrder: item.sortOrder },
-      });
-    }
+    await prisma.$transaction(
+      items.map((item: { id: string; sortOrder: number }) =>
+        prisma.onboardingItem.update({
+          where: { id: item.id },
+          data: { sortOrder: item.sortOrder },
+        })
+      )
+    );
 
     res.json({ success: true });
   } catch (error) {
@@ -1220,17 +1258,19 @@ router.delete('/ia-categories/:id', authMiddleware, requirePermission('admin.ful
   }
 });
 
-// IA-Kategorien neu ordnen
+// IA-Kategorien neu ordnen - OPTIMIERT mit Transaction
 router.put('/ia-categories/reorder', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
   try {
     const { items } = req.body; // Array mit { id, sortOrder }
 
-    for (const item of items) {
-      await prisma.iACategory.update({
-        where: { id: item.id },
-        data: { sortOrder: item.sortOrder },
-      });
-    }
+    await prisma.$transaction(
+      items.map((item: { id: string; sortOrder: number }) =>
+        prisma.iACategory.update({
+          where: { id: item.id },
+          data: { sortOrder: item.sortOrder },
+        })
+      )
+    );
 
     res.json({ success: true });
   } catch (error) {
@@ -1339,17 +1379,19 @@ router.delete('/qa-units/:id', authMiddleware, requirePermission('admin.full'), 
   }
 });
 
-// QA-Units neu ordnen
+// QA-Units neu ordnen - OPTIMIERT mit Transaction
 router.put('/qa-units/reorder', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
   try {
     const { items } = req.body; // Array mit { id, sortOrder }
 
-    for (const item of items) {
-      await prisma.qAUnit.update({
-        where: { id: item.id },
-        data: { sortOrder: item.sortOrder },
-      });
-    }
+    await prisma.$transaction(
+      items.map((item: { id: string; sortOrder: number }) =>
+        prisma.qAUnit.update({
+          where: { id: item.id },
+          data: { sortOrder: item.sortOrder },
+        })
+      )
+    );
 
     res.json({ success: true });
   } catch (error) {

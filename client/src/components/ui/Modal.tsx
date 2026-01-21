@@ -1,6 +1,27 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef, useCallback, memo } from 'react';
 import { X } from 'lucide-react';
 import clsx from 'clsx';
+
+// Statische Objekte außerhalb der Komponente für Performance
+const sizeClasses: Record<string, string> = {
+  sm: 'max-w-sm',
+  md: 'max-w-lg',
+  lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
+  '2xl': 'max-w-5xl',
+};
+
+const variantClasses: Record<string, string> = {
+  default: '',
+  danger: 'border-red-900/50',
+  success: 'border-green-900/50',
+};
+
+const titleClasses: Record<string, string> = {
+  default: 'text-white',
+  danger: 'text-red-400',
+  success: 'text-green-400',
+};
 
 interface ModalProps {
   isOpen: boolean;
@@ -12,7 +33,7 @@ interface ModalProps {
   variant?: 'default' | 'danger' | 'success';
 }
 
-export default function Modal({
+function ModalComponent({
   isOpen,
   onClose,
   title,
@@ -21,12 +42,24 @@ export default function Modal({
   footer,
   variant = 'default',
 }: ModalProps) {
+  // Ref für onClose um Dependencies zu stabilisieren
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Stabiler Callback für ESC-Taste
+  const handleEsc = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') onCloseRef.current();
+  }, []);
+
+  // Stabiler Callback für Backdrop-Click
+  const handleBackdropClick = useCallback((e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onCloseRef.current();
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
-
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
 
     document.addEventListener('keydown', handleEsc);
     const originalOverflow = document.body.style.overflow;
@@ -36,29 +69,9 @@ export default function Modal({
       document.removeEventListener('keydown', handleEsc);
       document.body.style.overflow = originalOverflow;
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, handleEsc]);
 
   if (!isOpen) return null;
-
-  const sizeClasses: Record<string, string> = {
-    sm: 'max-w-sm',
-    md: 'max-w-lg',
-    lg: 'max-w-2xl',
-    xl: 'max-w-4xl',
-    '2xl': 'max-w-5xl',
-  };
-
-  const variantClasses: Record<string, string> = {
-    default: '',
-    danger: 'border-red-900/50',
-    success: 'border-green-900/50',
-  };
-
-  const titleClasses: Record<string, string> = {
-    default: 'text-white',
-    danger: 'text-red-400',
-    success: 'text-green-400',
-  };
 
   return (
     <div
@@ -75,11 +88,7 @@ export default function Modal({
         justifyContent: 'center',
         padding: '1rem',
       }}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
+      onMouseDown={handleBackdropClick}
     >
       <div
         style={{
@@ -145,3 +154,7 @@ export default function Modal({
     </div>
   );
 }
+
+// Memoized Export für bessere Performance
+const Modal = memo(ModalComponent);
+export default Modal;

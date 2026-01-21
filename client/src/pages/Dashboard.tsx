@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useCallback, memo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dashboardApi, absencesApi, bonusApi, calendarApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -144,6 +144,32 @@ interface DashboardStats {
   recentActivity: RecentActivity[];
   teamDistribution: TeamDistribution[];
 }
+
+// MEMOIZED Team-Verteilungs-Liste Komponente
+const TeamDistributionList = memo(function TeamDistributionList({
+  teams,
+  getTeamColor,
+}: {
+  teams: TeamDistribution[];
+  getTeamColor: (team: string) => string;
+}) {
+  const sortedTeams = useMemo(() =>
+    [...teams].sort((a, b) => b.count - a.count).slice(0, 5),
+    [teams]
+  );
+
+  return (
+    <>
+      {sortedTeams.map((team) => (
+        <div key={team.team} className="flex items-center gap-3">
+          <div className={`w-3 h-3 rounded-full ${getTeamColor(team.team)}`} />
+          <span className="flex-1 text-sm text-slate-300">{team.team}</span>
+          <span className="text-sm font-medium text-white">{team.count}</span>
+        </div>
+      ))}
+    </>
+  );
+});
 
 // Statistik-Karte mit Glasmorphism-Effekt
 function StatCard({
@@ -378,19 +404,18 @@ export default function Dashboard() {
   const myBonus = myBonusData;
   const upcomingEvents = upcomingEventsData || [];
 
-  // Berechne Team-Farben
-  const teamColors: Record<string, string> = {
-    'White': 'bg-slate-300',
-    'Red': 'bg-red-500',
-    'Gold': 'bg-amber-500',
-    'Silver': 'bg-slate-400',
-    'Green': 'bg-emerald-500',
-    'Kein Team': 'bg-slate-600',
-  };
-
-  const getTeamColor = (team: string) => {
+  // Team-Farben als stabile Referenz - MEMOIZED
+  const getTeamColor = useCallback((team: string) => {
+    const teamColors: Record<string, string> = {
+      'White': 'bg-slate-300',
+      'Red': 'bg-red-500',
+      'Gold': 'bg-amber-500',
+      'Silver': 'bg-slate-400',
+      'Green': 'bg-emerald-500',
+      'Kein Team': 'bg-slate-600',
+    };
     return teamColors[team] || 'bg-slate-500';
-  };
+  }, []);
 
   if (isLoading) {
     return (
@@ -619,21 +644,12 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Team-Verteilung */}
+            {/* Team-Verteilung - MEMOIZED sortierte Liste */}
             {teamDistribution.length > 0 && (
               <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
                 <p className="font-medium text-white mb-3">Team-Verteilung</p>
                 <div className="space-y-2">
-                  {teamDistribution
-                    .sort((a, b) => b.count - a.count)
-                    .slice(0, 5)
-                    .map((team) => (
-                      <div key={team.team} className="flex items-center gap-3">
-                        <div className={`w-3 h-3 rounded-full ${getTeamColor(team.team)}`} />
-                        <span className="flex-1 text-sm text-slate-300">{team.team}</span>
-                        <span className="text-sm font-medium text-white">{team.count}</span>
-                      </div>
-                    ))}
+                  <TeamDistributionList teams={teamDistribution} getTeamColor={getTeamColor} />
                 </div>
               </div>
             )}

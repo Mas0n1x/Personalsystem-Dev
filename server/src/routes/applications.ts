@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
-import { createInviteLink, updateDiscordNickname, assignHireRoles, findFreeBadgeNumber, getTeamConfigForLevel } from '../services/discordBot.js';
+import { createInviteLink, updateDiscordNickname, assignHireRoles, findFreeBadgeNumber, getTeamConfigForLevel, findDiscordMember } from '../services/discordBot.js';
 import { triggerApplicationCompleted, triggerApplicationOnboarding, triggerApplicationRejected, getEmployeeIdFromUserId } from '../services/bonusService.js';
 import { announceHire } from '../services/discordAnnouncements.js';
 import { broadcastCreate, broadcastUpdate, broadcastDelete, emitEmployeeHired } from '../services/socketService.js';
@@ -47,7 +47,8 @@ const router = Router();
 
 // Rang zu Level Mapping
 const RANK_TO_LEVEL: Record<string, number> = {
-  'Cadet': 1,
+  'Recruit': 1,
+  'Cadet': 1,         // Legacy Alias für Recruit
   'Officer I': 2,
   'Officer II': 3,
   'Officer III': 4,
@@ -89,33 +90,47 @@ async function getOnboardingChecklist() {
 // GET alle Bewerbungen
 router.get('/', authMiddleware, requirePermission('hr.view'), async (req: AuthRequest, res: Response) => {
   try {
-    const { status } = req.query;
+    const { status, page = '1', limit = '50' } = req.query;
 
     const where: Record<string, unknown> = {};
     if (status && status !== 'ALL') {
       where.status = status;
     }
 
-    const applications = await prisma.application.findMany({
-      where,
-      include: {
-        createdBy: {
-          select: {
-            displayName: true,
-            username: true,
-          },
-        },
-        processedBy: {
-          select: {
-            displayName: true,
-            username: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const take = parseInt(limit as string);
 
-    res.json(applications);
+    const [applications, total] = await Promise.all([
+      prisma.application.findMany({
+        where,
+        include: {
+          createdBy: {
+            select: {
+              displayName: true,
+              username: true,
+            },
+          },
+          processedBy: {
+            select: {
+              displayName: true,
+              username: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.application.count({ where }),
+    ]);
+
+    res.json({
+      data: applications,
+      total,
+      page: parseInt(page as string),
+      limit: take,
+      totalPages: Math.ceil(total / take),
+    });
   } catch (error) {
     console.error('Get applications error:', error);
     res.status(500).json({ error: 'Fehler beim Abrufen der Bewerbungen' });
@@ -382,6 +397,24 @@ router.get('/:id/id-card', authMiddleware, requirePermission('hr.view'), async (
   } catch (error) {
     console.error('Get ID card error:', error);
     res.status(500).json({ error: 'Fehler beim Abrufen des Bildes' });
+  }
+});
+
+// GET Discord-Member suchen (für automatische ID-Erkennung)
+router.get('/search-discord/:query', authMiddleware, requirePermission('hr.view'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { query } = req.params;
+
+    if (!query || query.length < 2) {
+      res.status(400).json({ error: 'Suchbegriff zu kurz' });
+      return;
+    }
+
+    const result = await findDiscordMember(query);
+    res.json(result);
+  } catch (error) {
+    console.error('Search Discord member error:', error);
+    res.status(500).json({ error: 'Fehler bei der Discord-Suche' });
   }
 });
 
@@ -695,14 +728,7 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
       });
     }
 
-    // Discord Nickname automatisch setzen auf den Namen aus dem Personalsystem
-    try {
-      await updateDiscordNickname(application.discordId, application.applicantName);
-      console.log(`Discord Nickname für ${application.discordId} auf "${application.applicantName}" gesetzt`);
-    } catch (nickError) {
-      console.error('Fehler beim Setzen des Discord Nicknames:', nickError);
-      // Nicht abbrechen, da das kein kritischer Fehler ist
-    }
+    // Discord Nickname wird später mit Dienstnummer gesetzt (nach Mitarbeiter-Erstellung)
 
     // Discord-Rollen aus Admin-Einstellungen zuweisen
     try {
@@ -746,7 +772,7 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
       prisma.systemSetting.findUnique({ where: { key: 'hrStartingDepartment' } }),
     ]);
 
-    const startRank = startRankSetting?.value || 'Cadet';
+    const startRank = startRankSetting?.value || 'Recruit';
     const startDepartment = startDepartmentSetting?.value || 'Patrol';
     const startRankLevel = RANK_TO_LEVEL[startRank] || 1;
 
@@ -775,6 +801,24 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
         status: 'ACTIVE',
       },
     });
+
+    // Discord Nickname automatisch setzen MIT Dienstnummer
+    try {
+      const nickname = badgeNumber
+        ? `[${badgeNumber}] ${application.applicantName}`
+        : application.applicantName;
+      await updateDiscordNickname(application.discordId, nickname);
+      console.log(`Discord Nickname für ${application.discordId} auf "${nickname}" gesetzt`);
+
+      // User displayName auch aktualisieren
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { displayName: nickname },
+      });
+    } catch (nickError) {
+      console.error('Fehler beim Setzen des Discord Nicknames:', nickError);
+      // Nicht abbrechen, da das kein kritischer Fehler ist
+    }
 
     // Bewerbung abschließen
     const updatedApplication = await prisma.application.update({

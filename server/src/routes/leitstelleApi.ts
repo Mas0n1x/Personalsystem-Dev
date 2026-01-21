@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma.js';
-import { getMemberRoles } from '../services/discordBot.js';
+import { getAllMembersWithRoles } from '../services/discordBot.js';
 
 const router = Router();
 
@@ -193,34 +193,18 @@ router.get('/employees', apiKeyMiddleware, async (_req: Request, res: Response) 
     if (isUnitCacheValid() && unitCache) {
       unitsMap = unitCache.data;
     } else {
-      // Cache neu aufbauen - alle Discord-Rollen auf einmal holen
+      // OPTIMIERT: Alle Discord-Rollen auf einmal holen (cached in discordBot.ts)
       unitsMap = new Map<string, string[]>();
+      const allMemberRoles = await getAllMembersWithRoles();
 
-      // Batch-Verarbeitung: Maximal 5 gleichzeitige Anfragen
-      const BATCH_SIZE = 5;
-      for (let i = 0; i < employees.length; i += BATCH_SIZE) {
-        const batch = employees.slice(i, i + BATCH_SIZE);
-        const batchResults = await Promise.all(
-          batch.map(async (emp) => {
-            try {
-              if (emp.user.discordId) {
-                const memberRoles = await getMemberRoles(emp.user.discordId);
-                if (memberRoles) {
-                  return {
-                    discordId: emp.user.discordId,
-                    units: extractUnitsFromRoles(memberRoles.map(r => r.name)),
-                  };
-                }
-              }
-            } catch (error) {
-              console.error(`Fehler beim Laden der Rollen fuer ${emp.user.discordId}:`, error);
-            }
-            return { discordId: emp.user.discordId, units: [] };
-          })
-        );
-
-        for (const result of batchResults) {
-          unitsMap.set(result.discordId, result.units);
+      for (const emp of employees) {
+        if (emp.user.discordId) {
+          const memberRoles = allMemberRoles.get(emp.user.discordId);
+          if (memberRoles) {
+            unitsMap.set(emp.user.discordId, extractUnitsFromRoles(memberRoles.map(r => r.name)));
+          } else {
+            unitsMap.set(emp.user.discordId, []);
+          }
         }
       }
 

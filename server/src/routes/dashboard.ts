@@ -4,7 +4,7 @@ import { authMiddleware, AuthRequest } from '../middleware/authMiddleware.js';
 
 const router = Router();
 
-// Dashboard Statistiken (erweitert)
+// Dashboard Statistiken (erweitert) - PERFORMANCE OPTIMIERT
 router.get('/stats', authMiddleware, async (_req: AuthRequest, res: Response) => {
   try {
     const now = new Date();
@@ -16,102 +16,48 @@ router.get('/stats', authMiddleware, async (_req: AuthRequest, res: Response) =>
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
+    // PERFORMANCE: Mitarbeiter-Statistiken in EINER groupBy Query statt 5 separaten counts
     const [
-      totalEmployees,
-      activeEmployees,
-      onLeaveEmployees,
-      suspendedEmployees,
-      terminatedThisMonth,
-      newHiresThisMonth,
-      newHiresLastMonth,
-      promotionsThisWeek,
-      promotionsThisMonth,
-      activeAbsences,
-      pendingApplications,
-      pendingUprankRequests,
-      pendingUnitReviews,
-      totalUnits,
-      activeUnitsCount,
+      employeeStatusCounts,
+      newHiresCounts,
+      promotionCounts,
+      pendingCounts,
+      unitCounts,
       recentActivity,
       teamDistribution,
       rankDistribution,
     ] = await Promise.all([
-      // Gesamt Mitarbeiter
-      prisma.employee.count(),
-
-      // Aktive Mitarbeiter
-      prisma.employee.count({ where: { status: 'ACTIVE' } }),
-
-      // Mitarbeiter im Urlaub
-      prisma.employee.count({ where: { status: 'ON_LEAVE' } }),
-
-      // Suspendierte Mitarbeiter
-      prisma.employee.count({ where: { status: 'SUSPENDED' } }),
-
-      // Kündigungen diesen Monat
-      prisma.employee.count({
-        where: {
-          status: 'TERMINATED',
-          updatedAt: { gte: startOfMonth },
-        },
+      // Alle Status-Counts in einer Query
+      prisma.employee.groupBy({
+        by: ['status'],
+        _count: true,
       }),
 
-      // Neueinstellungen diesen Monat
-      prisma.employee.count({
-        where: {
-          createdAt: { gte: startOfMonth },
-        },
-      }),
+      // Neueinstellungen (diesen + letzten Monat) - 2 Queries statt separater
+      Promise.all([
+        prisma.employee.count({ where: { createdAt: { gte: startOfMonth } } }),
+        prisma.employee.count({ where: { createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
+      ]),
 
-      // Neueinstellungen letzten Monat (für Vergleich)
-      prisma.employee.count({
-        where: {
-          createdAt: { gte: startOfLastMonth, lte: endOfLastMonth },
-        },
-      }),
+      // Beförderungen (Woche + Monat)
+      Promise.all([
+        prisma.promotionArchive.count({ where: { promotedAt: { gte: startOfWeek } } }),
+        prisma.promotionArchive.count({ where: { promotedAt: { gte: startOfMonth } } }),
+      ]),
 
-      // Beförderungen diese Woche
-      prisma.promotionArchive.count({
-        where: {
-          promotedAt: { gte: startOfWeek },
-        },
-      }),
+      // Alle Pending-Counts zusammen
+      Promise.all([
+        prisma.absence.count({ where: { startDate: { lte: now }, endDate: { gte: now } } }),
+        prisma.application.count({ where: { status: 'PENDING' } }),
+        prisma.uprankRequest.count({ where: { status: 'PENDING' } }),
+        prisma.unitReview.count({ where: { status: 'PENDING' } }),
+      ]),
 
-      // Beförderungen diesen Monat
-      prisma.promotionArchive.count({
-        where: {
-          promotedAt: { gte: startOfMonth },
-        },
-      }),
-
-      // Aktive Abmeldungen (ohne status, da Absence kein status Feld hat)
-      prisma.absence.count({
-        where: {
-          startDate: { lte: now },
-          endDate: { gte: now },
-        },
-      }),
-
-      // Offene Bewerbungen
-      prisma.application.count({
-        where: { status: 'PENDING' },
-      }),
-
-      // Offene Uprank-Anfragen
-      prisma.uprankRequest.count({
-        where: { status: 'PENDING' },
-      }),
-
-      // Offene Unit-Reviews
-      prisma.unitReview.count({
-        where: { status: 'PENDING' },
-      }),
-
-      // Units gesamt
-      prisma.unit.count(),
-
-      // Aktive Units
-      prisma.unit.count({ where: { isActive: true } }),
+      // Unit-Counts
+      Promise.all([
+        prisma.unit.count(),
+        prisma.unit.count({ where: { isActive: true } }),
+      ]),
 
       // Letzte Aktivitäten (5)
       prisma.auditLog.findMany({
@@ -145,6 +91,23 @@ router.get('/stats', authMiddleware, async (_req: AuthRequest, res: Response) =>
         take: 10,
       }),
     ]);
+
+    // Status-Counts aus groupBy extrahieren
+    const statusMap = new Map(employeeStatusCounts.map(s => [s.status, s._count]));
+    const totalEmployees = employeeStatusCounts.reduce((sum, s) => sum + s._count, 0);
+    const activeEmployees = statusMap.get('ACTIVE') || 0;
+    const onLeaveEmployees = statusMap.get('ON_LEAVE') || 0;
+    const suspendedEmployees = statusMap.get('SUSPENDED') || 0;
+
+    // Kündigungen diesen Monat (separate Query nötig wegen Datumsfilter)
+    const terminatedThisMonth = await prisma.employee.count({
+      where: { status: 'TERMINATED', updatedAt: { gte: startOfMonth } },
+    });
+
+    const [newHiresThisMonth, newHiresLastMonth] = newHiresCounts;
+    const [promotionsThisWeek, promotionsThisMonth] = promotionCounts;
+    const [activeAbsences, pendingApplications, pendingUprankRequests, pendingUnitReviews] = pendingCounts;
+    const [totalUnits, activeUnitsCount] = unitCounts;
 
     // Berechne Trends
     const newHiresTrend = newHiresLastMonth > 0

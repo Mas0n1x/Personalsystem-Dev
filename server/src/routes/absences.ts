@@ -156,8 +156,19 @@ router.post('/', authMiddleware, requirePermission('employees.view'), async (req
 
     const employeeId = user.employee.id;
 
-    // Bei Dienstfrei: Prüfen ob diese Woche schon genutzt
+    // Bei Dienstfrei: Prüfen ob diese Woche schon genutzt UND auf 1 Tag begrenzen
     if (type === 'DAY_OFF') {
+      // Prüfe ob Start und Ende der gleiche Tag sind
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+
+      if (start.getTime() !== end.getTime()) {
+        res.status(400).json({ error: 'Dienstfrei kann maximal 1 Tag dauern. Für längere Abwesenheit nutze bitte "Abmeldung".' });
+        return;
+      }
+
       const alreadyUsed = await hasUsedDayOffThisWeek(employeeId);
       if (alreadyUsed) {
         res.status(400).json({ error: 'Dienstfrei wurde diese Woche bereits genutzt. Neues Dienstfrei ab Montag möglich.' });

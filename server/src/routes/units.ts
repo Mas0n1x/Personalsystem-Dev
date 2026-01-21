@@ -52,20 +52,22 @@ router.get('/overview', authMiddleware, requirePermission('employees.view'), asy
       return;
     }
 
-    // Alle aktiven Employees laden
-    const employees = await prisma.employee.findMany({
-      where: { status: 'ACTIVE' },
-      include: {
-        user: {
-          select: {
-            discordId: true,
+    // OPTIMIERT: Nur benötigte Felder laden + parallele Abfrage
+    const [employees, allMemberRoles] = await Promise.all([
+      prisma.employee.findMany({
+        where: { status: 'ACTIVE' },
+        select: {
+          id: true,
+          user: {
+            select: {
+              discordId: true,
+            },
           },
         },
-      },
-    });
-
-    // PERFORMANT: Alle Member-Rollen auf einmal laden statt einzeln
-    const allMemberRoles = await getAllMembersWithRoles();
+      }),
+      // PERFORMANT: Alle Member-Rollen auf einmal laden statt einzeln
+      getAllMembersWithRoles(),
+    ]);
 
     // OPTIMIERT: Erstelle eine Map von RoleId -> Employee-Counts
     // Dies reduziert O(units * employees) zu O(employees + units)
@@ -174,24 +176,27 @@ router.get('/:id/members', authMiddleware, requirePermission('employees.view'), 
       return;
     }
 
-    // Alle aktiven Employees mit ihren User-Daten laden
-    const employees = await prisma.employee.findMany({
-      where: { status: 'ACTIVE' },
-      include: {
-        user: {
-          select: {
-            id: true,
-            discordId: true,
-            displayName: true,
-            username: true,
-            avatar: true,
+    // OPTIMIERT: Employees und Discord-Rollen parallel laden
+    const [employees, allMemberRoles] = await Promise.all([
+      prisma.employee.findMany({
+        where: { status: 'ACTIVE' },
+        select: {
+          id: true,
+          rank: true,
+          badgeNumber: true,
+          user: {
+            select: {
+              id: true,
+              discordId: true,
+              displayName: true,
+              username: true,
+              avatar: true,
+            },
           },
         },
-      },
-    });
-
-    // PERFORMANT: Alle Member-Rollen auf einmal laden
-    const allMemberRoles = await getAllMembersWithRoles();
+      }),
+      getAllMembersWithRoles(),
+    ]);
 
     console.log(`[Units] Loaded ${allMemberRoles.size} Discord members with roles`);
     console.log(`[Units] Active employees to check: ${employees.length}`);

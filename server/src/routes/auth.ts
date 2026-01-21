@@ -10,6 +10,25 @@ const router = Router();
 const DISCORD_API = 'https://discord.com/api/v10';
 const DISCORD_CDN = 'https://cdn.discordapp.com';
 
+// CACHE für System-Rollen (5 Minuten TTL)
+let systemRolesCache: { id: string; discordRoleId: string | null; level: number }[] | null = null;
+let systemRolesCacheTime = 0;
+const SYSTEM_ROLES_CACHE_TTL = 5 * 60 * 1000; // 5 Minuten
+
+async function getSystemRoles() {
+  const now = Date.now();
+  if (systemRolesCache && (now - systemRolesCacheTime) < SYSTEM_ROLES_CACHE_TTL) {
+    return systemRolesCache;
+  }
+  systemRolesCache = await prisma.role.findMany({
+    where: { discordRoleId: { not: null } },
+    orderBy: { level: 'desc' },
+    select: { id: true, discordRoleId: true, level: true },
+  });
+  systemRolesCacheTime = now;
+  return systemRolesCache;
+}
+
 // Funktion um System-Rolle basierend auf Discord-Rollen zuzuweisen
 async function assignRoleFromDiscord(discordId: string): Promise<string | null> {
   try {
@@ -19,14 +38,15 @@ async function assignRoleFromDiscord(discordId: string): Promise<string | null> 
     const guild = client.guilds.cache.get(process.env.DISCORD_GUILD_ID);
     if (!guild) return null;
 
-    const member = await guild.members.fetch(discordId).catch(() => null);
+    // Nutze Cache statt fetch wenn möglich
+    let member = guild.members.cache.get(discordId);
+    if (!member) {
+      member = await guild.members.fetch(discordId).catch(() => undefined);
+    }
     if (!member) return null;
 
-    // Hole alle System-Rollen die eine Discord-Rolle zugewiesen haben
-    const systemRoles = await prisma.role.findMany({
-      where: { discordRoleId: { not: null } },
-      orderBy: { level: 'desc' },
-    });
+    // Hole gecachte System-Rollen
+    const systemRoles = await getSystemRoles();
 
     // Finde die höchste System-Rolle, deren Discord-Rolle der Benutzer hat
     for (const sysRole of systemRoles) {
@@ -48,6 +68,8 @@ const ALLOWED_REDIRECT_URIS: Record<string, string> = {
   'http://192.168.2.103:5173': 'http://192.168.2.103:5173/auth/callback',
   'http://test.mas0n1x.online': 'http://test.mas0n1x.online/auth/callback',
   'https://test.mas0n1x.online': 'https://test.mas0n1x.online/auth/callback',
+  'http://personal.corleone-lspd.de': 'http://personal.corleone-lspd.de/auth/callback',
+  'https://personal.corleone-lspd.de': 'https://personal.corleone-lspd.de/auth/callback',
 };
 
 // Redirect URI basierend auf Origin ermitteln

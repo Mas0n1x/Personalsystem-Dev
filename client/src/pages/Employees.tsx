@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { employeesApi } from '../services/api';
@@ -122,30 +122,28 @@ export default function Employees() {
     },
   });
 
-  // Handlers
-  const handleUprank = (e: React.MouseEvent, employee: Employee) => {
+  // Handlers - MEMOIZED mit useCallback für Performance
+  const handleUprank = useCallback((e: React.MouseEvent, employee: Employee) => {
     e.stopPropagation();
-    // Verhindere doppelte Ausführung
     if (uprankMutation.isPending) return;
     if (employee.rankLevel >= 17) {
       toast.error('Höchster Rang bereits erreicht');
       return;
     }
     uprankMutation.mutate(employee.id);
-  };
+  }, [uprankMutation]);
 
-  const handleDownrank = (e: React.MouseEvent, employee: Employee) => {
+  const handleDownrank = useCallback((e: React.MouseEvent, employee: Employee) => {
     e.stopPropagation();
-    // Verhindere doppelte Ausführung
     if (downrankMutation.isPending) return;
     if (employee.rankLevel <= 1) {
       toast.error('Niedrigster Rang bereits erreicht');
       return;
     }
     downrankMutation.mutate(employee.id);
-  };
+  }, [downrankMutation]);
 
-  const handleOpenUnits = async (e: React.MouseEvent, employee: Employee) => {
+  const handleOpenUnits = useCallback(async (e: React.MouseEvent, employee: Employee) => {
     e.stopPropagation();
     setSelectedEmployee(employee);
 
@@ -158,51 +156,55 @@ export default function Employees() {
     } catch {
       toast.error('Fehler beim Laden der Units');
     }
-  };
+  }, []);
 
-  const handleOpenTerminate = (e: React.MouseEvent, employee: Employee) => {
+  const handleOpenTerminate = useCallback((e: React.MouseEvent, employee: Employee) => {
     e.stopPropagation();
     setSelectedEmployee(employee);
     setTerminateReason('');
     setTerminateModalOpen(true);
-  };
+  }, []);
 
-  const handleSaveUnits = () => {
+  const handleSaveUnits = useCallback(() => {
     if (!selectedEmployee) return;
     setUnitsMutation.mutate({
       id: selectedEmployee.id,
       unitRoleIds: selectedUnitRoles,
     });
-  };
+  }, [selectedEmployee, selectedUnitRoles, setUnitsMutation]);
 
-  const handleConfirmTerminate = () => {
+  const handleConfirmTerminate = useCallback(() => {
     if (!selectedEmployee) return;
     terminateMutation.mutate({
       id: selectedEmployee.id,
       reason: terminateReason || undefined,
     });
-  };
+  }, [selectedEmployee, terminateReason, terminateMutation]);
 
-  const toggleUnitRole = (roleId: string) => {
+  const toggleUnitRole = useCallback((roleId: string) => {
     setSelectedUnitRoles(prev =>
       prev.includes(roleId) ? prev.filter(id => id !== roleId) : [...prev, roleId]
     );
-  };
+  }, []);
 
-  // Rollen nach Unit gruppieren und sortieren (Basis-Rolle zuerst, dann nach order)
-  const groupedUnitRoles = unitRoles.reduce<Record<string, UnitRole[]>>((acc, role) => {
-    if (!acc[role.unit]) acc[role.unit] = [];
-    acc[role.unit].push(role);
-    return acc;
-  }, {});
+  // Rollen nach Unit gruppieren und sortieren - MEMOIZED
+  const groupedUnitRoles = useMemo(() => {
+    const grouped = unitRoles.reduce<Record<string, UnitRole[]>>((acc, role) => {
+      if (!acc[role.unit]) acc[role.unit] = [];
+      acc[role.unit].push(role);
+      return acc;
+    }, {});
 
-  // Innerhalb jeder Gruppe sortieren
-  Object.values(groupedUnitRoles).forEach(roles => {
-    roles.sort((a, b) => {
-      if (a.isBase !== b.isBase) return a.isBase ? -1 : 1;
-      return a.order - b.order;
+    // Innerhalb jeder Gruppe sortieren
+    Object.values(grouped).forEach(roles => {
+      roles.sort((a, b) => {
+        if (a.isBase !== b.isBase) return a.isBase ? -1 : 1;
+        return a.order - b.order;
+      });
     });
-  });
+
+    return grouped;
+  }, [unitRoles]);
 
   const columns = [
     {
@@ -356,16 +358,16 @@ export default function Employees() {
 
   const hasActiveFilters = search || department || rank || team;
 
-  // Stats berechnen
+  // Stats berechnen - MEMOIZED für Performance
   const employees = response?.data || [];
   const totalEmployees = response?.total || 0;
-  const teamStats = {
+  const teamStats = useMemo(() => ({
     white: employees.filter(e => e.rankLevel >= 16).length,
     red: employees.filter(e => e.rankLevel >= 13 && e.rankLevel < 16).length,
     gold: employees.filter(e => e.rankLevel >= 10 && e.rankLevel < 13).length,
     silver: employees.filter(e => e.rankLevel >= 6 && e.rankLevel < 10).length,
     green: employees.filter(e => e.rankLevel >= 1 && e.rankLevel < 6).length,
-  };
+  }), [employees]);
 
   return (
     <div className="space-y-6">

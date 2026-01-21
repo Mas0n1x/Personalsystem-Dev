@@ -118,7 +118,9 @@
       "Bash(systemctl stop:*)",
       "Bash(service nginx stop:*)",
       "Bash(systemctl disable:*)",
-      "Bash(pgrep:*)"
+      "Bash(pgrep:*)",
+      "Bash(systemctl restart:*)",
+      "Bash(pm2 logs:*)"
     ]
   }
 }

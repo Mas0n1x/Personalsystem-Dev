@@ -352,7 +352,13 @@ export default function Absences() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setAbsenceType('DAY_OFF')}
+                    onClick={() => {
+                      setAbsenceType('DAY_OFF');
+                      // Bei Wechsel zu Dienstfrei: Enddatum auf Startdatum setzen
+                      if (startDate) {
+                        setEndDate(startDate);
+                      }
+                    }}
                     className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
                       absenceType === 'DAY_OFF'
                         ? 'bg-blue-600 text-white'
@@ -383,25 +389,33 @@ export default function Absences() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="label">Von *</label>
+                  <label className="label">{absenceType === 'DAY_OFF' ? 'Datum *' : 'Von *'}</label>
                   <input
                     type="date"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      // Bei Dienstfrei: Enddatum automatisch auf Startdatum setzen
+                      if (absenceType === 'DAY_OFF') {
+                        setEndDate(e.target.value);
+                      }
+                    }}
                     className="input"
                     required
                   />
                 </div>
-                <div>
-                  <label className="label">Bis *</label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="input"
-                    required
-                  />
-                </div>
+                {absenceType !== 'DAY_OFF' && (
+                  <div>
+                    <label className="label">Bis *</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="input"
+                      required
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 pt-4">

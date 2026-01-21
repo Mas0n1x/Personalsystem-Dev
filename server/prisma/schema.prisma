@@ -488,10 +488,12 @@ model DetectiveFolder {
   id              String    @id @default(cuid())
   name            String                          // Name des Ordners (z.B. Detektivname)
   description     String?                         // Beschreibung
+  status          String    @default("OPEN")      // OPEN, CLOSED
   detectiveId     String                          // Mitarbeiter (Detektiv)
   detective       Employee  @relation("DetectiveFolders", fields: [detectiveId], references: [id], onDelete: Cascade)
   createdById     String
   createdBy       User      @relation("DetectiveFolderCreatedBy", fields: [createdById], references: [id])
+  closedAt        DateTime?                       // Wann der Ordner geschlossen wurde
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -500,6 +502,7 @@ model DetectiveFolder {
 
   @@unique([detectiveId])                         // Ein Ordner pro Detektiv
   @@index([detectiveId])
+  @@index([status])
   @@map("detective_folders")
 }
 
@@ -752,23 +755,26 @@ model TeamChangeReport {
 
 // Uprank-Anträge von Teamleitern an das Management
 model UprankRequest {
-  id              String    @id @default(cuid())
-  employeeId      String
-  employee        Employee  @relation("UprankRequestEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
-  currentRank     String                            // Aktueller Rang
-  targetRank      String                            // Gewünschter Rang
-  reason          String                            // Begründung
-  achievements    String?                           // Leistungen/Erfolge
-  status          String    @default("PENDING")     // PENDING, APPROVED, REJECTED
-  rejectionReason String?                           // Ablehnungsgrund
-  requestedById   String
-  requestedBy     User      @relation("UprankRequestedBy", fields: [requestedById], references: [id])
-  processedById   String?
-  processedBy     User?     @relation("UprankProcessedBy", fields: [processedById], references: [id])
-  processedAt     DateTime?
-  isAcademyRequest Boolean  @default(false)         // Ob aus Academy-System
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  employeeId        String
+  employee          Employee  @relation("UprankRequestEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  currentRank       String                            // Aktueller Rang
+  targetRank        String                            // Gewünschter Rang
+  reason            String                            // Begründung
+  achievements      String?                           // Leistungen/Erfolge
+  status            String    @default("PENDING")     // PENDING, APPROVED, REJECTED
+  rejectionReason   String?                           // Ablehnungsgrund
+  interviewCompleted Boolean  @default(false)         // Ob Bewerbungsgespräch durchgeführt wurde
+  interviewNotes    String?                           // Notizen zum Gespräch
+  interviewDate     DateTime?                         // Datum des Gesprächs
+  requestedById     String
+  requestedBy       User      @relation("UprankRequestedBy", fields: [requestedById], references: [id])
+  processedById     String?
+  processedBy       User?     @relation("UprankProcessedBy", fields: [processedById], references: [id])
+  processedAt       DateTime?
+  isAcademyRequest  Boolean   @default(false)         // Ob aus Academy-System
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([employeeId])
   @@index([status])
