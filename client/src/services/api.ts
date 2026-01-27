@@ -317,6 +317,8 @@ export const uprankLockApi = {
 
 // Bewerbungen API
 export const applicationApi = {
+  // Kombinierter Init-Endpoint für schnelleres Laden (7 Calls -> 1)
+  getInit: (params?: Record<string, string>) => api.get('/applications/init', { params }),
   getAll: (params?: Record<string, string>) => api.get('/applications', { params }),
   getStats: () => api.get('/applications/stats'),
   getById: (id: string) => api.get(`/applications/${id}`),

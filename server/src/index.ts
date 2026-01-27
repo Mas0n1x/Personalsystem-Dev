@@ -72,6 +72,12 @@ const io = new Server(httpServer, {
     origin: allowedOrigins,
     credentials: true,
   },
+  // Ping/Pong für Cloudflare Tunnel (100s idle timeout)
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  // Transports
+  transports: ['websocket', 'polling'],
+  allowUpgrades: true,
 });
 
 // Middleware

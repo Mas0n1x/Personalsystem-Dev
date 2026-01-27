@@ -33,26 +33,41 @@ async function getSystemRoles() {
 async function assignRolesFromDiscord(discordId: string): Promise<string[]> {
   try {
     const client = await getDiscordClient();
-    if (!client || !process.env.DISCORD_GUILD_ID) return [];
+    if (!client || !process.env.DISCORD_GUILD_ID) {
+      console.log(`[AUTH] Discord-Client oder Guild-ID nicht verfügbar`);
+      return [];
+    }
 
     const guild = client.guilds.cache.get(process.env.DISCORD_GUILD_ID);
-    if (!guild) return [];
+    if (!guild) {
+      console.log(`[AUTH] Guild nicht gefunden: ${process.env.DISCORD_GUILD_ID}`);
+      return [];
+    }
 
     // Nutze Cache statt fetch wenn möglich
     let member = guild.members.cache.get(discordId);
     if (!member) {
       member = await guild.members.fetch(discordId).catch(() => undefined);
     }
-    if (!member) return [];
+    if (!member) {
+      console.log(`[AUTH] Member nicht gefunden in Guild: ${discordId}`);
+      return [];
+    }
 
     // Hole gecachte System-Rollen
     const systemRoles = await getSystemRoles();
+
+    // Debug: Zeige alle Discord-Rollen des Members
+    const memberRoleNames = member.roles.cache.map(r => `${r.name} (${r.id})`).join(', ');
+    console.log(`[AUTH] Discord-Rollen von ${member.displayName}: ${memberRoleNames}`);
+    console.log(`[AUTH] Verfügbare System-Rollen mit Discord-Verknüpfung: ${systemRoles.length}`);
 
     // Finde ALLE System-Rollen, deren Discord-Rolle der Benutzer hat
     const matchedRoleIds: string[] = [];
     for (const sysRole of systemRoles) {
       if (sysRole.discordRoleId && member.roles.cache.has(sysRole.discordRoleId)) {
         matchedRoleIds.push(sysRole.id);
+        console.log(`[AUTH] Match gefunden: System-Rolle ${sysRole.id} für Discord-Rolle ${sysRole.discordRoleId}`);
       }
     }
 
@@ -170,6 +185,12 @@ router.post('/discord/callback', async (req: Request, res: Response) => {
 
     // Kombiniere bestehende Rollen mit Discord-Rollen (ohne Duplikate)
     const roleIdsToAssign = [...new Set([...existingRoleIds, ...discordRoleIds])];
+
+    // Debug-Logging für Rollen-Zuweisung
+    console.log(`[AUTH] Login für User: ${discordUser.username} (${discordUser.id})`);
+    console.log(`[AUTH] Existierende Rollen-IDs: ${existingRoleIds.length > 0 ? existingRoleIds.join(', ') : 'keine'}`);
+    console.log(`[AUTH] Discord-Rollen-IDs: ${discordRoleIds.length > 0 ? discordRoleIds.join(', ') : 'keine'}`);
+    console.log(`[AUTH] Zugewiesene Rollen-IDs: ${roleIdsToAssign.length > 0 ? roleIdsToAssign.join(', ') : 'keine'}`);
 
     // Versuche den Server-Nickname aus Discord zu holen (falls verfügbar)
     let serverNickname: string | null = null;

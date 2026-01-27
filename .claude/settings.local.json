@@ -122,7 +122,12 @@
       "Bash(systemctl restart:*)",
       "Bash(pm2 logs:*)",
       "Bash(docker volume:*)",
-      "Bash(docker cp:*)"
+      "Bash(docker cp:*)",
+      "Bash(nginx -s reload:*)",
+      "Bash(sudo nginx:*)",
+      "Bash(ps:*)",
+      "Bash(pm2 status:*)",
+      "Bash(systemctl status:*)"
     ]
   }
 }

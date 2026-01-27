@@ -73,19 +73,211 @@ const FALLBACK_ONBOARDING_CHECKLIST = [
   { id: 'garage', text: 'Fahrzeuggarage erklärt' },
 ];
 
-// Hilfsfunktion um Onboarding-Items zu laden (aus DB oder Fallback)
+// ==================== CACHING für statische Daten ====================
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 Minuten Cache
+const cache: {
+  questions: CacheEntry<{ id: string; text: string }[]> | null;
+  criteria: CacheEntry<{ id: string; name: string }[]> | null;
+  onboarding: CacheEntry<{ id: string; text: string }[]> | null;
+} = {
+  questions: null,
+  criteria: null,
+  onboarding: null,
+};
+
+// Cache invalidieren (bei Änderungen an den Daten aufrufen)
+export function invalidateHRCache(type?: 'questions' | 'criteria' | 'onboarding') {
+  if (type) {
+    cache[type] = null;
+  } else {
+    cache.questions = null;
+    cache.criteria = null;
+    cache.onboarding = null;
+  }
+}
+
+// Hilfsfunktion um Onboarding-Items zu laden (aus DB oder Fallback) - MIT CACHE
 async function getOnboardingChecklist() {
+  const now = Date.now();
+  if (cache.onboarding && (now - cache.onboarding.timestamp) < CACHE_TTL) {
+    return cache.onboarding.data;
+  }
+
   const dbItems = await prisma.onboardingItem.findMany({
     where: { isActive: true },
     orderBy: { sortOrder: 'asc' },
   });
 
-  if (dbItems.length > 0) {
-    return dbItems.map(item => ({ id: item.id, text: item.text }));
+  const result = dbItems.length > 0
+    ? dbItems.map(item => ({ id: item.id, text: item.text }))
+    : FALLBACK_ONBOARDING_CHECKLIST;
+
+  cache.onboarding = { data: result, timestamp: now };
+  return result;
+}
+
+// Fallback-Fragen (auch weiter unten definiert, hier für Cache-Funktionen)
+const FALLBACK_QUESTIONS_CACHE = [
+  { id: 'q1', text: 'Was sind deine Aufgaben als Cadet?' },
+  { id: 'q2', text: 'Wie verhältst du dich bei einer Verkehrskontrolle?' },
+  { id: 'q3', text: 'Was machst du bei einem Notruf?' },
+];
+
+// Fallback-Kriterien (auch weiter unten definiert, hier für Cache-Funktionen)
+const FALLBACK_CRITERIA_CACHE = [
+  { id: 'stabilization', name: 'Stabilisationsschein geprüft' },
+  { id: 'visa', name: 'Visumsstufe geprüft' },
+  { id: 'noOffenses', name: 'Keine Straftaten (7 Tage)' },
+  { id: 'appearance', name: 'Angemessenes Aussehen' },
+  { id: 'noFactionLock', name: 'Keine Fraktionssperre' },
+  { id: 'noOpenBills', name: 'Keine offenen Rechnungen' },
+  { id: 'searched', name: 'Durchsuchen' },
+  { id: 'blacklistChecked', name: 'Blacklist gecheckt' },
+  { id: 'handbookGiven', name: 'Diensthandbuch ausgegeben' },
+  { id: 'employmentTest', name: 'Einstellungstest' },
+  { id: 'rpSituation', name: 'RP Situation dargestellt (AVK) & Smalltalk' },
+];
+
+// Gecachte Fragen laden
+async function getCachedQuestions() {
+  const now = Date.now();
+  if (cache.questions && (now - cache.questions.timestamp) < CACHE_TTL) {
+    return cache.questions.data;
   }
 
-  return FALLBACK_ONBOARDING_CHECKLIST;
+  const questions = await prisma.academyQuestion.findMany({
+    where: { isActive: true },
+    orderBy: { sortOrder: 'asc' },
+  });
+
+  const result = questions.length > 0
+    ? questions.map(q => ({ id: q.id, text: q.question }))
+    : FALLBACK_QUESTIONS_CACHE;
+
+  cache.questions = { data: result, timestamp: now };
+  return result;
 }
+
+// Gecachte Kriterien laden
+async function getCachedCriteria() {
+  const now = Date.now();
+  if (cache.criteria && (now - cache.criteria.timestamp) < CACHE_TTL) {
+    return cache.criteria.data;
+  }
+
+  const criteria = await prisma.academyCriterion.findMany({
+    where: { isActive: true },
+    orderBy: { sortOrder: 'asc' },
+  });
+
+  const result = criteria.length > 0
+    ? criteria.map(c => ({ id: c.id, name: c.name }))
+    : FALLBACK_CRITERIA_CACHE;
+
+  cache.criteria = { data: result, timestamp: now };
+  return result;
+}
+
+// ==================== KOMBINIERTER INIT-ENDPOINT für HR-Seite ====================
+// Reduziert 7 API-Calls auf 1 für schnelleres Laden
+router.get('/init', authMiddleware, requirePermission('hr.view'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { status, page = '1', limit = '50' } = req.query;
+
+    const where: Record<string, unknown> = {};
+    if (status && status !== 'ALL') {
+      where.status = status;
+    }
+
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const take = parseInt(limit as string);
+
+    // Alle Daten parallel laden für maximale Performance
+    const [
+      applications,
+      applicationTotal,
+      criteriaStats,
+      questionsStats,
+      onboardingStats,
+      completedStats,
+      rejectedStats,
+      questions,
+      criteria,
+      onboardingItems,
+      blacklist,
+      blacklistTotal,
+      blacklistPermanent,
+      blacklistTemporary,
+    ] = await Promise.all([
+      // Bewerbungen
+      prisma.application.findMany({
+        where,
+        include: {
+          createdBy: { select: { displayName: true, username: true } },
+          processedBy: { select: { displayName: true, username: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.application.count({ where }),
+      // Application Stats
+      prisma.application.count({ where: { status: 'CRITERIA' } }),
+      prisma.application.count({ where: { status: 'QUESTIONS' } }),
+      prisma.application.count({ where: { status: 'ONBOARDING' } }),
+      prisma.application.count({ where: { status: 'COMPLETED' } }),
+      prisma.application.count({ where: { status: 'REJECTED' } }),
+      // Gecachte statische Daten
+      getCachedQuestions(),
+      getCachedCriteria(),
+      getOnboardingChecklist(),
+      // Blacklist
+      prisma.blacklist.findMany({
+        include: { addedBy: { select: { displayName: true, username: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.blacklist.count(),
+      prisma.blacklist.count({ where: { expiresAt: null } }),
+      prisma.blacklist.count({ where: { expiresAt: { not: null, gt: new Date() } } }),
+    ]);
+
+    res.json({
+      applications: {
+        data: applications,
+        total: applicationTotal,
+        page: parseInt(page as string),
+        limit: take,
+        totalPages: Math.ceil(applicationTotal / take),
+      },
+      applicationStats: {
+        criteria: criteriaStats,
+        questions: questionsStats,
+        onboarding: onboardingStats,
+        completed: completedStats,
+        rejected: rejectedStats,
+        pending: criteriaStats + questionsStats + onboardingStats,
+        total: criteriaStats + questionsStats + onboardingStats + completedStats + rejectedStats,
+      },
+      questions,
+      criteria,
+      onboardingItems,
+      blacklist,
+      blacklistStats: {
+        total: blacklistTotal,
+        permanent: blacklistPermanent,
+        temporary: blacklistTemporary,
+      },
+    });
+  } catch (error) {
+    console.error('HR Init error:', error);
+    res.status(500).json({ error: 'Fehler beim Laden der HR-Daten' });
+  }
+});
 
 // GET alle Bewerbungen
 router.get('/', authMiddleware, requirePermission('hr.view'), async (req: AuthRequest, res: Response) => {

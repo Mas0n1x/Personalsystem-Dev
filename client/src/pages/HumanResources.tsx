@@ -83,6 +83,39 @@ type Tab = 'applications' | 'blacklist';
 
 // Fallback-Kriterien wurden auf den Server verschoben (/api/applications/criteria)
 
+// Utility Functions außerhalb der Komponente für bessere Performance
+const formatDate = (dateStr: string) =>
+  new Date(dateStr).toLocaleDateString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
+const formatDateTime = (dateStr: string) =>
+  new Date(dateStr).toLocaleDateString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+const isExpired = (dateStr: string | null) => {
+  if (!dateStr) return false;
+  return new Date(dateStr) < new Date();
+};
+
+// Status Badge Mapping - verhindert Neuerstellen bei jedem Render
+const STATUS_BADGES: Record<Application['status'], JSX.Element> = {
+  CRITERIA: <span className="px-2 py-0.5 text-xs bg-blue-600/20 text-blue-400 rounded-full">Kriterien</span>,
+  QUESTIONS: <span className="px-2 py-0.5 text-xs bg-purple-600/20 text-purple-400 rounded-full">Fragen</span>,
+  ONBOARDING: <span className="px-2 py-0.5 text-xs bg-amber-600/20 text-amber-400 rounded-full">Onboarding</span>,
+  COMPLETED: <span className="px-2 py-0.5 text-xs bg-green-600/20 text-green-400 rounded-full">Abgeschlossen</span>,
+  REJECTED: <span className="px-2 py-0.5 text-xs bg-red-600/20 text-red-400 rounded-full">Abgelehnt</span>,
+};
+
+const getStatusBadge = (status: Application['status']) => STATUS_BADGES[status];
+
 export default function HumanResources() {
   const { user, hasAnyPermission } = useAuth();
   const queryClient = useQueryClient();
@@ -180,51 +213,25 @@ export default function HumanResources() {
   const [blacklistReason, setBlacklistReason] = useState('');
   const [blacklistExpires, setBlacklistExpires] = useState('');
 
-  // Queries
-  const { data: blacklistData, isLoading: blacklistLoading } = useQuery({
-    queryKey: ['blacklist'],
-    queryFn: () => blacklistApi.getAll(),
+  // OPTIMIERT: Kombinierter Query für alle HR-Daten (7 API-Calls -> 1)
+  const { data: hrInitData, isLoading: hrLoading } = useQuery({
+    queryKey: ['hr-init', applicationStatus],
+    queryFn: () => applicationApi.getInit(applicationStatus !== 'ALL' ? { status: applicationStatus } : undefined),
+    staleTime: 30000, // 30 Sekunden Cache
   });
 
-  const { data: blacklistStatsData } = useQuery({
-    queryKey: ['blacklist-stats'],
-    queryFn: () => blacklistApi.getStats(),
-  });
+  // Daten aus kombiniertem Response extrahieren
+  const blacklist = (hrInitData?.data?.blacklist || []) as BlacklistEntry[];
+  const blacklistStats = hrInitData?.data?.blacklistStats as { total: number; permanent: number; temporary: number } | undefined;
+  const applications = (hrInitData?.data?.applications?.data || []) as Application[];
+  const applicationStats = hrInitData?.data?.applicationStats as { criteria: number; questions: number; onboarding: number; completed: number; rejected: number; pending: number; total: number } | undefined;
+  const questions = (hrInitData?.data?.questions || []) as Question[];
+  const onboardingItems = (hrInitData?.data?.onboardingItems || []) as OnboardingItem[];
+  const dynamicCriteria = (hrInitData?.data?.criteria || []) as Criterion[];
 
-  const { data: applicationsData, isLoading: applicationsLoading } = useQuery({
-    queryKey: ['applications', applicationStatus],
-    queryFn: () => applicationApi.getAll(applicationStatus !== 'ALL' ? { status: applicationStatus } : undefined),
-  });
-
-  const { data: applicationStatsData } = useQuery({
-    queryKey: ['application-stats'],
-    queryFn: () => applicationApi.getStats(),
-  });
-
-  const { data: questionsData } = useQuery({
-    queryKey: ['application-questions'],
-    queryFn: () => applicationApi.getQuestions(),
-  });
-
-  const { data: onboardingData } = useQuery({
-    queryKey: ['application-onboarding'],
-    queryFn: () => applicationApi.getOnboardingChecklist(),
-  });
-
-  // Dynamische Einstellungskriterien aus der Applications-API (inkl. Fallback)
-  const { data: criteriaData } = useQuery({
-    queryKey: ['application-criteria'],
-    queryFn: () => applicationApi.getCriteria(),
-  });
-
-  const blacklist = (blacklistData?.data || []) as BlacklistEntry[];
-  const blacklistStats = blacklistStatsData?.data as { total: number; permanent: number; temporary: number } | undefined;
-  const applications = (applicationsData?.data || []) as Application[];
-  const applicationStats = applicationStatsData?.data as { criteria: number; questions: number; onboarding: number; completed: number; rejected: number; pending: number; total: number } | undefined;
-  const questions = (questionsData?.data || []) as Question[];
-  const onboardingItems = (onboardingData?.data || []) as OnboardingItem[];
-  // Kriterien kommen jetzt direkt vom /applications/criteria Endpunkt (inkl. Fallback vom Server)
-  const dynamicCriteria = (criteriaData?.data || []) as Criterion[];
+  // Loading-States für Kompatibilität
+  const blacklistLoading = hrLoading;
+  const applicationsLoading = hrLoading;
 
   // Kriterienliste - Server liefert jetzt bereits Fallback wenn keine in DB
   const CRITERIA_ITEMS = useMemo(() => {
@@ -239,8 +246,7 @@ export default function HumanResources() {
   const createBlacklistMutation = useMutation({
     mutationFn: blacklistApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['blacklist'] });
-      queryClient.invalidateQueries({ queryKey: ['blacklist-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-init'] });
       closeBlacklistModal();
       toast.success('Blacklist-Eintrag erstellt');
     },
@@ -250,7 +256,7 @@ export default function HumanResources() {
     mutationFn: ({ id, data }: { id: string; data: { reason?: string; expiresAt?: string } }) =>
       blacklistApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['blacklist'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-init'] });
       closeBlacklistModal();
       toast.success('Blacklist-Eintrag aktualisiert');
     },
@@ -259,8 +265,7 @@ export default function HumanResources() {
   const deleteBlacklistMutation = useMutation({
     mutationFn: blacklistApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['blacklist'] });
-      queryClient.invalidateQueries({ queryKey: ['blacklist-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-init'] });
       toast.success('Blacklist-Eintrag entfernt');
     },
   });
@@ -269,8 +274,7 @@ export default function HumanResources() {
   const createApplicationMutation = useMutation({
     mutationFn: applicationApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['applications'] });
-      queryClient.invalidateQueries({ queryKey: ['application-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-init'] });
       closeCreateModal();
       toast.success('Bewerbung erstellt');
     },
@@ -285,8 +289,7 @@ export default function HumanResources() {
     mutationFn: ({ id, data }: { id: string; data: Record<string, boolean> }) =>
       applicationApi.updateCriteria(id, data),
     onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['applications'] });
-      queryClient.invalidateQueries({ queryKey: ['application-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-init'] });
       setSelectedApplication(response.data);
       if (response.data.status === 'QUESTIONS') {
         toast.success('Alle Kriterien erfüllt - weiter zum Fragenkatalog');
@@ -298,8 +301,7 @@ export default function HumanResources() {
     mutationFn: ({ id, questionsCompleted }: { id: string; questionsCompleted: string[] }) =>
       applicationApi.updateQuestions(id, questionsCompleted),
     onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['applications'] });
-      queryClient.invalidateQueries({ queryKey: ['application-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-init'] });
       setSelectedApplication(response.data);
       if (response.data.status === 'ONBOARDING') {
         toast.success('Fragenkatalog abgeschlossen - weiter zum Onboarding');
@@ -317,7 +319,7 @@ export default function HumanResources() {
         discordRolesAssigned?: boolean;
       }),
     onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-init'] });
       setSelectedApplication(response.data.application);
     },
   });
@@ -325,8 +327,7 @@ export default function HumanResources() {
   const completeApplicationMutation = useMutation({
     mutationFn: applicationApi.complete,
     onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['applications'] });
-      queryClient.invalidateQueries({ queryKey: ['application-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-init'] });
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       closeDetailModal();
       toast.success(response.data.message || 'Bewerbung abgeschlossen');
@@ -342,12 +343,7 @@ export default function HumanResources() {
     mutationFn: ({ id, data }: { id: string; data: { rejectionReason: string; addToBlacklist?: boolean; blacklistReason?: string; blacklistExpires?: string } }) =>
       applicationApi.reject(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['applications'] });
-      queryClient.invalidateQueries({ queryKey: ['application-stats'] });
-      if (addToBlacklist) {
-        queryClient.invalidateQueries({ queryKey: ['blacklist'] });
-        queryClient.invalidateQueries({ queryKey: ['blacklist-stats'] });
-      }
+      queryClient.invalidateQueries({ queryKey: ['hr-init'] });
       closeRejectModal();
       closeDetailModal();
       toast.success('Bewerbung abgelehnt');
@@ -357,8 +353,7 @@ export default function HumanResources() {
   const deleteApplicationMutation = useMutation({
     mutationFn: applicationApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['applications'] });
-      queryClient.invalidateQueries({ queryKey: ['application-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-init'] });
       toast.success('Bewerbung gelöscht');
     },
   });
@@ -388,8 +383,8 @@ export default function HumanResources() {
     },
   });
 
-  // Blacklist Modal
-  const openBlacklistModal = (entry?: BlacklistEntry) => {
+  // Blacklist Modal - memoized
+  const openBlacklistModal = useCallback((entry?: BlacklistEntry) => {
     if (entry) {
       setEditingBlacklist(entry);
       setDiscordId(entry.discordId);
@@ -404,18 +399,18 @@ export default function HumanResources() {
       setExpiresAt('');
     }
     setShowBlacklistModal(true);
-  };
+  }, []);
 
-  const closeBlacklistModal = () => {
+  const closeBlacklistModal = useCallback(() => {
     setShowBlacklistModal(false);
     setEditingBlacklist(null);
     setDiscordId('');
     setUsername('');
     setReason('');
     setExpiresAt('');
-  };
+  }, []);
 
-  const handleBlacklistSubmit = (e: React.FormEvent) => {
+  const handleBlacklistSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (editingBlacklist) {
       updateBlacklistMutation.mutate({
@@ -430,10 +425,10 @@ export default function HumanResources() {
         expiresAt: expiresAt || undefined,
       });
     }
-  };
+  }, [editingBlacklist, updateBlacklistMutation, createBlacklistMutation, reason, expiresAt, discordId, username]);
 
-  // Create Modal Functions
-  const closeCreateModal = () => {
+  // Create Modal Functions - memoized
+  const closeCreateModal = useCallback(() => {
     setShowCreateModal(false);
     setApplicantName('');
     setApplicationDate(new Date().toISOString().split('T')[0]);
@@ -442,10 +437,10 @@ export default function HumanResources() {
     setCheckUsername('');
     setBlacklistCheckResult(null);
     setIsCheckingBlacklist(false);
-  };
+  }, []);
 
-  // Blacklist Check Funktion
-  const checkBlacklist = async () => {
+  // Blacklist Check Funktion - verwendet bereits geladene Daten statt neuem API-Call
+  const checkBlacklist = useCallback(() => {
     if (!checkDiscordId && !checkUsername) {
       toast.error('Bitte Discord ID oder Username eingeben');
       return;
@@ -454,52 +449,45 @@ export default function HumanResources() {
     setIsCheckingBlacklist(true);
     setBlacklistCheckResult(null);
 
-    try {
-      // Prüfe gegen alle Blacklist-Einträge
-      const blacklistData = await blacklistApi.getAll();
-      const entries = blacklistData.data || [];
+    // Verwende bereits geladene Blacklist-Daten statt neuem API-Call
+    let matchedEntry = null;
+    let matchedBy: 'discordId' | 'username' | 'both' | undefined;
 
-      let matchedEntry = null;
-      let matchedBy: 'discordId' | 'username' | 'both' | undefined;
+    for (const entry of blacklist) {
+      const matchesDiscordId = checkDiscordId && entry.discordId === checkDiscordId;
+      const matchesUsername = checkUsername && entry.username.toLowerCase() === checkUsername.toLowerCase();
 
-      for (const entry of entries) {
-        const matchesDiscordId = checkDiscordId && entry.discordId === checkDiscordId;
-        const matchesUsername = checkUsername && entry.username.toLowerCase() === checkUsername.toLowerCase();
-
-        if (matchesDiscordId && matchesUsername) {
-          matchedEntry = entry;
-          matchedBy = 'both';
-          break;
-        } else if (matchesDiscordId) {
-          matchedEntry = entry;
-          matchedBy = 'discordId';
-        } else if (matchesUsername && !matchedEntry) {
-          matchedEntry = entry;
-          matchedBy = 'username';
-        }
+      if (matchesDiscordId && matchesUsername) {
+        matchedEntry = entry;
+        matchedBy = 'both';
+        break;
+      } else if (matchesDiscordId) {
+        matchedEntry = entry;
+        matchedBy = 'discordId';
+      } else if (matchesUsername && !matchedEntry) {
+        matchedEntry = entry;
+        matchedBy = 'username';
       }
-
-      if (matchedEntry) {
-        setBlacklistCheckResult({
-          checked: true,
-          isBlacklisted: true,
-          matchedBy,
-          entry: { reason: matchedEntry.reason, expiresAt: matchedEntry.expiresAt },
-        });
-      } else {
-        setBlacklistCheckResult({
-          checked: true,
-          isBlacklisted: false,
-        });
-      }
-    } catch {
-      toast.error('Fehler beim Prüfen der Blacklist');
-    } finally {
-      setIsCheckingBlacklist(false);
     }
-  };
 
-  const handleCreateSubmit = async (e: React.FormEvent) => {
+    if (matchedEntry) {
+      setBlacklistCheckResult({
+        checked: true,
+        isBlacklisted: true,
+        matchedBy,
+        entry: { reason: matchedEntry.reason, expiresAt: matchedEntry.expiresAt ?? undefined },
+      });
+    } else {
+      setBlacklistCheckResult({
+        checked: true,
+        isBlacklisted: false,
+      });
+    }
+
+    setIsCheckingBlacklist(false);
+  }, [checkDiscordId, checkUsername, blacklist]);
+
+  const handleCreateSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
     const formData = new FormData();
@@ -517,10 +505,10 @@ export default function HumanResources() {
     }
 
     createApplicationMutation.mutate(formData);
-  };
+  }, [applicantName, applicationDate, idCardFile, checkDiscordId, checkUsername, createApplicationMutation]);
 
-  // Detail Modal Functions
-  const openDetailModal = (app: Application) => {
+  // Detail Modal Functions - memoized
+  const openDetailModal = useCallback((app: Application) => {
     setSelectedApplication(app);
 
     // Criteria laden (aus dem JSON-Feld criteriaData)
@@ -560,9 +548,9 @@ export default function HumanResources() {
     setDiscordRolesAssigned(app.discordRolesAssigned || false);
 
     setShowDetailModal(true);
-  };
+  }, [CRITERIA_ITEMS]);
 
-  const closeDetailModal = () => {
+  const closeDetailModal = useCallback(() => {
     setShowDetailModal(false);
     setSelectedApplication(null);
     setCriteria({});
@@ -572,26 +560,26 @@ export default function HumanResources() {
     setDetailDiscordUsername('');
     setDiscordInviteLink('');
     setDiscordRolesAssigned(false);
-  };
+  }, []);
 
-  // Reject Modal
-  const openRejectModal = () => {
+  // Reject Modal - memoized
+  const openRejectModal = useCallback(() => {
     setRejectionReason('');
     setAddToBlacklist(false);
     setBlacklistReason('');
     setBlacklistExpires('');
     setShowRejectModal(true);
-  };
+  }, []);
 
-  const closeRejectModal = () => {
+  const closeRejectModal = useCallback(() => {
     setShowRejectModal(false);
     setRejectionReason('');
     setAddToBlacklist(false);
     setBlacklistReason('');
     setBlacklistExpires('');
-  };
+  }, []);
 
-  const handleRejectSubmit = (e: React.FormEvent) => {
+  const handleRejectSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (selectedApplication) {
       rejectApplicationMutation.mutate({
@@ -604,56 +592,59 @@ export default function HumanResources() {
         },
       });
     }
-  };
+  }, [selectedApplication, rejectApplicationMutation, rejectionReason, addToBlacklist, detailDiscordId, blacklistReason, blacklistExpires]);
 
-  // Handlers
-  const handleCriteriaChange = (key: string, value: boolean) => {
-    const newCriteria = { ...criteria, [key]: value };
-    setCriteria(newCriteria);
+  // Handlers - memoized für bessere Performance
+  const handleCriteriaChange = useCallback((key: string, value: boolean) => {
+    setCriteria((prev) => {
+      const newCriteria = { ...prev, [key]: value };
+      if (selectedApplication) {
+        updateCriteriaMutation.mutate({
+          id: selectedApplication.id,
+          data: newCriteria,
+        });
+      }
+      return newCriteria;
+    });
+  }, [selectedApplication, updateCriteriaMutation]);
 
-    if (selectedApplication) {
-      updateCriteriaMutation.mutate({
-        id: selectedApplication.id,
-        data: newCriteria,
-      });
-    }
-  };
+  const handleQuestionToggle = useCallback((questionId: string) => {
+    setQuestionsCompleted((prev) => {
+      const newQuestions = prev.includes(questionId)
+        ? prev.filter((q) => q !== questionId)
+        : [...prev, questionId];
+      if (selectedApplication) {
+        updateQuestionsMutation.mutate({
+          id: selectedApplication.id,
+          questionsCompleted: newQuestions,
+        });
+      }
+      return newQuestions;
+    });
+  }, [selectedApplication, updateQuestionsMutation]);
 
-  const handleQuestionToggle = (questionId: string) => {
-    const newQuestions = questionsCompleted.includes(questionId)
-      ? questionsCompleted.filter((q) => q !== questionId)
-      : [...questionsCompleted, questionId];
-    setQuestionsCompleted(newQuestions);
+  const handleOnboardingToggle = useCallback((itemId: string) => {
+    setOnboardingCompleted((prev) => {
+      const newOnboarding = prev.includes(itemId)
+        ? prev.filter((i) => i !== itemId)
+        : [...prev, itemId];
+      if (selectedApplication) {
+        updateOnboardingMutation.mutate({
+          id: selectedApplication.id,
+          data: {
+            onboardingCompleted: newOnboarding,
+            discordId: detailDiscordId || undefined,
+            discordUsername: detailDiscordUsername || undefined,
+            discordInviteLink: discordInviteLink || undefined,
+            discordRolesAssigned,
+          },
+        });
+      }
+      return newOnboarding;
+    });
+  }, [selectedApplication, updateOnboardingMutation, detailDiscordId, detailDiscordUsername, discordInviteLink, discordRolesAssigned]);
 
-    if (selectedApplication) {
-      updateQuestionsMutation.mutate({
-        id: selectedApplication.id,
-        questionsCompleted: newQuestions,
-      });
-    }
-  };
-
-  const handleOnboardingToggle = (itemId: string) => {
-    const newOnboarding = onboardingCompleted.includes(itemId)
-      ? onboardingCompleted.filter((i) => i !== itemId)
-      : [...onboardingCompleted, itemId];
-    setOnboardingCompleted(newOnboarding);
-
-    if (selectedApplication) {
-      updateOnboardingMutation.mutate({
-        id: selectedApplication.id,
-        data: {
-          onboardingCompleted: newOnboarding,
-          discordId: detailDiscordId || undefined,
-          discordUsername: detailDiscordUsername || undefined,
-          discordInviteLink: discordInviteLink || undefined,
-          discordRolesAssigned,
-        },
-      });
-    }
-  };
-
-  const handleDiscordDataSave = () => {
+  const handleDiscordDataSave = useCallback(() => {
     if (selectedApplication) {
       updateOnboardingMutation.mutate({
         id: selectedApplication.id,
@@ -667,9 +658,9 @@ export default function HumanResources() {
       });
       toast.success('Discord-Daten gespeichert');
     }
-  };
+  }, [selectedApplication, updateOnboardingMutation, onboardingCompleted, detailDiscordId, detailDiscordUsername, discordInviteLink, discordRolesAssigned]);
 
-  const handleComplete = () => {
+  const handleComplete = useCallback(() => {
     if (selectedApplication) {
       if (!detailDiscordId) {
         toast.error('Discord ID ist erforderlich');
@@ -677,48 +668,11 @@ export default function HumanResources() {
       }
       completeApplicationMutation.mutate(selectedApplication.id);
     }
-  };
+  }, [selectedApplication, detailDiscordId, completeApplicationMutation]);
 
-  // Utility Functions
-  const getStatusBadge = (status: Application['status']) => {
-    switch (status) {
-      case 'CRITERIA':
-        return <span className="px-2 py-0.5 text-xs bg-blue-600/20 text-blue-400 rounded-full">Kriterien</span>;
-      case 'QUESTIONS':
-        return <span className="px-2 py-0.5 text-xs bg-purple-600/20 text-purple-400 rounded-full">Fragen</span>;
-      case 'ONBOARDING':
-        return <span className="px-2 py-0.5 text-xs bg-amber-600/20 text-amber-400 rounded-full">Onboarding</span>;
-      case 'COMPLETED':
-        return <span className="px-2 py-0.5 text-xs bg-green-600/20 text-green-400 rounded-full">Abgeschlossen</span>;
-      case 'REJECTED':
-        return <span className="px-2 py-0.5 text-xs bg-red-600/20 text-red-400 rounded-full">Abgelehnt</span>;
-    }
-  };
-
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-
-  const formatDateTime = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-
-  const isExpired = (dateStr: string | null) => {
-    if (!dateStr) return false;
-    return new Date(dateStr) < new Date();
-  };
-
-  // Permission checks
-  const canManageBlacklist = hasAnyPermission('blacklist.manage', 'admin.full');
-  const canManageHR = hasAnyPermission('hr.manage', 'admin.full');
+  // Permission checks - memoized
+  const canManageBlacklist = useMemo(() => hasAnyPermission('blacklist.manage', 'admin.full'), [hasAnyPermission]);
+  const canManageHR = useMemo(() => hasAnyPermission('hr.manage', 'admin.full'), [hasAnyPermission]);
 
   // Sync selectedApplication when data changes
   useEffect(() => {
