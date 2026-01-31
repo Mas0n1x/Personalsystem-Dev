@@ -233,7 +233,7 @@ export default function InternalAffairs() {
   const { data: allEmployees = [], isLoading: isLoadingAllEmployees } = useQuery({
     queryKey: ['all-employees-for-teamchange'],
     queryFn: async () => {
-      const res = await employeesApi.getAll();
+      const res = await employeesApi.getAll({ all: 'true' });
       // API gibt { data: employees[], total, page, ... } zurück
       return res.data?.data || res.data || [];
     },

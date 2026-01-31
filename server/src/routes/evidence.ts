@@ -418,6 +418,22 @@ router.delete('/:id', authMiddleware, requirePermission('evidence.manage'), asyn
   try {
     const { id } = req.params;
 
+    // Storniere zugehörige Bonuszahlungen (nur PENDING)
+    const cancelledBonuses = await prisma.bonusPayment.updateMany({
+      where: {
+        referenceId: id,
+        referenceType: 'Evidence',
+        status: 'PENDING',
+      },
+      data: {
+        status: 'CANCELLED',
+      },
+    });
+
+    if (cancelledBonuses.count > 0) {
+      console.log(`Asservat ${id} gelöscht: ${cancelledBonuses.count} Bonuszahlung(en) storniert`);
+    }
+
     await prisma.evidence.delete({ where: { id } });
 
     // Live-Update broadcast

@@ -324,6 +324,19 @@ export default function HumanResources() {
     },
   });
 
+  const assignDiscordRolesMutation = useMutation({
+    mutationFn: (id: string) => applicationApi.assignDiscordRoles(id),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['hr-init'] });
+      setSelectedApplication(response.data.application);
+      setDiscordRolesAssigned(true);
+      toast.success(`Discord-Rollen erfolgreich vergeben (${response.data.rolesAssigned} Rolle${response.data.rolesAssigned > 1 ? 'n' : ''})`);
+    },
+    onError: (error: { response?: { data?: { error?: string } } }) => {
+      toast.error(error.response?.data?.error || 'Fehler beim Vergeben der Discord-Rollen');
+    },
+  });
+
   const completeApplicationMutation = useMutation({
     mutationFn: applicationApi.complete,
     onSuccess: (response) => {
@@ -1407,30 +1420,35 @@ export default function HumanResources() {
                         </button>
                       </div>
                     </div>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={discordRolesAssigned}
-                        onChange={(e) => {
-                          setDiscordRolesAssigned(e.target.checked);
-                          if (selectedApplication && selectedApplication.status === 'ONBOARDING') {
-                            updateOnboardingMutation.mutate({
-                              id: selectedApplication.id,
-                              data: {
-                                onboardingCompleted,
-                                discordId: detailDiscordId || undefined,
-                                discordUsername: detailDiscordUsername || undefined,
-                                discordInviteLink: discordInviteLink || undefined,
-                                discordRolesAssigned: e.target.checked,
-                              },
-                            });
-                          }
-                        }}
-                        className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-green-500 focus:ring-green-500"
-                        disabled={selectedApplication.status === 'COMPLETED' || selectedApplication.status === 'REJECTED'}
-                      />
-                      <span className="text-sm text-white">Discord Rollen vergeben</span>
-                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedApplication) {
+                          assignDiscordRolesMutation.mutate(selectedApplication.id);
+                        }
+                      }}
+                      className={`btn-secondary text-sm flex items-center gap-2 ${
+                        discordRolesAssigned
+                          ? 'bg-green-600/20 border-green-500/50 text-green-400 cursor-default'
+                          : ''
+                      }`}
+                      disabled={
+                        !detailDiscordId ||
+                        discordRolesAssigned ||
+                        selectedApplication.status === 'COMPLETED' ||
+                        selectedApplication.status === 'REJECTED' ||
+                        assignDiscordRolesMutation.isPending
+                      }
+                    >
+                      {assignDiscordRolesMutation.isPending ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : discordRolesAssigned ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <UserPlus className="h-4 w-4" />
+                      )}
+                      {discordRolesAssigned ? 'Discord Rollen vergeben' : 'Discord Rollen vergeben'}
+                    </button>
                   </div>
 
                   {/* Onboarding Checkliste */}

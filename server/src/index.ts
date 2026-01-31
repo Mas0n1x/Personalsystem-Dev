@@ -45,6 +45,8 @@ import unitRoutes from './routes/units.js';
 import calendarRoutes from './routes/calendar.js';
 import dutyTimeRoutes from './routes/dutyTime.js';
 import leitstelleApiRoutes from './routes/leitstelleApi.js';
+import civilianServiceRoutes from './routes/civilianService.js';
+import detectiveProfileRoutes from './routes/detectiveProfiles.js';
 
 // Services
 import { initializeDiscordBot } from './services/discordBot.js';
@@ -135,6 +137,8 @@ app.use('/api/units', unitRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/duty-time', dutyTimeRoutes);
 app.use('/api/leitstelle-external', leitstelleApiRoutes);
+app.use('/api/civilian-service', civilianServiceRoutes);
+app.use('/api/detective-profiles', detectiveProfileRoutes);
 
 // Error handling
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

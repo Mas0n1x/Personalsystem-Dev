@@ -125,7 +125,7 @@ interface TeamChangeReport {
 }
 
 const RANKS = [
-  'Cadet',
+  'Recruit',
   'Officer I',
   'Officer II',
   'Officer III',
@@ -1273,7 +1273,15 @@ function CreateRequestModal({
 }: {
   employees: Employee[];
   onClose: () => void;
-  onCreate: (data: { employeeId: string; targetRank: string; reason: string; achievements?: string }) => void;
+  onCreate: (data: {
+    employeeId: string;
+    targetRank: string;
+    reason: string;
+    achievements?: string;
+    interviewCompleted: boolean;
+    interviewNotes?: string;
+    interviewDate?: string;
+  }) => void;
   isLoading: boolean;
 }) {
   const [formData, setFormData] = useState({
@@ -1281,6 +1289,9 @@ function CreateRequestModal({
     targetRank: '',
     reason: '',
     achievements: '',
+    interviewCompleted: false,
+    interviewNotes: '',
+    interviewDate: new Date().toISOString().split('T')[0],
   });
 
   const selectedEmployee = employees.find((e) => e.id === formData.employeeId);
@@ -1294,6 +1305,9 @@ function CreateRequestModal({
       targetRank: formData.targetRank,
       reason: formData.reason,
       achievements: formData.achievements || undefined,
+      interviewCompleted: formData.interviewCompleted,
+      interviewNotes: formData.interviewNotes || undefined,
+      interviewDate: formData.interviewDate || undefined,
     });
   };
 
@@ -1372,13 +1386,56 @@ function CreateRequestModal({
             />
           </div>
 
+          <div className="border-t border-slate-700 pt-4 mt-4">
+            <h3 className="text-sm font-semibold text-slate-300 mb-3">Bewerbungsgespräch (Pflicht)</h3>
+
+            <div className="mb-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.interviewCompleted}
+                  onChange={(e) => setFormData({ ...formData, interviewCompleted: e.target.checked })}
+                  className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-green-500 focus:ring-green-500"
+                />
+                <span className="text-sm text-white">Bewerbungsgespräch durchgeführt *</span>
+              </label>
+              <p className="text-xs text-slate-400 mt-1 ml-6">
+                Ein Bewerbungsgespräch mit dem Mitarbeiter ist vor dem Uprank-Antrag erforderlich
+              </p>
+            </div>
+
+            {formData.interviewCompleted && (
+              <>
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Datum des Gesprächs</label>
+                  <input
+                    type="date"
+                    value={formData.interviewDate}
+                    onChange={(e) => setFormData({ ...formData, interviewDate: e.target.value })}
+                    className="input w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Notizen zum Gespräch</label>
+                  <textarea
+                    value={formData.interviewNotes}
+                    onChange={(e) => setFormData({ ...formData, interviewNotes: e.target.value })}
+                    className="input w-full h-24"
+                    placeholder="Wichtige Punkte aus dem Bewerbungsgespräch..."
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
           <div className="flex justify-end gap-3 pt-4">
             <button type="button" onClick={onClose} className="btn-secondary">
               Abbrechen
             </button>
             <button
               type="submit"
-              disabled={isLoading || !formData.employeeId || !formData.targetRank || selectedEmployee?.hasActiveLock}
+              disabled={isLoading || !formData.employeeId || !formData.targetRank || !formData.interviewCompleted || selectedEmployee?.hasActiveLock}
               className="btn-primary"
             >
               {isLoading ? 'Erstelle...' : 'Antrag erstellen'}

@@ -168,22 +168,35 @@ export default function Calendar() {
     }),
   });
 
-  // Query Discord roles
+  // Query Discord roles (optional - fails gracefully if user doesn't have permission)
   const { data: rolesData } = useQuery({
     queryKey: ['notification-discord-roles'],
     queryFn: async () => {
-      const res = await notificationsApi.getDiscordRoles();
-      return res.data as { serverName: string; roles: DiscordRole[] };
+      try {
+        const res = await notificationsApi.getDiscordRoles();
+        return res.data as { serverName: string; roles: DiscordRole[] };
+      } catch (error) {
+        console.warn('Discord roles not available (missing permission or Discord offline)');
+        return { serverName: '', roles: [] as DiscordRole[] };
+      }
     },
+    retry: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Query Employees
   const { data: employeesData } = useQuery({
     queryKey: ['employees-list'],
     queryFn: async () => {
-      const res = await employeesApi.getAll({ status: 'ACTIVE' });
-      return res.data?.data as Employee[] || [];
+      try {
+        const res = await employeesApi.getAll({ status: 'ACTIVE' });
+        return res.data?.data as Employee[] || [];
+      } catch (error) {
+        console.error('Failed to load employees:', error);
+        return [] as Employee[];
+      }
     },
+    retry: 1,
   });
 
   const events = (eventsData?.data || []) as CalendarEvent[];
@@ -722,21 +735,27 @@ export default function Calendar() {
                   Discord-Rollen benachrichtigen
                 </label>
                 <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 bg-slate-700/30 rounded-lg">
-                  {discordRoles.map((role) => (
-                    <button
-                      key={role.id}
-                      type="button"
-                      onClick={() => toggleRole(role.id)}
-                      className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
-                        selectedRoles.includes(role.id)
-                          ? 'bg-primary-600/30 text-primary-400 border border-primary-500'
-                          : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
-                      }`}
-                    >
-                      {selectedRoles.includes(role.id) && <Check className="h-3 w-3" />}
-                      {role.name.replace('»', '').trim()}
-                    </button>
-                  ))}
+                  {discordRoles.length === 0 ? (
+                    <p className="text-xs text-slate-500 py-2 w-full text-center">
+                      Keine Discord-Rollen verfügbar
+                    </p>
+                  ) : (
+                    discordRoles.map((role) => (
+                      <button
+                        key={role.id}
+                        type="button"
+                        onClick={() => toggleRole(role.id)}
+                        className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
+                          selectedRoles.includes(role.id)
+                            ? 'bg-primary-600/30 text-primary-400 border border-primary-500'
+                            : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                        }`}
+                      >
+                        {selectedRoles.includes(role.id) && <Check className="h-3 w-3" />}
+                        {role.name.replace('»', '').trim()}
+                      </button>
+                    ))
+                  )}
                 </div>
                 {selectedRoles.length > 0 && (
                   <p className="text-xs text-primary-400 mt-1">
@@ -752,21 +771,27 @@ export default function Calendar() {
                   Mitarbeiter benachrichtigen
                 </label>
                 <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 bg-slate-700/30 rounded-lg">
-                  {employees.map((emp) => (
-                    <button
-                      key={emp.id}
-                      type="button"
-                      onClick={() => toggleEmployee(emp.id)}
-                      className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
-                        selectedEmployees.includes(emp.id)
-                          ? 'bg-green-600/30 text-green-400 border border-green-500'
-                          : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
-                      }`}
-                    >
-                      {selectedEmployees.includes(emp.id) && <Check className="h-3 w-3" />}
-                      {emp.user.displayName || emp.user.username}
-                    </button>
-                  ))}
+                  {employees.length === 0 ? (
+                    <p className="text-xs text-slate-500 py-2 w-full text-center">
+                      Keine Mitarbeiter verfügbar
+                    </p>
+                  ) : (
+                    employees.map((emp) => (
+                      <button
+                        key={emp.id}
+                        type="button"
+                        onClick={() => toggleEmployee(emp.id)}
+                        className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
+                          selectedEmployees.includes(emp.id)
+                            ? 'bg-green-600/30 text-green-400 border border-green-500'
+                            : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                        }`}
+                      >
+                        {selectedEmployees.includes(emp.id) && <Check className="h-3 w-3" />}
+                        {emp.user.displayName || emp.user.username}
+                      </button>
+                    ))
+                  )}
                 </div>
                 {selectedEmployees.length > 0 && (
                   <p className="text-xs text-green-400 mt-1">

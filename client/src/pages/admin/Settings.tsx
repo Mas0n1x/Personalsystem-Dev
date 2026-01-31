@@ -240,7 +240,6 @@ export default function Settings() {
               onChange={(e) => setSettings({ ...settings, hrStartingRank: e.target.value })}
             >
               <option value="Recruit">Recruit</option>
-              <option value="Cadet">Cadet</option>
               <option value="Officer I">Officer I</option>
               <option value="Officer II">Officer II</option>
               <option value="Officer III">Officer III</option>

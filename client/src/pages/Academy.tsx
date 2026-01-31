@@ -587,7 +587,7 @@ export default function Academy() {
           {juniorOfficerTrainees.length > 0 && (
             <div>
               <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <span className="text-amber-400">Cadets / Junior Officers</span>
+                <span className="text-amber-400">Recruits / Junior Officers</span>
                 <span className="text-sm font-normal text-slate-400">
                   ({juniorOfficerTrainees.length})
                 </span>

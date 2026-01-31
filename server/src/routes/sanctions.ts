@@ -432,6 +432,22 @@ router.delete('/:id', authMiddleware, requirePermission('sanctions.manage'), asy
   try {
     const { id } = req.params;
 
+    // Storniere zugehörige Bonuszahlungen (nur PENDING)
+    const cancelledBonuses = await prisma.bonusPayment.updateMany({
+      where: {
+        referenceId: id,
+        referenceType: 'Sanction',
+        status: 'PENDING',
+      },
+      data: {
+        status: 'CANCELLED',
+      },
+    });
+
+    if (cancelledBonuses.count > 0) {
+      console.log(`Sanktion ${id} gelöscht: ${cancelledBonuses.count} Bonuszahlung(en) storniert`);
+    }
+
     await prisma.sanction.delete({ where: { id } });
 
     // Live-Update broadcast

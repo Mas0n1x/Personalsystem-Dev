@@ -48,7 +48,6 @@ const router = Router();
 // Rang zu Level Mapping
 const RANK_TO_LEVEL: Record<string, number> = {
   'Recruit': 1,
-  'Cadet': 1,         // Legacy Alias für Recruit
   'Officer I': 2,
   'Officer II': 3,
   'Officer III': 4,
@@ -123,7 +122,7 @@ async function getOnboardingChecklist() {
 
 // Fallback-Fragen (auch weiter unten definiert, hier für Cache-Funktionen)
 const FALLBACK_QUESTIONS_CACHE = [
-  { id: 'q1', text: 'Was sind deine Aufgaben als Cadet?' },
+  { id: 'q1', text: 'Was sind deine Aufgaben als Recruit?' },
   { id: 'q2', text: 'Wie verhältst du dich bei einer Verkehrskontrolle?' },
   { id: 'q3', text: 'Was machst du bei einem Notruf?' },
 ];
@@ -357,7 +356,7 @@ router.get('/stats', authMiddleware, requirePermission('hr.view'), async (_req: 
 
 // Fallback-Fragen für den Fall, dass keine in der Datenbank konfiguriert sind
 const FALLBACK_QUESTIONS = [
-  { id: 'q1', text: 'Was sind deine Aufgaben als Cadet?' },
+  { id: 'q1', text: 'Was sind deine Aufgaben als Recruit?' },
   { id: 'q2', text: 'Wie verhältst du dich bei einer Verkehrskontrolle?' },
   { id: 'q3', text: 'Was machst du bei einem Notruf?' },
 ];
@@ -873,6 +872,93 @@ router.put('/:id/onboarding', authMiddleware, requirePermission('hr.manage'), as
   }
 });
 
+// PUT Discord-Rollen sofort vergeben (ohne Bewerbung abzuschließen)
+router.put('/:id/assign-discord-roles', authMiddleware, requirePermission('hr.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const application = await prisma.application.findUnique({
+      where: { id },
+    });
+
+    if (!application) {
+      res.status(404).json({ error: 'Bewerbung nicht gefunden' });
+      return;
+    }
+
+    if (!application.discordId) {
+      res.status(400).json({ error: 'Discord ID ist erforderlich' });
+      return;
+    }
+
+    // Discord-Rollen aus Admin-Einstellungen zuweisen
+    try {
+      const hireRolesSetting = await prisma.systemSetting.findUnique({
+        where: { key: 'hrOnboardingRoleIds' },
+      });
+
+      if (!hireRolesSetting?.value) {
+        res.status(400).json({ error: 'Keine Discord-Rollen in den Einstellungen konfiguriert' });
+        return;
+      }
+
+      // Unterstütze sowohl kommaseparierte IDs als auch JSON-Array
+      let roleIds: string[] = [];
+      try {
+        roleIds = JSON.parse(hireRolesSetting.value) as string[];
+      } catch {
+        // Fallback: kommaseparierte IDs
+        roleIds = hireRolesSetting.value.split(',').map(id => id.trim()).filter(Boolean);
+      }
+
+      if (!roleIds || roleIds.length === 0) {
+        res.status(400).json({ error: 'Keine Discord-Rollen in den Einstellungen konfiguriert' });
+        return;
+      }
+
+      const roleResult = await assignHireRoles(application.discordId, roleIds);
+      console.log(`Discord Rollen manuell zugewiesen: ${roleResult.assigned.length} erfolgreich, ${roleResult.failed.length} fehlgeschlagen`);
+
+      if (roleResult.assigned.length === 0) {
+        res.status(500).json({ error: 'Fehler beim Zuweisen der Discord-Rollen' });
+        return;
+      }
+
+      // discordRolesAssigned Flag setzen
+      const updatedApplication = await prisma.application.update({
+        where: { id },
+        data: {
+          discordRolesAssigned: true,
+        },
+        include: {
+          createdBy: {
+            select: {
+              displayName: true,
+              username: true,
+            },
+          },
+        },
+      });
+
+      // Live-Update broadcast
+      broadcastUpdate('application', updatedApplication);
+
+      res.json({
+        success: true,
+        application: updatedApplication,
+        rolesAssigned: roleResult.assigned.length,
+        rolesFailed: roleResult.failed.length,
+      });
+    } catch (roleError) {
+      console.error('Fehler beim Zuweisen der Discord-Rollen:', roleError);
+      res.status(500).json({ error: 'Fehler beim Zuweisen der Discord-Rollen' });
+    }
+  } catch (error) {
+    console.error('Assign discord roles error:', error);
+    res.status(500).json({ error: 'Fehler beim Zuweisen der Discord-Rollen' });
+  }
+});
+
 // PUT Bewerbung abschließen (erstellt Mitarbeiter)
 router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), async (req: AuthRequest, res: Response) => {
   try {
@@ -980,7 +1066,7 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
       console.error('Fehler bei der Dienstnummer-Vergabe:', badgeError);
     }
 
-    // Mitarbeiter erstellen (department verwendet Prisma Default 'Patrol')
+    // Mitarbeiter erstellen
     const employee = await prisma.employee.create({
       data: {
         userId: user.id,

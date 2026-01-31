@@ -202,6 +202,23 @@ router.put('/:id', requirePermission('qa.manage'), async (req: AuthRequest, res:
 router.delete('/:id', requirePermission('qa.manage'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+
+    // Storniere zugehörige Bonuszahlungen (nur PENDING)
+    const cancelledBonuses = await prisma.bonusPayment.updateMany({
+      where: {
+        referenceId: id,
+        referenceType: 'UnitReview',
+        status: 'PENDING',
+      },
+      data: {
+        status: 'CANCELLED',
+      },
+    });
+
+    if (cancelledBonuses.count > 0) {
+      console.log(`UnitReview ${id} gelöscht: ${cancelledBonuses.count} Bonuszahlung(en) storniert`);
+    }
+
     await prisma.unitReview.delete({ where: { id } });
     res.json({ success: true });
   } catch (error) {

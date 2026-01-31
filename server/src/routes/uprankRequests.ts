@@ -4,8 +4,28 @@ import { authMiddleware, AuthRequest, requirePermission } from '../middleware/au
 import { notifyPromotion } from '../services/notificationService.js';
 import { announcePromotion, announceAcademyGraduation } from '../services/discordAnnouncements.js';
 import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
+import { updateDiscordNickname, syncDiscordMembers } from '../services/discordBot.js';
 
 const router = Router();
+
+// Rank-Level Mapping
+const RANK_TO_LEVEL: Record<string, number> = {
+  'Recruit': 1,
+  'Officer I': 2,
+  'Officer II': 3,
+  'Officer III': 4,
+  'Senior Officer': 5,
+  'Corporal': 6,
+  'Sergeant I': 7,
+  'Sergeant II': 8,
+  'Lieutenant I': 9,
+  'Lieutenant II': 10,
+  'Captain': 11,
+  'Commander': 12,
+  'Deputy Chief': 13,
+  'Assistant Chief': 14,
+  'Chief of Police': 15,
+};
 
 router.use(authMiddleware);
 
@@ -269,6 +289,9 @@ router.put('/:id/process', requirePermission('management.uprank'), async (req: A
 
     // If approved, update employee rank and archive
     if (status === 'APPROVED') {
+      // Neues Rank-Level berechnen
+      const newRankLevel = RANK_TO_LEVEL[request.targetRank] || request.employee.rankLevel + 1;
+
       // Beförderung im Archiv speichern
       await prisma.promotionArchive.create({
         data: {
@@ -276,19 +299,45 @@ router.put('/:id/process', requirePermission('management.uprank'), async (req: A
           oldRank: request.employee.rank,
           oldRankLevel: request.employee.rankLevel,
           newRank: request.targetRank,
-          newRankLevel: request.employee.rankLevel + 1, // Annahme: 1 Rang höher
+          newRankLevel: newRankLevel,
           promotedById: userId,
           reason: request.reason,
         },
       });
 
-      await prisma.employee.update({
+      const updatedEmployee = await prisma.employee.update({
         where: { id: request.employeeId },
         data: {
           rank: request.targetRank,
-          rankLevel: request.employee.rankLevel + 1
+          rankLevel: newRankLevel
+        },
+        include: {
+          user: true
         }
       });
+
+      // Name ohne Badge-Nummer extrahieren
+      const cleanName = (name: string | null) => {
+        if (!name) return null;
+        return name.replace(/^\[[A-Z]+-\d+\]\s*/, '').trim();
+      };
+      const pureName = cleanName(updatedEmployee.user.displayName) || updatedEmployee.user.username;
+
+      // Discord Nickname aktualisieren (mit Badge-Nummer)
+      const newNickname = updatedEmployee.badgeNumber
+        ? `[${updatedEmployee.badgeNumber}] ${pureName}`
+        : pureName;
+
+      await updateDiscordNickname(updatedEmployee.user.discordId, newNickname);
+
+      // User displayName auch aktualisieren
+      await prisma.user.update({
+        where: { id: updatedEmployee.userId },
+        data: { displayName: newNickname },
+      });
+
+      // Discord-Rollen synchronisieren (aktualisiert Rollen basierend auf neuem Rang)
+      await syncDiscordMembers();
 
       // Benachrichtigung an den beförderten Mitarbeiter senden
       const promotedByName = updatedRequest.processedBy?.displayName || updatedRequest.processedBy?.username || 'Unbekannt';
@@ -299,21 +348,15 @@ router.put('/:id/process', requirePermission('management.uprank'), async (req: A
         promotedByName
       );
 
-      // Name ohne Badge-Nummer extrahieren
-      const cleanName = (name: string | null) => {
-        if (!name) return null;
-        return name.replace(/^\[[A-Z]+-\d+\]\s*/, '').trim();
-      };
-      const pureName = cleanName(updatedRequest.employee.user.displayName) || updatedRequest.employee.user.username;
-
       // Discord Announcement senden
       if (request.isAcademyRequest) {
-        // Academy Graduation Announcement
+        // Academy Graduation Announcement - Ausbilder ist der requestedBy (der die Ausbildung durchgeführt hat)
+        const trainerName = updatedRequest.requestedBy?.displayName || updatedRequest.requestedBy?.username || 'Academy';
         await announceAcademyGraduation({
           employeeName: pureName,
           employeeAvatar: null, // Nicht verfügbar in diesem Context
           graduationType: request.targetRank === 'Junior Officer' ? 'Junior Officer Ausbildung' : 'Officer Ausbildung',
-          completedBy: promotedByName,
+          completedBy: trainerName,
           badgeNumber: updatedRequest.employee.badgeNumber,
           notes: request.achievements || null,
         });

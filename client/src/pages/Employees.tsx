@@ -481,7 +481,6 @@ export default function Employees() {
             <option value="">Alle Abteilungen</option>
             <option value="S.W.A.T.">S.W.A.T.</option>
             <option value="Detectives">Detectives</option>
-            <option value="Highway Patrol">Highway Patrol</option>
             <option value="Air Support">Air Support</option>
             <option value="Internal Affairs">Internal Affairs</option>
             <option value="Human Resources">Human Resources</option>

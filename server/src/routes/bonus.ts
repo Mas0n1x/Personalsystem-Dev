@@ -371,13 +371,13 @@ router.get('/my/caps', authMiddleware, async (req: AuthRequest, res: Response) =
     // Einsatzleitung Aktivitäten
     const OPERATION_ACTIVITIES = ['ROBBERY_LEADER', 'ROBBERY_NEGOTIATOR'];
 
-    // Alle Zahlungen diese Woche abrufen
+    // Alle PENDING Zahlungen diese Woche abrufen (nur offene Zahlungen zählen zum Cap)
     const allPayments = await prisma.bonusPayment.findMany({
       where: {
         employeeId: employee.id,
         weekStart,
         weekEnd,
-        status: { not: 'CANCELLED' },
+        status: 'PENDING',
       },
       include: { config: true },
     });
@@ -823,13 +823,13 @@ export async function createBonusPayment(
 
     // Prüfe ob diese Aktivität einem Cap unterliegt
     if (UNIT_WORK_ACTIVITIES.includes(activityType)) {
-      // Berechne bereits verdiente Summe für Unit-Arbeit diese Woche
+      // Berechne bereits verdiente Summe für Unit-Arbeit diese Woche (nur PENDING Zahlungen)
       const unitWorkPayments = await prisma.bonusPayment.findMany({
         where: {
           employeeId,
           weekStart,
           weekEnd,
-          status: { not: 'CANCELLED' },
+          status: 'PENDING',
           config: {
             activityType: { in: UNIT_WORK_ACTIVITIES },
           },
@@ -852,13 +852,13 @@ export async function createBonusPayment(
     }
 
     if (OPERATION_ACTIVITIES.includes(activityType)) {
-      // Berechne bereits verdiente Summe für Einsatzleitung/Verhandlung diese Woche
+      // Berechne bereits verdiente Summe für Einsatzleitung/Verhandlung diese Woche (nur PENDING Zahlungen)
       const operationPayments = await prisma.bonusPayment.findMany({
         where: {
           employeeId,
           weekStart,
           weekEnd,
-          status: { not: 'CANCELLED' },
+          status: 'PENDING',
           config: {
             activityType: { in: OPERATION_ACTIVITIES },
           },
@@ -881,13 +881,13 @@ export async function createBonusPayment(
     }
 
     // ==================== GESAMT-CAP PRÜFEN ====================
-    // Berechne gesamte Sonderzahlungen diese Woche (alle Aktivitäten)
+    // Berechne gesamte Sonderzahlungen diese Woche (nur PENDING Zahlungen)
     const allPayments = await prisma.bonusPayment.findMany({
       where: {
         employeeId,
         weekStart,
         weekEnd,
-        status: { not: 'CANCELLED' },
+        status: 'PENDING',
       },
     });
 

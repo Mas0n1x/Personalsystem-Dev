@@ -289,7 +289,7 @@ export default function Management() {
   // Filter employees without unit (department is empty or only contains default)
   const employeesWithoutUnit = (allEmployeesData?.data || []).filter((emp: Employee) => {
     const dept = emp.department?.trim() || '';
-    return dept === '' || dept === 'Patrol' || dept === '-';
+    return dept === '' || dept === '-';
   });
 
   // Bonus Queries

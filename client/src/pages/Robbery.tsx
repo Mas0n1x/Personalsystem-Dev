@@ -184,14 +184,16 @@ export default function Robbery() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!leaderId || !negotiatorId || !selectedFile) {
-      toast.error('Bitte alle Felder ausfüllen');
+    if (!leaderId || !selectedFile) {
+      toast.error('Bitte Einsatzleitung und Beweisfoto auswählen');
       return;
     }
 
     const formData = new FormData();
     formData.append('leaderId', leaderId);
-    formData.append('negotiatorId', negotiatorId);
+    if (negotiatorId) {
+      formData.append('negotiatorId', negotiatorId);
+    }
     formData.append('image', selectedFile);
 
     createMutation.mutate(formData);
@@ -415,14 +417,13 @@ export default function Robbery() {
 
               {/* Negotiator Selection */}
               <div>
-                <label className="label">Verhandlungsführung *</label>
+                <label className="label">Verhandlungsführung (Optional)</label>
                 <div className="relative">
                   <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                   <select
                     value={negotiatorId}
                     onChange={(e) => setNegotiatorId(e.target.value)}
                     className="input pl-10"
-                    required
                   >
                     <option value="">Mitarbeiter auswählen...</option>
                     {employees.map((emp) => (
@@ -478,7 +479,7 @@ export default function Robbery() {
                 </button>
                 <button
                   type="submit"
-                  disabled={createMutation.isPending || !leaderId || !negotiatorId || !selectedFile}
+                  disabled={createMutation.isPending || !leaderId || !selectedFile}
                   className="btn-primary flex items-center gap-2 px-5"
                 >
                   <Plus className="h-4 w-4" />

@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { casesApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import CivilianServiceTracker from '../components/detectives/CivilianServiceTracker';
+import DetectiveNamesManager from '../components/detectives/DetectiveNamesManager';
 import {
   Plus,
   X,
@@ -21,6 +23,10 @@ import {
   User,
   Pencil,
   Save,
+  MessageSquarePlus,
+  Clock,
+  Users,
+  UserCheck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -42,6 +48,17 @@ interface CaseImage {
   uploadedBy: {
     displayName: string | null;
     username: string;
+  };
+}
+
+interface InvestigationResult {
+  id: string;
+  content: string;
+  createdAt: string;
+  createdBy: {
+    displayName: string | null;
+    username: string;
+    avatar: string | null;
   };
 }
 
@@ -86,6 +103,7 @@ interface Case {
   };
   folder?: DetectiveFolder;
   images?: CaseImage[];
+  investigationResults?: InvestigationResult[];
   _count?: {
     images: number;
   };
@@ -94,6 +112,9 @@ interface Case {
 export default function Detectives() {
   const { user, hasAnyPermission } = useAuth();
   const queryClient = useQueryClient();
+
+  // Tab State
+  const [activeTab, setActiveTab] = useState<'cases' | 'civilian-service' | 'names'>('cases');
 
   // View State
   const [selectedFolder, setSelectedFolder] = useState<DetectiveFolder | null>(null);
@@ -105,6 +126,7 @@ export default function Detectives() {
   const [showCreateCaseModal, setShowCreateCaseModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [showAddResultModal, setShowAddResultModal] = useState(false);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
@@ -122,6 +144,9 @@ export default function Detectives() {
   // Upload State
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageDescription, setImageDescription] = useState('');
+
+  // Investigation Result State
+  const [resultContent, setResultContent] = useState('');
 
   // Edit State
   const [isEditing, setIsEditing] = useState(false);
@@ -287,6 +312,33 @@ export default function Detectives() {
     },
   });
 
+  const createInvestigationResultMutation = useMutation({
+    mutationFn: ({ caseId, content }: { caseId: string; content: string }) =>
+      casesApi.createInvestigationResult(caseId, { content }),
+    onSuccess: async () => {
+      toast.success('Ermittlungsergebnis hinzugefügt');
+      setResultContent('');
+      setShowAddResultModal(false);
+      // Reload case details
+      if (selectedCase) {
+        const response = await casesApi.getById(selectedCase.id);
+        setSelectedCase(response.data as Case);
+      }
+    },
+  });
+
+  const deleteInvestigationResultMutation = useMutation({
+    mutationFn: casesApi.deleteInvestigationResult,
+    onSuccess: async () => {
+      toast.success('Ermittlungsergebnis gelöscht');
+      // Reload case details
+      if (selectedCase) {
+        const response = await casesApi.getById(selectedCase.id);
+        setSelectedCase(response.data as Case);
+      }
+    },
+  });
+
   // Modal Functions - Folder
   const openCreateFolderModal = () => {
     setSelectedDetectiveId('');
@@ -409,6 +461,26 @@ export default function Detectives() {
     uploadImageMutation.mutate({
       id: selectedCase.id,
       formData,
+    });
+  };
+
+  // Investigation Result Modal Functions
+  const openAddResultModal = () => {
+    setResultContent('');
+    setShowAddResultModal(true);
+  };
+
+  const closeAddResultModal = () => {
+    setShowAddResultModal(false);
+    setResultContent('');
+  };
+
+  const handleAddResultSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCase || !resultContent.trim()) return;
+    createInvestigationResultMutation.mutate({
+      caseId: selectedCase.id,
+      content: resultContent.trim(),
     });
   };
 
@@ -848,6 +920,67 @@ export default function Detectives() {
                   )}
                 </div>
 
+                {/* Investigation Results (Ermittlungsergebnisse) */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <MessageSquarePlus className="h-5 w-5 text-blue-400" />
+                      <p className="font-semibold text-white">Ermittlungsergebnisse</p>
+                    </div>
+                    {canManage && !isEditing && (
+                      <button onClick={openAddResultModal} className="btn-ghost text-sm px-3 py-1 flex items-center gap-2">
+                        <Plus className="h-4 w-4" />
+                        Hinzufügen
+                      </button>
+                    )}
+                  </div>
+
+                  {selectedCase.investigationResults && selectedCase.investigationResults.length > 0 ? (
+                    <div className="space-y-3">
+                      {selectedCase.investigationResults.map((result) => (
+                        <div key={result.id} className="bg-blue-900/10 border border-blue-700/30 rounded-lg p-4">
+                          <div className="flex items-start justify-between gap-3 mb-2">
+                            <div className="flex items-center gap-2 text-xs text-slate-400">
+                              <Clock className="h-3 w-3" />
+                              <span>{formatDateTime(result.createdAt)}</span>
+                              <span>•</span>
+                              <span>{result.createdBy.displayName || result.createdBy.username}</span>
+                            </div>
+                            {canManage && !isEditing && (
+                              <button
+                                onClick={() => {
+                                  setConfirmDialog({
+                                    isOpen: true,
+                                    title: 'Ermittlungsergebnis löschen',
+                                    message: 'Möchtest du dieses Ermittlungsergebnis wirklich löschen?',
+                                    confirmText: 'Löschen',
+                                    variant: 'danger',
+                                    onConfirm: () => deleteInvestigationResultMutation.mutate(result.id),
+                                  });
+                                }}
+                                className="p-1 text-slate-400 hover:text-red-400 hover:bg-red-600/20 rounded transition-colors"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-white whitespace-pre-wrap">{result.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 bg-slate-700/30 rounded-lg border border-dashed border-slate-600">
+                      <MessageSquarePlus className="h-8 w-8 text-slate-600 mx-auto mb-2" />
+                      <p className="text-sm text-slate-500">Noch keine Ermittlungsergebnisse vorhanden</p>
+                      {canManage && !isEditing && (
+                        <button onClick={openAddResultModal} className="btn-ghost text-sm mt-2">
+                          Erstes Ergebnis hinzufügen
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Images */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -971,6 +1104,53 @@ export default function Detectives() {
           </div>
         )}
 
+        {/* Add Investigation Result Modal */}
+        {showAddResultModal && selectedCase && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-800 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl">
+              <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MessageSquarePlus className="h-5 w-5 text-blue-400" />
+                  <h2 className="text-xl font-bold text-white">Ermittlungsergebnis hinzufügen</h2>
+                </div>
+                <button onClick={closeAddResultModal} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
+                  <X className="h-5 w-5 text-slate-400" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddResultSubmit} className="p-6 space-y-5">
+                <div>
+                  <label className="label">Ermittlungsergebnis / Fortschritt *</label>
+                  <textarea
+                    value={resultContent}
+                    onChange={(e) => setResultContent(e.target.value)}
+                    className="input min-h-[150px]"
+                    placeholder="Beschreibe die neuen Erkenntnisse, Entwicklungen oder Fortschritte in der Ermittlung..."
+                    required
+                    autoFocus
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Halte wichtige Ermittlungsschritte chronologisch fest
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button type="button" onClick={closeAddResultModal} className="btn-ghost px-5">
+                    Abbrechen
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-primary px-5"
+                    disabled={createInvestigationResultMutation.isPending || !resultContent.trim()}
+                  >
+                    {createInvestigationResultMutation.isPending ? 'Wird hinzugefügt...' : 'Hinzufügen'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Image Modal */}
         {showImageModal && selectedImage && (
           <div
@@ -1001,16 +1181,59 @@ export default function Detectives() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Detektiv-Ordner</h1>
-          <p className="text-slate-400 mt-1">Ermittlungsakten nach Detektiv organisiert</p>
+          <h1 className="text-2xl font-bold text-white">Detectives</h1>
+          <p className="text-slate-400 mt-1">Ermittlungsakten, Zivildienst-Tracking & Namen-Dokumentation</p>
         </div>
-        {canManage && employeesWithoutFolder.length > 0 && (
+        {activeTab === 'cases' && canManage && employeesWithoutFolder.length > 0 && (
           <button onClick={openCreateFolderModal} className="btn-primary flex items-center gap-2">
             <Plus className="h-4 w-4" />
             Neuer Ordner
           </button>
         )}
       </div>
+
+      {/* Tabs */}
+      <div className="bg-slate-800 rounded-lg border border-slate-700">
+        <div className="flex border-b border-slate-700">
+          <button
+            onClick={() => setActiveTab('cases')}
+            className={`flex-1 px-6 py-4 font-medium transition-colors flex items-center justify-center gap-2 ${
+              activeTab === 'cases'
+                ? 'text-primary-400 border-b-2 border-primary-400 bg-slate-700/30'
+                : 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/20'
+            }`}
+          >
+            <Folder className="h-5 w-5" />
+            Detektiv-Akten
+          </button>
+          <button
+            onClick={() => setActiveTab('civilian-service')}
+            className={`flex-1 px-6 py-4 font-medium transition-colors flex items-center justify-center gap-2 ${
+              activeTab === 'civilian-service'
+                ? 'text-primary-400 border-b-2 border-primary-400 bg-slate-700/30'
+                : 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/20'
+            }`}
+          >
+            <Clock className="h-5 w-5" />
+            Zivildienst-Tracking
+          </button>
+          <button
+            onClick={() => setActiveTab('names')}
+            className={`flex-1 px-6 py-4 font-medium transition-colors flex items-center justify-center gap-2 ${
+              activeTab === 'names'
+                ? 'text-primary-400 border-b-2 border-primary-400 bg-slate-700/30'
+                : 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/20'
+            }`}
+          >
+            <Users className="h-5 w-5" />
+            Namen-Dokumentation
+          </button>
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'cases' && (
+        <div className="space-y-6">
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
@@ -1124,6 +1347,18 @@ export default function Detectives() {
           </div>
         )}
       </div>
+        </div>
+      )}
+
+      {/* Civilian Service Tab */}
+      {activeTab === 'civilian-service' && user?.employee?.id && (
+        <CivilianServiceTracker employeeId={user.employee.id} />
+      )}
+
+      {/* Names Documentation Tab */}
+      {activeTab === 'names' && (
+        <DetectiveNamesManager />
+      )}
 
       {/* Create Folder Modal */}
       {showCreateFolderModal && (

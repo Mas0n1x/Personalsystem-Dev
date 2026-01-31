@@ -290,6 +290,25 @@ router.delete('/folders/:id', authMiddleware, requirePermission('detectives.mana
       include: { images: true },
     });
 
+    // Storniere zugehörige Bonuszahlungen für alle Cases (nur PENDING)
+    if (cases.length > 0) {
+      const caseIds = cases.map(c => c.id);
+      const cancelledBonuses = await prisma.bonusPayment.updateMany({
+        where: {
+          referenceId: { in: caseIds },
+          referenceType: 'Case',
+          status: 'PENDING',
+        },
+        data: {
+          status: 'CANCELLED',
+        },
+      });
+
+      if (cancelledBonuses.count > 0) {
+        console.log(`Ordner ${req.params.id} gelöscht: ${cancelledBonuses.count} Bonuszahlung(en) storniert`);
+      }
+    }
+
     // Lösche Bilder vom Dateisystem (synchron ist hier ok, da Dateisystem)
     for (const caseItem of cases) {
       for (const image of caseItem.images) {
@@ -471,6 +490,18 @@ router.get('/:id', authMiddleware, requirePermission('detectives.view'), async (
             },
           },
           orderBy: { createdAt: 'desc' },
+        },
+        investigationResults: {
+          include: {
+            createdBy: {
+              select: {
+                displayName: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
         },
       },
     });
@@ -705,6 +736,22 @@ router.delete('/images/:imageId', authMiddleware, requirePermission('detectives.
 // DELETE Fall löschen
 router.delete('/:id', authMiddleware, requirePermission('detectives.manage'), async (req: AuthRequest, res: Response) => {
   try {
+    // Storniere zugehörige Bonuszahlungen (nur PENDING)
+    const cancelledBonuses = await prisma.bonusPayment.updateMany({
+      where: {
+        referenceId: req.params.id,
+        referenceType: 'Case',
+        status: 'PENDING',
+      },
+      data: {
+        status: 'CANCELLED',
+      },
+    });
+
+    if (cancelledBonuses.count > 0) {
+      console.log(`Fall ${req.params.id} gelöscht: ${cancelledBonuses.count} Bonuszahlung(en) storniert`);
+    }
+
     // Zuerst alle Bilder des Falls löschen
     const images = await prisma.caseImage.findMany({
       where: { caseId: req.params.id },
@@ -726,6 +773,121 @@ router.delete('/:id', authMiddleware, requirePermission('detectives.manage'), as
   } catch (error) {
     console.error('Delete case error:', error);
     res.status(500).json({ error: 'Fehler beim Löschen des Falls' });
+  }
+});
+
+// ==================== ERMITTLUNGSERGEBNISSE ====================
+
+// GET alle Ermittlungsergebnisse für einen Fall
+router.get('/:id/investigation-results', authMiddleware, requirePermission('detectives.view'), async (req: AuthRequest, res: Response) => {
+  try {
+    const results = await prisma.caseInvestigationResult.findMany({
+      where: { caseId: req.params.id },
+      include: {
+        createdBy: {
+          select: {
+            displayName: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    res.json(results);
+  } catch (error) {
+    console.error('Get investigation results error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Ermittlungsergebnisse' });
+  }
+});
+
+// POST neues Ermittlungsergebnis hinzufügen
+router.post('/:id/investigation-results', authMiddleware, requirePermission('detectives.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { content } = req.body;
+
+    if (!content || content.trim() === '') {
+      res.status(400).json({ error: 'Inhalt ist erforderlich' });
+      return;
+    }
+
+    // Prüfe ob Fall existiert
+    const caseExists = await prisma.case.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!caseExists) {
+      res.status(404).json({ error: 'Fall nicht gefunden' });
+      return;
+    }
+
+    const result = await prisma.caseInvestigationResult.create({
+      data: {
+        caseId: req.params.id,
+        content: content.trim(),
+        createdById: req.user!.id,
+      },
+      include: {
+        createdBy: {
+          select: {
+            displayName: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    console.error('Create investigation result error:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen des Ermittlungsergebnisses' });
+  }
+});
+
+// PUT Ermittlungsergebnis aktualisieren
+router.put('/investigation-results/:resultId', authMiddleware, requirePermission('detectives.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { content } = req.body;
+
+    if (!content || content.trim() === '') {
+      res.status(400).json({ error: 'Inhalt ist erforderlich' });
+      return;
+    }
+
+    const result = await prisma.caseInvestigationResult.update({
+      where: { id: req.params.resultId },
+      data: { content: content.trim() },
+      include: {
+        createdBy: {
+          select: {
+            displayName: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Update investigation result error:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren des Ermittlungsergebnisses' });
+  }
+});
+
+// DELETE Ermittlungsergebnis löschen
+router.delete('/investigation-results/:resultId', authMiddleware, requirePermission('detectives.manage'), async (req: AuthRequest, res: Response) => {
+  try {
+    await prisma.caseInvestigationResult.delete({
+      where: { id: req.params.resultId },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete investigation result error:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen des Ermittlungsergebnisses' });
   }
 });
 

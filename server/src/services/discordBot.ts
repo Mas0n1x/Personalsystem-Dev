@@ -270,8 +270,14 @@ export async function initializeDiscordBot(): Promise<void> {
         where: { userId: user.id },
       });
 
-      if (!employee || employee.status !== 'ACTIVE') {
-        console.log(`[Discord] Kein aktiver Mitarbeiter für User ${user.username}`);
+      if (!employee) {
+        console.log(`[Discord] Kein Mitarbeiter für User ${user.username} gefunden`);
+        return;
+      }
+
+      // Prüfe ob Employee bereits gekündigt wurde (z.B. durch manuelle Kündigung über API)
+      if (employee.status !== 'ACTIVE') {
+        console.log(`[Discord] Mitarbeiter ${user.displayName || user.username} ist bereits gekündigt (Status: ${employee.status}) - überspringe automatische Kündigung`);
         return;
       }
 
@@ -297,7 +303,7 @@ export async function initializeDiscordBot(): Promise<void> {
         discordId: user.discordId,
       });
 
-      // Discord Benachrichtigung im Kündigungskanal
+      // Discord Benachrichtigung im Kündigungskanal (nur bei automatischer Kündigung)
       await announceTermination({
         employeeName: user.displayName || user.username,
         employeeAvatar: user.avatar,
@@ -633,10 +639,54 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
     console.log(`[Discord-Sync] ${members.size} Mitglieder zur Verarbeitung`);
 
     // PERFORMANCE: System-Rollen und bestehende User EINMAL laden statt pro Member
-    const systemRoles = await prisma.role.findMany({
+    let systemRoles = await prisma.role.findMany({
       where: { discordRoleId: { not: null } },
       orderBy: { level: 'desc' },
     });
+
+    // Auto-create rank roles if they don't exist yet
+    if (systemRoles.length === 0) {
+      console.log('[Discord-Sync] No rank roles found in database, auto-creating from Discord roles...');
+
+      // Get leadership.view permission (if it exists)
+      const leadershipPerm = await prisma.permission.findUnique({
+        where: { name: 'leadership.view' }
+      });
+
+      const createdRoles: typeof systemRoles = [];
+
+      // Scan all Discord roles and create rank roles (Level 1-17)
+      for (const [, discordRole] of guild.roles.cache) {
+        const extracted = extractRankFromRoleName(discordRole.name);
+        if (extracted) {
+          const shouldHaveLeadership = extracted.level >= 2; // Officers and above
+
+          const newRole = await prisma.role.create({
+            data: {
+              name: extracted.rank.replace(/\s+/g, '_').toUpperCase(),
+              displayName: extracted.rank,
+              level: extracted.level,
+              discordRoleId: discordRole.id,
+              permissions: (leadershipPerm && shouldHaveLeadership) ? {
+                connect: { id: leadershipPerm.id }
+              } : undefined
+            }
+          });
+
+          createdRoles.push(newRole);
+          const leadershipStatus = (leadershipPerm && shouldHaveLeadership) ? ' + leadership.view' : '';
+          console.log(`  ✅ Created rank role: ${extracted.rank} (Level ${extracted.level})${leadershipStatus}`);
+        }
+      }
+
+      console.log(`[Discord-Sync] Created ${createdRoles.length} rank roles`);
+
+      // Reload system roles
+      systemRoles = await prisma.role.findMany({
+        where: { discordRoleId: { not: null } },
+        orderBy: { level: 'desc' },
+      });
+    }
 
     // Alle bestehenden User mit discordId und Rollen laden für schnellen Lookup
     const existingUsers = await prisma.user.findMany({
@@ -687,6 +737,9 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
         // Merge: Bestehende Rollen behalten, neue hinzufügen
         const allRoleIds = [...new Set([...existingRoleIds, ...matchedRoleIds])];
 
+        // Check if there are new roles to add
+        const hasNewRoles = allRoleIds.length > existingRoleIds.length;
+
         const user = await prisma.user.upsert({
           where: { discordId: member.id },
           create: {
@@ -702,9 +755,9 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
             displayName: member.displayName || member.user.globalName || null,
             avatar: member.user.avatarURL() || null,
             isActive: true,
-            // Rollen nur hinzufügen (nicht ersetzen) wenn es neue Discord-basierte Rollen gibt
-            ...(matchedRoleIds.length > 0 && existingRoleIds.length === 0 ? {
-              roles: { connect: matchedRoleIds.map(id => ({ id })) },
+            // Add new Discord-based roles while keeping existing ones
+            ...(hasNewRoles ? {
+              roles: { set: allRoleIds.map(id => ({ id })) },
             } : {}),
           },
         });
@@ -791,6 +844,39 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
     result.removed = usersToRemove.length;
   } catch (error) {
     result.errors.push(`Cleanup Fehler: ${error}`);
+  }
+
+  // Leadership-Zugriff für Officers (Level 2+) automatisch gewähren
+  try {
+    const leadershipPerm = await prisma.permission.findUnique({
+      where: { name: 'leadership.view' },
+    });
+
+    if (leadershipPerm) {
+      // Alle Rang-Rollen mit Level >= 2 finden
+      const officerRoles = await prisma.role.findMany({
+        where: {
+          discordRoleId: { not: null },
+          level: { gte: 2 },
+        },
+        include: { permissions: { where: { name: 'leadership.view' } } },
+      });
+
+      // Rollen ohne leadership.view Permission updaten
+      for (const role of officerRoles) {
+        const hasLeadershipView = role.permissions.some(p => p.name === 'leadership.view');
+        if (!hasLeadershipView) {
+          await prisma.role.update({
+            where: { id: role.id },
+            data: {
+              permissions: { connect: { id: leadershipPerm.id } },
+            },
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.log(`[Discord-Sync] Warning: Could not grant leadership permissions: ${error}`);
   }
 
   return result;

@@ -66,10 +66,26 @@ const upload = multer({
 cron.schedule('59 23 * * 0', async () => {
   console.log('Cron-Job: Lösche alle Räube der Woche...');
   try {
-    // Hole nur imagePath für effizientes Löschen der Bilder
+    // Hole alle Räube mit ID und imagePath
     const robberies = await prisma.robbery.findMany({
-      select: { imagePath: true },
+      select: { id: true, imagePath: true },
     });
+
+    // Storniere alle zugehörigen PENDING Bonuszahlungen
+    const cancelledBonuses = await prisma.bonusPayment.updateMany({
+      where: {
+        referenceId: { in: robberies.map(r => r.id) },
+        referenceType: 'Robbery',
+        status: 'PENDING',
+      },
+      data: {
+        status: 'CANCELLED',
+      },
+    });
+
+    if (cancelledBonuses.count > 0) {
+      console.log(`Cron-Job: ${cancelledBonuses.count} Bonuszahlung(en) storniert`);
+    }
 
     // Lösche alle Bilder (parallel für bessere Performance)
     await Promise.all(
@@ -246,30 +262,38 @@ router.post('/', authMiddleware, requirePermission('robbery.create'), upload.sin
     const { leaderId, negotiatorId } = req.body;
     const file = req.file;
 
-    if (!leaderId || !negotiatorId || !file) {
+    // Nur Einsatzleitung und Beweisfoto sind Pflicht, Verhandlungsführung ist optional
+    if (!leaderId || !file) {
       if (file) {
         fs.unlinkSync(file.path);
       }
-      res.status(400).json({ error: 'Einsatzleitung, Verhandlungsführung und Beweisfoto sind erforderlich' });
+      res.status(400).json({ error: 'Einsatzleitung und Beweisfoto sind erforderlich' });
       return;
     }
 
-    // Prüfe ob Mitarbeiter existieren
-    const [leader, negotiator] = await Promise.all([
-      prisma.employee.findUnique({ where: { id: leaderId } }),
-      prisma.employee.findUnique({ where: { id: negotiatorId } }),
-    ]);
+    // Prüfe ob Einsatzleitung existiert
+    const leader = await prisma.employee.findUnique({ where: { id: leaderId } });
 
-    if (!leader || !negotiator) {
+    if (!leader) {
       fs.unlinkSync(file.path);
-      res.status(400).json({ error: 'Mitarbeiter nicht gefunden' });
+      res.status(400).json({ error: 'Einsatzleitung nicht gefunden' });
       return;
+    }
+
+    // Prüfe ob Verhandlungsführung existiert (falls angegeben)
+    if (negotiatorId) {
+      const negotiator = await prisma.employee.findUnique({ where: { id: negotiatorId } });
+      if (!negotiator) {
+        fs.unlinkSync(file.path);
+        res.status(400).json({ error: 'Verhandlungsführung nicht gefunden' });
+        return;
+      }
     }
 
     const robbery = await prisma.robbery.create({
       data: {
         leaderId,
-        negotiatorId,
+        negotiatorId: negotiatorId || null,
         imagePath: file.filename,
         createdById: req.user!.id,
       },
@@ -285,7 +309,7 @@ router.post('/', authMiddleware, requirePermission('robbery.create'), upload.sin
             },
           },
         },
-        negotiator: {
+        negotiator: negotiatorId ? {
           include: {
             user: {
               select: {
@@ -295,7 +319,7 @@ router.post('/', authMiddleware, requirePermission('robbery.create'), upload.sin
               },
             },
           },
-        },
+        } : undefined,
         createdBy: {
           select: {
             displayName: true,
@@ -311,12 +335,13 @@ router.post('/', authMiddleware, requirePermission('robbery.create'), upload.sin
     // Live-Update broadcast (async)
     broadcastCreate('robbery', robbery);
 
-    // Bonus-Trigger für Einsatzleitung und Verhandlungsführung (async, non-blocking)
+    // Bonus-Trigger für Einsatzleitung (immer) und Verhandlungsführung (falls vorhanden)
     // Diese laufen im Hintergrund und blockieren nicht die Response
-    Promise.all([
-      triggerRobberyLeader(leaderId, robbery.id),
-      triggerRobberyNegotiator(negotiatorId, robbery.id),
-    ]).catch((err) => console.error('Bonus trigger error:', err));
+    const bonusTriggers = [triggerRobberyLeader(leaderId, robbery.id)];
+    if (negotiatorId) {
+      bonusTriggers.push(triggerRobberyNegotiator(negotiatorId, robbery.id));
+    }
+    Promise.all(bonusTriggers).catch((err) => console.error('Bonus trigger error:', err));
   } catch (error) {
     console.error('Create robbery error:', error);
     res.status(500).json({ error: 'Fehler beim Erstellen des Raubs' });
@@ -333,6 +358,23 @@ router.delete('/:id', authMiddleware, requirePermission('robbery.manage'), async
     if (!robbery) {
       res.status(404).json({ error: 'Raub nicht gefunden' });
       return;
+    }
+
+    // Storniere zugehörige Bonuszahlungen (falls vorhanden)
+    // Nur PENDING Zahlungen stornieren, bereits ausgezahlte bleiben bestehen
+    const cancelledBonuses = await prisma.bonusPayment.updateMany({
+      where: {
+        referenceId: id,
+        referenceType: 'Robbery',
+        status: 'PENDING',
+      },
+      data: {
+        status: 'CANCELLED',
+      },
+    });
+
+    if (cancelledBonuses.count > 0) {
+      console.log(`Raub ${id} gelöscht: ${cancelledBonuses.count} Bonuszahlung(en) storniert`);
     }
 
     // Lösche das Bild

@@ -219,12 +219,45 @@ export default function BonusSettings() {
       </div>
 
       {/* Info */}
-      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-        <p className="text-blue-400 text-sm">
-          <strong>Hinweis:</strong> Setze den Betrag auf 0, um eine Bonus-Art zu deaktivieren.
-          Die Boni werden automatisch vergeben, wenn die entsprechende Tätigkeit abgeschlossen wird.
-          Jeden Sonntag um 23:59 Uhr wird die Woche automatisch geschlossen und die offenen Zahlungen ans Management weitergeleitet.
-        </p>
+      <div className="space-y-4">
+        {/* CAP-Informationen */}
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+          <h3 className="text-yellow-400 font-semibold mb-3 flex items-center gap-2">
+            <DollarSign className="h-4 w-4" />
+            Wöchentliche Bonus-Limits (CAPs)
+          </h3>
+          <div className="grid md:grid-cols-3 gap-4 mb-3">
+            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+              <p className="text-xs text-slate-400 mb-1">Unit-Arbeit Cap</p>
+              <p className="text-lg font-bold text-blue-400">$60,000 / Woche</p>
+              <p className="text-xs text-slate-500 mt-1">HR, Academy, IA, QA</p>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+              <p className="text-xs text-slate-400 mb-1">Einsatzleitung Cap</p>
+              <p className="text-lg font-bold text-purple-400">$60,000 / Woche</p>
+              <p className="text-xs text-slate-500 mt-1">Räuber-Einsätze</p>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+              <p className="text-xs text-slate-400 mb-1">Gesamt Cap</p>
+              <p className="text-lg font-bold text-yellow-400">$120,000 / Woche</p>
+              <p className="text-xs text-slate-500 mt-1">Alle Aktivitäten</p>
+            </div>
+          </div>
+          <p className="text-yellow-300 text-sm">
+            <strong>Hinweis:</strong> Jeder Mitarbeiter kann pro Woche maximal $120,000 an Sonderzahlungen verdienen.
+            Davon maximal $60,000 aus Unit-Arbeit (HR, Academy, IA, QA) und maximal $60,000 aus Einsatzleitungen.
+            Wenn ein Cap erreicht ist, werden keine weiteren Boni für diese Kategorie vergeben.
+          </p>
+        </div>
+
+        {/* Allgemeine Info */}
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+          <p className="text-blue-400 text-sm">
+            <strong>Hinweis:</strong> Setze den Betrag auf 0, um eine Bonus-Art zu deaktivieren.
+            Die Boni werden automatisch vergeben, wenn die entsprechende Tätigkeit abgeschlossen wird.
+            Jeden Sonntag um 23:59 Uhr wird die Woche automatisch geschlossen und die offenen Zahlungen ans Management weitergeleitet.
+          </p>
+        </div>
       </div>
 
       {/* New Config Form */}

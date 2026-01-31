@@ -42,6 +42,7 @@ model User {
   createdCases         Case[] @relation("CaseCreatedBy")
   createdDetectiveFolders DetectiveFolder[] @relation("DetectiveFolderCreatedBy")
   uploadedCaseImages   CaseImage[] @relation("CaseImageUploadedBy")
+  caseInvestigationResults CaseInvestigationResult[] @relation("CaseInvestigationResultCreatedBy")
   instructedTrainings  Training[] @relation("TrainingInstructor")
   leadInvestigations   Investigation[] @relation("InvestigationLead")
   investigationNotes   InvestigationNote[] @relation("InvestigationNoteCreatedBy")
@@ -96,9 +97,9 @@ model Employee {
   userId        String   @unique
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   badgeNumber   String?  @unique
-  rank          String   @default("Cadet")
+  rank          String   @default("Recruit")
   rankLevel     Int      @default(0) // 1-17 aus Discord Rollen
-  department    String   @default("Patrol")
+  department    String   @default("")
   status        String   @default("ACTIVE") // ACTIVE, INACTIVE, SUSPENDED, ON_LEAVE, TERMINATED
   hireDate      DateTime @default(now())
   notes         String?
@@ -124,6 +125,8 @@ model Employee {
   academyRetrainings     AcademyRetraining[] @relation("AcademyRetrainingEmployee")
   bonusPayments          BonusPayment[] @relation("BonusPaymentEmployee")
   promotionArchive       PromotionArchive[] @relation("PromotionArchiveEmployee")
+  detectiveProfile       DetectiveProfile? @relation("DetectiveProfile")
+  civilianServiceSessions CivilianServiceSession[] @relation("CivilianServiceSessions")
 
   @@index([status])
   @@index([rankLevel])
@@ -367,10 +370,10 @@ model TuningInvoice {
 
 model Robbery {
   id              String    @id @default(cuid())
-  leaderId        String                          // Einsatzleitung
+  leaderId        String                          // Einsatzleitung (Pflicht)
   leader          Employee  @relation("RobberyLeader", fields: [leaderId], references: [id])
-  negotiatorId    String                          // Verhandlungsführung
-  negotiator      Employee  @relation("RobberyNegotiator", fields: [negotiatorId], references: [id])
+  negotiatorId    String?                         // Verhandlungsführung (Optional)
+  negotiator      Employee? @relation("RobberyNegotiator", fields: [negotiatorId], references: [id])
   imagePath       String                          // Beweisfoto
   createdById     String
   createdBy       User      @relation("RobberyCreatedBy", fields: [createdById], references: [id])
@@ -523,7 +526,8 @@ model Case {
   updatedAt       DateTime  @updatedAt
 
   // Relationen
-  images          CaseImage[]
+  images                CaseImage[]
+  investigationResults  CaseInvestigationResult[]
 
   @@index([status])
   @@index([caseNumber])
@@ -543,6 +547,54 @@ model CaseImage {
 
   @@index([caseId])
   @@map("case_images")
+}
+
+// Ermittlungsergebnisse für Fälle (chronologisch)
+model CaseInvestigationResult {
+  id          String   @id @default(cuid())
+  caseId      String
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  content     String                             // Ermittlungsergebnis / Fortschritt
+  createdById String
+  createdBy   User     @relation("CaseInvestigationResultCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([caseId])
+  @@index([createdAt])
+  @@map("case_investigation_results")
+}
+
+// Detective-Profile (Namen-Dokumentation)
+model DetectiveProfile {
+  id                  String    @id @default(cuid())
+  employeeId          String    @unique                 // Referenz zum Employee (Detektiv)
+  employee            Employee  @relation("DetectiveProfile", fields: [employeeId], references: [id], onDelete: Cascade)
+  civilianCoverName   String?                          // Ziviler Deckname
+  detectiveName       String?                          // Detektiv-Name
+  realName            String?                          // Klarname
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@map("detective_profiles")
+}
+
+// Zivildienst-Tracking (Ein-/Ausstempeln)
+model CivilianServiceSession {
+  id          String    @id @default(cuid())
+  employeeId  String                                   // Referenz zum Employee (Detektiv)
+  employee    Employee  @relation("CivilianServiceSessions", fields: [employeeId], references: [id], onDelete: Cascade)
+  startTime   DateTime  @default(now())                // Einstempeln
+  endTime     DateTime?                                // Ausstempeln (null = noch aktiv)
+  duration    Int?                                     // Dauer in Minuten (wird beim Ausstempeln berechnet)
+  notes       String?                                  // Optional: Notizen zur Session
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@index([startTime])
+  @@map("civilian_service_sessions")
 }
 
 // ==================== POLICE ACADEMY ====================

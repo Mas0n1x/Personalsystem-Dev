@@ -362,6 +362,9 @@ export const applicationApi = {
     discordRolesAssigned?: boolean;
   }) => api.put(`/applications/${id}/onboarding`, data),
 
+  // Discord-Rollen sofort vergeben
+  assignDiscordRoles: (id: string) => api.put(`/applications/${id}/assign-discord-roles`),
+
   // Abschluss
   complete: (id: string) => api.put(`/applications/${id}/complete`),
 
@@ -398,6 +401,14 @@ export const casesApi = {
   }),
   deleteImage: (imageId: string) => api.delete(`/cases/images/${imageId}`),
   delete: (id: string) => api.delete(`/cases/${id}`),
+
+  // Investigation Results (Ermittlungsergebnisse)
+  getInvestigationResults: (caseId: string) => api.get(`/cases/${caseId}/investigation-results`),
+  createInvestigationResult: (caseId: string, data: { content: string }) =>
+    api.post(`/cases/${caseId}/investigation-results`, data),
+  updateInvestigationResult: (resultId: string, data: { content: string }) =>
+    api.put(`/cases/investigation-results/${resultId}`, data),
+  deleteInvestigationResult: (resultId: string) => api.delete(`/cases/investigation-results/${resultId}`),
 };
 
 // Trainings API (Police Academy)
@@ -480,8 +491,15 @@ export const uprankRequestsApi = {
   getById: (id: string) => api.get(`/uprank-requests/${id}`),
   getEmployees: () => api.get('/uprank-requests/employees'),
   getMyRequests: () => api.get('/uprank-requests/my/requests'),
-  create: (data: { employeeId: string; targetRank: string; reason: string; achievements?: string }) =>
-    api.post('/uprank-requests', data),
+  create: (data: {
+    employeeId: string;
+    targetRank: string;
+    reason: string;
+    achievements?: string;
+    interviewCompleted: boolean;
+    interviewNotes?: string;
+    interviewDate?: string;
+  }) => api.post('/uprank-requests', data),
   process: (id: string, data: { status: 'APPROVED' | 'REJECTED'; rejectionReason?: string }) =>
     api.put(`/uprank-requests/${id}/process`, data),
   delete: (id: string) => api.delete(`/uprank-requests/${id}`),
@@ -705,4 +723,47 @@ export const dutyTimeApi = {
 
   // Cache leeren (Admin)
   clearCache: () => api.post('/duty-time/clear-cache'),
+};
+
+// Civilian Service API (Zivildienst-Tracking)
+export const civilianServiceApi = {
+  // Aktuelle Session
+  getCurrent: (employeeId: string) => api.get('/civilian-service/current', { params: { employeeId } }),
+
+  // Sessions eines Detektivs
+  getSessions: (employeeId: string, limit = 50, offset = 0) =>
+    api.get('/civilian-service/sessions', { params: { employeeId, limit: limit.toString(), offset: offset.toString() } }),
+
+  // Statistiken
+  getStats: (employeeId: string) => api.get('/civilian-service/stats', { params: { employeeId } }),
+
+  // Übersichts-Statistiken aller Detectives
+  getOverviewStats: () => api.get('/civilian-service/overview-stats'),
+
+  // Einstempeln
+  clockIn: (employeeId: string, notes?: string) =>
+    api.post('/civilian-service/clock-in', { employeeId, notes }),
+
+  // Ausstempeln
+  clockOut: (employeeId: string) =>
+    api.post('/civilian-service/clock-out', { employeeId }),
+
+  // Session löschen
+  deleteSession: (sessionId: string) => api.delete(`/civilian-service/sessions/${sessionId}`),
+};
+
+// Detective Profiles API (Namen-Dokumentation)
+export const detectiveProfilesApi = {
+  // Alle Profile
+  getAll: () => api.get('/detective-profiles'),
+
+  // Ein Profil
+  getByEmployeeId: (employeeId: string) => api.get(`/detective-profiles/${employeeId}`),
+
+  // Profil aktualisieren
+  update: (employeeId: string, data: { civilianCoverName?: string; detectiveName?: string; realName?: string }) =>
+    api.put(`/detective-profiles/${employeeId}`, data),
+
+  // Profil löschen
+  delete: (employeeId: string) => api.delete(`/detective-profiles/${employeeId}`),
 };
