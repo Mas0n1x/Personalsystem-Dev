@@ -69,7 +69,7 @@ export default function Sidebar() {
       name: 'Units',
       items: [
         { name: 'Units-Übersicht', href: '/units', icon: Shield, permission: 'employees.view' },
-        { name: 'HR', href: '/hr', icon: UserX, permission: 'blacklist.view' },
+        { name: 'HR', href: '/hr', icon: UserX, permission: 'hr.view' },
         { name: 'Detectives', href: '/detectives', icon: Search, permission: 'detectives.view' },
         { name: 'Academy', href: '/academy', icon: GraduationCap, permission: 'academy.view' },
         { name: 'Internal Affairs', href: '/internal-affairs', icon: ShieldAlert, permission: 'ia.view' },

@@ -924,6 +924,17 @@ router.put('/:id/assign-discord-roles', authMiddleware, requirePermission('hr.ma
         return;
       }
 
+      // Discord Nickname setzen (nur Name, ohne Dienstnummer)
+      let nicknameUpdated = false;
+      try {
+        await updateDiscordNickname(application.discordId, application.applicantName);
+        console.log(`Discord Nickname für ${application.discordId} auf "${application.applicantName}" gesetzt`);
+        nicknameUpdated = true;
+      } catch (nickError) {
+        console.error('Fehler beim Setzen des Discord Nicknames:', nickError);
+        // Nicht abbrechen, da Rollen bereits zugewiesen wurden
+      }
+
       // discordRolesAssigned Flag setzen
       const updatedApplication = await prisma.application.update({
         where: { id },
@@ -948,6 +959,7 @@ router.put('/:id/assign-discord-roles', authMiddleware, requirePermission('hr.ma
         application: updatedApplication,
         rolesAssigned: roleResult.assigned.length,
         rolesFailed: roleResult.failed.length,
+        nicknameUpdated,
       });
     } catch (roleError) {
       console.error('Fehler beim Zuweisen der Discord-Rollen:', roleError);

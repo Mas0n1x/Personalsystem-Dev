@@ -199,9 +199,9 @@ export default function Calendar() {
     retry: 1,
   });
 
-  const events = (eventsData?.data || []) as CalendarEvent[];
-  const discordRoles = rolesData?.roles || [];
-  const employees = employeesData || [];
+  const events = Array.isArray(eventsData?.data) ? eventsData.data as CalendarEvent[] : [];
+  const discordRoles = Array.isArray(rolesData?.roles) ? rolesData.roles : [];
+  const employees = Array.isArray(employeesData) ? employeesData : [];
   const days = getDaysInMonth(year, month);
 
   // Mutations
