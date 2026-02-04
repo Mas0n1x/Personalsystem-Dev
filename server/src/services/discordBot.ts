@@ -689,10 +689,11 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
     }
 
     // Alle bestehenden User mit discordId und Rollen laden für schnellen Lookup
+    // Inkludiere discordRoleId um zwischen Discord-basierten und manuellen Rollen zu unterscheiden
     const existingUsers = await prisma.user.findMany({
-      select: { discordId: true, roles: { select: { id: true } } },
+      select: { discordId: true, roles: { select: { id: true, discordRoleId: true } } },
     });
-    const existingUserMap = new Map(existingUsers.map(u => [u.discordId, u.roles.map(r => r.id)]));
+    const existingUserMap = new Map(existingUsers.map(u => [u.discordId, u.roles]));
 
     for (const [, member] of members) {
       // Bots überspringen
@@ -731,14 +732,27 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
         }
 
         // User erstellen/aktualisieren
-        // WICHTIG: Bestehende Rollen nicht überschreiben wenn bereits gesetzt (z.B. manuell als Admin)
-        const existingRoleIds = existingUserMap.get(member.id) || [];
+        // Bestehende Rollen laden (mit discordRoleId Info)
+        const existingRoles = existingUserMap.get(member.id) || [];
 
-        // Merge: Bestehende Rollen behalten, neue hinzufügen
-        const allRoleIds = [...new Set([...existingRoleIds, ...matchedRoleIds])];
+        // Behalte nur manuelle Rollen (ohne discordRoleId) - diese wurden manuell zugewiesen
+        const manualRoleIds = existingRoles
+          .filter(r => !r.discordRoleId)
+          .map(r => r.id);
 
-        // Check if there are new roles to add
-        const hasNewRoles = allRoleIds.length > existingRoleIds.length;
+        // Kombiniere: Manuelle Rollen + aktuelle Discord-basierte Rollen
+        const finalRoleIds = [...new Set([...manualRoleIds, ...matchedRoleIds])];
+
+        // Alte Discord-Rollen-IDs aus dem System
+        const oldDiscordRoleIds = existingRoles
+          .filter(r => r.discordRoleId)
+          .map(r => r.id);
+
+        // Prüfe ob sich die Rollen geändert haben
+        const rolesChanged =
+          finalRoleIds.length !== existingRoles.length ||
+          !finalRoleIds.every(id => existingRoles.some(r => r.id === id)) ||
+          !existingRoles.every(r => finalRoleIds.includes(r.id));
 
         const user = await prisma.user.upsert({
           where: { discordId: member.id },
@@ -755,9 +769,9 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
             displayName: member.displayName || member.user.globalName || null,
             avatar: member.user.avatarURL() || null,
             isActive: true,
-            // Add new Discord-based roles while keeping existing ones
-            ...(hasNewRoles ? {
-              roles: { set: allRoleIds.map(id => ({ id })) },
+            // Setze Rollen neu: Manuelle behalten, Discord-basierte aktualisieren
+            ...(rolesChanged ? {
+              roles: { set: finalRoleIds.map(id => ({ id })) },
             } : {}),
           },
         });

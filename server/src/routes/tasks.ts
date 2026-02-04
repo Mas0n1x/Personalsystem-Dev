@@ -32,7 +32,7 @@ const taskInclude = {
 };
 
 // GET alle Tasks (mit Filter)
-router.get('/', authMiddleware, requirePermission('leadership.view'), async (req: AuthRequest, res: Response) => {
+router.get('/', authMiddleware, requirePermission('leadership.tasks'), async (req: AuthRequest, res: Response) => {
   try {
     const { status, assigneeId, priority } = req.query;
 
@@ -73,7 +73,7 @@ router.get('/', authMiddleware, requirePermission('leadership.view'), async (req
 });
 
 // POST neuen Task erstellen
-router.post('/', authMiddleware, requirePermission('leadership.manage'), async (req: AuthRequest, res: Response) => {
+router.post('/', authMiddleware, requirePermission('leadership.tasks'), async (req: AuthRequest, res: Response) => {
   try {
     const { title, description, priority, assigneeIds, dueDate, dueTime } = req.body;
 
@@ -112,7 +112,7 @@ router.post('/', authMiddleware, requirePermission('leadership.manage'), async (
 });
 
 // PUT Task Status ändern (für Drag & Drop)
-router.put('/:id/status', authMiddleware, requirePermission('leadership.manage'), async (req: AuthRequest, res: Response) => {
+router.put('/:id/status', authMiddleware, requirePermission('leadership.tasks'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -139,7 +139,7 @@ router.put('/:id/status', authMiddleware, requirePermission('leadership.manage')
 });
 
 // PUT Task aktualisieren
-router.put('/:id', authMiddleware, requirePermission('leadership.manage'), async (req: AuthRequest, res: Response) => {
+router.put('/:id', authMiddleware, requirePermission('leadership.tasks'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { title, description, priority, assigneeIds, dueDate, dueTime, status } = req.body;
@@ -180,7 +180,7 @@ router.put('/:id', authMiddleware, requirePermission('leadership.manage'), async
 });
 
 // DELETE Task löschen
-router.delete('/:id', authMiddleware, requirePermission('leadership.manage'), async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authMiddleware, requirePermission('leadership.tasks'), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 

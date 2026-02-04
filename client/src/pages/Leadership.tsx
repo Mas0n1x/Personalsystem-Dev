@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tasksApi, employeesApi, sanctionsApi, treasuryApi, announcementsApi, notificationsApi } from '../services/api';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useLiveUpdates } from '../hooks/useLiveUpdates';
+import { usePermissions } from '../hooks/usePermissions';
 import {
   Plus,
   X,
@@ -124,6 +125,8 @@ const STATUS_COLUMNS = [
 // ==================== MAIN COMPONENT ====================
 
 export default function Leadership() {
+  const { canViewTasks } = usePermissions();
+
   return (
     <div className="space-y-6">
       {/* Header mit Gradient */}
@@ -152,7 +155,7 @@ export default function Leadership() {
 
       {/* Bottom Row: Tasks + Sanctions */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <TasksWidget />
+        {canViewTasks && <TasksWidget />}
         <SanctionsWidget />
       </div>
     </div>

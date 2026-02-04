@@ -19,6 +19,7 @@ async function setupPermissions() {
       { name: 'backup.manage', description: 'Backups verwalten', category: 'backup' },
       { name: 'leadership.view', description: 'Leadership-Bereich anzeigen', category: 'leadership' },
       { name: 'leadership.manage', description: 'Leadership-Bereich verwalten', category: 'leadership' },
+      { name: 'leadership.tasks', description: 'Leadership-Aufgaben anzeigen und verwalten', category: 'leadership' },
       { name: 'treasury.view', description: 'Kasse anzeigen', category: 'treasury' },
       { name: 'treasury.manage', description: 'Kasse verwalten', category: 'treasury' },
       { name: 'sanctions.view', description: 'Sanktionen anzeigen', category: 'sanctions' },

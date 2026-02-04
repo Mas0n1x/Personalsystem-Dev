@@ -1046,13 +1046,119 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
       // Nicht abbrechen, da das kein kritischer Fehler ist
     }
 
-    // Prüfe ob bereits Mitarbeiter
+    // Prüfe ob bereits aktiver Mitarbeiter
     const existingEmployee = await prisma.employee.findUnique({
       where: { userId: user.id },
     });
 
     if (existingEmployee) {
-      res.status(400).json({ error: 'Diese Person ist bereits als Mitarbeiter registriert' });
+      if (existingEmployee.status === 'ACTIVE') {
+        res.status(400).json({ error: 'Diese Person ist bereits als aktiver Mitarbeiter registriert' });
+        return;
+      }
+
+      // Wenn inaktiver/gekündigter Mitarbeiter existiert, reaktivieren wir ihn
+      console.log(`Reaktiviere ehemaligen Mitarbeiter ${user.displayName} (Employee ID: ${existingEmployee.id})`);
+
+      // Einstellung für Start-Rang laden
+      const startRankSettingReactivate = await prisma.systemSetting.findUnique({
+        where: { key: 'hrStartingRank' }
+      });
+      const startRankReactivate = startRankSettingReactivate?.value || 'Recruit';
+      const startRankLevelReactivate = RANK_TO_LEVEL[startRankReactivate] || 1;
+
+      // Neue Dienstnummer vergeben
+      const teamConfigReactivate = getTeamConfigForLevel(startRankLevelReactivate);
+      let newBadgeNumber: string | null = null;
+      try {
+        newBadgeNumber = await findFreeBadgeNumber(teamConfigReactivate.badgeMin, teamConfigReactivate.badgeMax, teamConfigReactivate.badgePrefix);
+      } catch (badgeError) {
+        console.error('Fehler bei der Dienstnummer-Vergabe:', badgeError);
+      }
+
+      // Employee reaktivieren mit neuem Rang und Dienstnummer
+      const reactivatedEmployee = await prisma.employee.update({
+        where: { id: existingEmployee.id },
+        data: {
+          status: 'ACTIVE',
+          rank: startRankReactivate,
+          rankLevel: startRankLevelReactivate,
+          badgeNumber: newBadgeNumber,
+          department: 'Patrol', // Reset auf Standard-Abteilung
+          hireDate: new Date(), // Neues Einstellungsdatum
+          notes: null, // Alte Notizen löschen
+        },
+      });
+
+      // Discord Nickname aktualisieren
+      try {
+        const nickname = newBadgeNumber
+          ? `[${newBadgeNumber}] ${application.applicantName}`
+          : application.applicantName;
+        await updateDiscordNickname(application.discordId, nickname);
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { displayName: nickname },
+        });
+      } catch (nickError) {
+        console.error('Fehler beim Setzen des Discord Nicknames:', nickError);
+      }
+
+      // Bewerbung abschließen
+      const updatedApplicationReactivate = await prisma.application.update({
+        where: { id },
+        data: {
+          status: 'COMPLETED',
+          currentStep: 4,
+          processedById: req.user!.id,
+          processedAt: new Date(),
+        },
+        include: {
+          createdBy: { select: { displayName: true, username: true } },
+          processedBy: { select: { displayName: true, username: true } },
+        },
+      });
+
+      // Bonus-Trigger
+      const processorEmployeeIdReactivate = await getEmployeeIdFromUserId(req.user!.id);
+      if (processorEmployeeIdReactivate) {
+        await triggerApplicationCompleted(processorEmployeeIdReactivate, application.applicantName, id);
+        await triggerApplicationOnboarding(processorEmployeeIdReactivate, application.applicantName, id);
+      }
+
+      // Discord Announcement
+      const hiredByNameReactivate = updatedApplicationReactivate.processedBy?.displayName || updatedApplicationReactivate.processedBy?.username || 'Unbekannt';
+      await announceHire({
+        employeeName: application.applicantName,
+        employeeAvatar: null,
+        rank: startRankReactivate,
+        badgeNumber: reactivatedEmployee.badgeNumber || 'Noch nicht zugewiesen',
+        hiredBy: hiredByNameReactivate,
+      });
+
+      // Live-Updates
+      broadcastUpdate('application', updatedApplicationReactivate);
+      broadcastUpdate('employee', reactivatedEmployee);
+
+      // Leitstelle API Event
+      emitEmployeeHired({
+        id: reactivatedEmployee.id,
+        badgeNumber: reactivatedEmployee.badgeNumber,
+        name: application.applicantName,
+        discordId: application.discordId,
+        rank: startRankReactivate,
+        rankLevel: startRankLevelReactivate,
+        units: [],
+        status: 'ACTIVE',
+      });
+
+      res.json({
+        application: updatedApplicationReactivate,
+        employee: reactivatedEmployee,
+        message: `${application.applicantName} wurde als ${startRankReactivate} wiedereingestellt`,
+        reactivated: true,
+      });
       return;
     }
 

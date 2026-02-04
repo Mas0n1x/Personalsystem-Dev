@@ -87,6 +87,7 @@ export function usePermissions() {
   // Leadership
   const canViewLeadership = hasAnyPermission('leadership.view', 'admin.full');
   const canManageLeadership = hasAnyPermission('leadership.manage', 'admin.full');
+  const canViewTasks = hasAnyPermission('leadership.tasks', 'admin.full');
 
   // Announcements
   const canViewAnnouncements = hasAnyPermission('announcements.view', 'leadership.view', 'admin.full');
@@ -186,6 +187,7 @@ export function usePermissions() {
     // Leadership
     canViewLeadership,
     canManageLeadership,
+    canViewTasks,
 
     // Announcements
     canViewAnnouncements,
