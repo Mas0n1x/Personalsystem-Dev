@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { investigationsApi, teamChangeReportsApi, employeesApi, adminApi } from '../services/api';
+import { investigationsApi, teamChangeReportsApi, employeesApi, adminApi, iaCheckLocksApi } from '../services/api';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { usePermissions } from '../hooks/usePermissions';
 import { useLiveUpdates } from '../hooks/useLiveUpdates';
@@ -22,6 +22,7 @@ import {
   ArrowRightLeft,
   Eye,
   Archive,
+  Calendar,
 } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
@@ -30,6 +31,9 @@ interface Employee {
   id: string;
   rank: string;
   user: { id: string; displayName: string | null; username: string };
+  isCheckedThisWeek?: boolean;
+  checkedAt?: string | null;
+  checkedBy?: { displayName: string | null; username: string } | null;
 }
 
 interface InvestigationNote {
@@ -242,9 +246,22 @@ export default function InternalAffairs() {
 
   // Mutations
   const createInvestigation = useMutation({
-    mutationFn: investigationsApi.create,
+    mutationFn: async (data: Parameters<typeof investigationsApi.create>[0]) => {
+      const result = await investigationsApi.create(data);
+      // Create IA check lock if accused is selected
+      if (data.accusedId) {
+        try {
+          await iaCheckLocksApi.create(data.accusedId);
+        } catch (error) {
+          // Ignore error if lock already exists
+          console.log('Check lock already exists or could not be created:', error);
+        }
+      }
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['investigations'] });
+      queryClient.invalidateQueries({ queryKey: ['investigation-employees'] });
       setShowCreateModal(false);
       toast.success('Ermittlung erstellt');
     },
@@ -973,11 +990,20 @@ export default function InternalAffairs() {
                 <select name="accusedId" className="input w-full">
                   <option value="">Kein Mitarbeiter ausgewählt</option>
                   {employees.map((emp: Employee) => (
-                    <option key={emp.id} value={emp.id}>
+                    <option
+                      key={emp.id}
+                      value={emp.id}
+                      disabled={emp.isCheckedThisWeek}
+                    >
                       {emp.user.displayName || emp.user.username} ({emp.rank})
+                      {emp.isCheckedThisWeek && ' ✓ Diese Woche geprüft'}
                     </option>
                   ))}
                 </select>
+                <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  Mitarbeiter mit "✓" wurden diese Woche bereits geprüft
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1">Beschwerdeführer (extern)</label>
@@ -1055,34 +1081,19 @@ export default function InternalAffairs() {
               )}
 
               {/* Status Change */}
-              {canManage && detail.status !== 'ARCHIVED' && (
-                <div className="flex gap-2 flex-wrap">
-                  {detail.status === 'OPEN' && (
-                    <button
-                      onClick={() => updateInvestigation.mutate({ id: detail.id, data: { status: 'IN_PROGRESS' } })}
-                      className="btn-primary flex items-center gap-2"
-                    >
-                      <Clock className="h-4 w-4" />
-                      Ermittlung starten
-                    </button>
-                  )}
-                  {detail.status === 'IN_PROGRESS' && (
-                    <button
-                      onClick={() => updateInvestigation.mutate({ id: detail.id, data: { status: 'CLOSED' } })}
-                      className="btn-primary flex items-center gap-2"
-                    >
-                      <CheckCircle className="h-4 w-4" />
-                      Abschließen
-                    </button>
-                  )}
-                  {/* Archivieren-Button für alle Status außer ARCHIVED */}
-                  <button
-                    onClick={() => updateInvestigation.mutate({ id: detail.id, data: { status: 'ARCHIVED' } })}
-                    className="btn-secondary flex items-center gap-2"
+              {canManage && (
+                <div className="flex items-center gap-3">
+                  <label className="text-sm font-medium text-slate-300">Status:</label>
+                  <select
+                    value={detail.status}
+                    onChange={(e) => updateInvestigation.mutate({ id: detail.id, data: { status: e.target.value } })}
+                    className="input w-48"
                   >
-                    <XCircle className="h-4 w-4" />
-                    Archivieren
-                  </button>
+                    <option value="OPEN">Offen</option>
+                    <option value="IN_PROGRESS">In Bearbeitung</option>
+                    <option value="CLOSED">Abgeschlossen</option>
+                    <option value="ARCHIVED">Archiviert</option>
+                  </select>
                 </div>
               )}
 
@@ -1307,6 +1318,7 @@ export default function InternalAffairs() {
                   {employees.map((emp: Employee) => (
                     <option key={emp.id} value={emp.id}>
                       {emp.user.displayName || emp.user.username} ({emp.rank})
+                      {emp.isCheckedThisWeek && ' ✓ Geprüft'}
                     </option>
                   ))}
                 </select>

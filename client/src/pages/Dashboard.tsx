@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useCallback, memo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { dashboardApi, absencesApi, bonusApi, calendarApi } from '../services/api';
+import { dashboardApi, absencesApi, bonusApi, calendarApi, unitWorkApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { usePermissions } from '../hooks/usePermissions';
@@ -29,6 +29,11 @@ import {
   Calendar,
   Clock,
   MapPin,
+  Building2,
+  CheckCircle,
+  FileSearch,
+  GraduationCap,
+  ClipboardList,
 } from 'lucide-react';
 
 interface ActiveAbsence {
@@ -120,6 +125,24 @@ interface CalendarEvent {
   isAllDay: boolean;
   color: string;
   category: string;
+}
+
+interface UnitWorkStats {
+  unitId: string;
+  unitName: string;
+  shortName: string | null;
+  color: string;
+  icon: string | null;
+  weekStart: string;
+  weekEnd: string;
+  stats: {
+    casesCompleted: number;
+    tasksCompleted: number;
+    trainingsCompleted: number;
+    investigationsCompleted: number;
+    applicationsProcessed: number;
+    total: number;
+  };
 }
 
 interface DashboardStats {
@@ -398,11 +421,21 @@ export default function Dashboard() {
     refetchInterval: 60000,
   });
 
+  const { data: unitWorkData } = useQuery({
+    queryKey: ['unit-work-stats'],
+    queryFn: async () => {
+      const res = await unitWorkApi.getCurrentStats();
+      return res.data as UnitWorkStats[];
+    },
+    refetchInterval: 60000,
+  });
+
   const stats = statsData?.stats;
   const teamDistribution = statsData?.teamDistribution || [];
   const activeAbsences = activeAbsencesData?.data as ActiveAbsence[] | undefined;
   const myBonus = myBonusData;
   const upcomingEvents = upcomingEventsData || [];
+  const unitWorkStats = unitWorkData || [];
 
   // Team-Farben als stabile Referenz - MEMOIZED
   const getTeamColor = useCallback((team: string) => {
@@ -721,6 +754,103 @@ export default function Dashboard() {
                   </Link>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unit-Arbeit Übersicht */}
+      {unitWorkStats.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="card-header flex items-center justify-between border-b border-slate-700/50">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-indigo-400" />
+              Unit-Arbeit diese Woche
+            </h2>
+            {unitWorkStats[0]?.weekStart && (
+              <span className="text-xs text-slate-400">
+                {new Date(unitWorkStats[0].weekStart).toLocaleDateString('de-DE')} - {new Date(unitWorkStats[0].weekEnd).toLocaleDateString('de-DE')}
+              </span>
+            )}
+          </div>
+          <div className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {unitWorkStats
+                .filter(unit => unit.stats.total > 0)
+                .sort((a, b) => b.stats.total - a.stats.total)
+                .map((unit) => (
+                <div
+                  key={unit.unitId}
+                  className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 transition-all"
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: unit.color }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-white truncate">{unit.unitName}</p>
+                      {unit.shortName && (
+                        <p className="text-xs text-slate-400">{unit.shortName}</p>
+                      )}
+                    </div>
+                    <span className="text-xl font-bold text-indigo-400">{unit.stats.total}</span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {unit.stats.casesCompleted > 0 && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1.5 text-slate-400">
+                          <FileSearch className="h-3 w-3" />
+                          Fälle
+                        </span>
+                        <span className="text-slate-300">{unit.stats.casesCompleted}</span>
+                      </div>
+                    )}
+                    {unit.stats.tasksCompleted > 0 && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1.5 text-slate-400">
+                          <CheckCircle className="h-3 w-3" />
+                          Aufgaben
+                        </span>
+                        <span className="text-slate-300">{unit.stats.tasksCompleted}</span>
+                      </div>
+                    )}
+                    {unit.stats.trainingsCompleted > 0 && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1.5 text-slate-400">
+                          <GraduationCap className="h-3 w-3" />
+                          Ausbildungen
+                        </span>
+                        <span className="text-slate-300">{unit.stats.trainingsCompleted}</span>
+                      </div>
+                    )}
+                    {unit.stats.investigationsCompleted > 0 && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1.5 text-slate-400">
+                          <FileSearch className="h-3 w-3" />
+                          Ermittlungen
+                        </span>
+                        <span className="text-slate-300">{unit.stats.investigationsCompleted}</span>
+                      </div>
+                    )}
+                    {unit.stats.applicationsProcessed > 0 && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1.5 text-slate-400">
+                          <ClipboardList className="h-3 w-3" />
+                          Bewerbungen
+                        </span>
+                        <span className="text-slate-300">{unit.stats.applicationsProcessed}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {unitWorkStats.filter(unit => unit.stats.total > 0).length === 0 && (
+                <div className="col-span-full text-center py-8 text-slate-400">
+                  Noch keine Aktivitäten diese Woche
+                </div>
+              )}
             </div>
           </div>
         </div>

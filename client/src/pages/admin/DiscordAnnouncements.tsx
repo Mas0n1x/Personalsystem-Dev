@@ -15,7 +15,9 @@ import {
   UserPlus,
   Check,
   X,
-  Hash
+  Hash,
+  LogIn,
+  LogOut
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
@@ -44,6 +46,8 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   ACADEMY_GRADUATION: <GraduationCap className="h-5 w-5 text-blue-400" />,
   TERMINATION: <UserMinus className="h-5 w-5 text-slate-400" />,
   HIRE: <UserPlus className="h-5 w-5 text-emerald-400" />,
+  MEMBER_JOIN: <LogIn className="h-5 w-5 text-green-400" />,
+  MEMBER_LEAVE: <LogOut className="h-5 w-5 text-red-400" />,
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -55,6 +59,8 @@ const TYPE_COLORS: Record<string, string> = {
   ACADEMY_GRADUATION: 'bg-blue-500/10 border-blue-500/30',
   TERMINATION: 'bg-slate-500/10 border-slate-500/30',
   HIRE: 'bg-emerald-500/10 border-emerald-500/30',
+  MEMBER_JOIN: 'bg-green-500/10 border-green-500/30',
+  MEMBER_LEAVE: 'bg-red-500/10 border-red-500/30',
 };
 
 export default function DiscordAnnouncements() {

@@ -4,6 +4,7 @@ import { authMiddleware, AuthRequest, requirePermission } from '../middleware/au
 import { triggerTrainingConducted, triggerTrainingParticipated, getEmployeeIdFromUserId } from '../services/bonusService.js';
 import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
 import { announceTraining } from '../services/discordAnnouncements.js';
+import { trackActivityByUserId } from '../services/unitWorkService.js';
 
 const router = Router();
 
@@ -351,6 +352,9 @@ router.put('/:id', requirePermission('academy.manage'), async (req: AuthRequest,
           attendedParticipants.map(p => triggerTrainingParticipated(p.employeeId, training.title, id))
         );
       }
+
+      // Unit-Arbeit tracken (Ausbilder)
+      await trackActivityByUserId(training.instructorId, 'trainingsCompleted');
     }
 
     // Live-Update broadcast

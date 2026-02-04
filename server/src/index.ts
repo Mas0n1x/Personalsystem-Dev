@@ -47,6 +47,11 @@ import dutyTimeRoutes from './routes/dutyTime.js';
 import leitstelleApiRoutes from './routes/leitstelleApi.js';
 import civilianServiceRoutes from './routes/civilianService.js';
 import detectiveProfileRoutes from './routes/detectiveProfiles.js';
+import unitWorkRoutes from './routes/unitWork.js';
+import iaNotesRoutes from './routes/iaNotes.js';
+import iaCheckLocksRoutes from './routes/iaCheckLocks.js';
+import leadershipTodosRoutes from './routes/leadershipTodos.js';
+import twitchStreamersRoutes from './routes/twitchStreamers.js';
 
 // Services
 import { initializeDiscordBot } from './services/discordBot.js';
@@ -54,6 +59,9 @@ import { initializeSocket } from './services/socketService.js';
 import { auditMiddleware } from './middleware/auditMiddleware.js';
 import { initializeBonusCronJob } from './services/bonusService.js';
 import { initializeCalendarReminders } from './services/calendarService.js';
+import { startAnnouncementScheduler } from './services/scheduledAnnouncements.js';
+import { initializeWeeklyResetJob } from './services/unitWorkService.js';
+import { initializeTwitchService } from './services/twitchService.js';
 
 dotenv.config();
 
@@ -139,6 +147,11 @@ app.use('/api/duty-time', dutyTimeRoutes);
 app.use('/api/leitstelle-external', leitstelleApiRoutes);
 app.use('/api/civilian-service', civilianServiceRoutes);
 app.use('/api/detective-profiles', detectiveProfileRoutes);
+app.use('/api/unit-work', unitWorkRoutes);
+app.use('/api/ia-notes', iaNotesRoutes);
+app.use('/api/ia-check-locks', iaCheckLocksRoutes);
+app.use('/api/leadership-todos', leadershipTodosRoutes);
+app.use('/api/twitch-streamers', twitchStreamersRoutes);
 
 // Error handling
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -178,6 +191,17 @@ async function startServer() {
     // Initialize Calendar Reminders (checks every minute)
     initializeCalendarReminders();
     console.log('✅ Calendar Reminders initialized');
+
+    // Initialize Scheduled Announcements (checks every minute)
+    startAnnouncementScheduler();
+    console.log('✅ Scheduled Announcements initialized');
+
+    // Initialize Unit Work Weekly Reset (Sundays 23:59)
+    initializeWeeklyResetJob();
+    console.log('✅ Unit Work Weekly Reset Job initialized');
+
+    // Initialize Twitch Service (checks every 2 minutes)
+    initializeTwitchService();
 
     httpServer.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);

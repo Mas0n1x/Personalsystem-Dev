@@ -24,6 +24,8 @@ import {
   HelpCircle,
   MessageSquare,
   Calendar,
+  ListTodo,
+  Twitch,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -62,6 +64,7 @@ export default function Sidebar() {
         { name: 'Tuning', href: '/tuning', icon: Car, permission: 'tuning.view' },
         { name: 'Räube', href: '/robbery', icon: Crosshair, permission: 'robbery.view' },
         { name: 'Leadership', href: '/leadership', icon: Briefcase, permission: 'leadership.view' },
+        { name: 'Leadership Todos', href: '/leadership-todos', icon: ListTodo, permission: 'leadership.view' },
         { name: 'Kalender', href: '/calendar', icon: Calendar, permission: 'calendar.view' },
       ],
     },
@@ -89,6 +92,7 @@ export default function Sidebar() {
         { name: 'Sonderzahlungen', href: '/admin/bonus', icon: DollarSign, permission: 'admin.full' },
         { name: 'Discord Ankündigungen', href: '/admin/discord-announcements', icon: MessageSquare, permission: 'admin.full' },
         { name: 'Units Verwaltung', href: '/admin/units', icon: Shield, permission: 'admin.full' },
+        { name: 'Twitch Streamer', href: '/admin/twitch-streamers', icon: Twitch, permission: 'admin.full' },
         { name: 'Audit-Logs', href: '/admin/audit-logs', icon: FileText, permission: 'audit.view' },
         { name: 'Backups', href: '/admin/backups', icon: Database, permission: 'admin.full' },
         { name: 'Einstellungen', href: '/admin/settings', icon: Settings, permission: 'admin.full' },

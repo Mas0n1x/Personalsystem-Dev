@@ -15,6 +15,7 @@ import {
   Bell,
   Users,
   Check,
+  Repeat,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -34,6 +35,10 @@ interface CalendarEvent {
   notifyEmployeeIds: string | null;
   reminderMinutes: number | null;
   reminderSent: boolean;
+  repeatType: string;
+  repeatUntil: string | null;
+  originalEventId?: string;
+  isRecurringInstance?: boolean;
   createdBy: {
     displayName: string | null;
     username: string;
@@ -152,6 +157,8 @@ export default function Calendar() {
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [reminderMinutes, setReminderMinutes] = useState<number>(0);
+  const [repeatType, setRepeatType] = useState<'NONE' | 'WEEKLY'>('NONE');
+  const [repeatUntil, setRepeatUntil] = useState('');
 
   // Calculate date range for current month view
   const year = currentDate.getFullYear();
@@ -268,6 +275,8 @@ export default function Calendar() {
     setSelectedRoles([]);
     setSelectedEmployees([]);
     setReminderMinutes(0);
+    setRepeatType('NONE');
+    setRepeatUntil('');
     setShowModal(true);
   };
 
@@ -293,6 +302,8 @@ export default function Calendar() {
     setSelectedRoles(event.discordRoleIds ? JSON.parse(event.discordRoleIds) : []);
     setSelectedEmployees(event.notifyEmployeeIds ? JSON.parse(event.notifyEmployeeIds) : []);
     setReminderMinutes(event.reminderMinutes || 0);
+    setRepeatType((event.repeatType as 'NONE' | 'WEEKLY') || 'NONE');
+    setRepeatUntil(event.repeatUntil ? new Date(event.repeatUntil).toISOString().split('T')[0] : '');
     setShowModal(true);
   };
 
@@ -330,10 +341,15 @@ export default function Calendar() {
       discordRoleIds: selectedRoles.length > 0 ? selectedRoles : undefined,
       notifyEmployeeIds: selectedEmployees.length > 0 ? selectedEmployees : undefined,
       reminderMinutes: reminderMinutes > 0 ? reminderMinutes : undefined,
+      repeatType,
+      repeatUntil: repeatUntil ? new Date(repeatUntil + 'T23:59:59').toISOString() : undefined,
     };
 
+    // Für wiederkehrende Instanzen: Bearbeite das Original
+    const eventId = editingEvent?.originalEventId || editingEvent?.id;
+
     if (editingEvent) {
-      updateMutation.mutate({ id: editingEvent.id, data });
+      updateMutation.mutate({ id: eventId!, data });
     } else {
       createMutation.mutate(data);
     }
@@ -819,6 +835,42 @@ export default function Calendar() {
                     ))}
                   </select>
                 </div>
+              )}
+
+              {/* Repeat Options */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label flex items-center gap-2">
+                    <Repeat className="h-4 w-4" />
+                    Wiederholung
+                  </label>
+                  <select
+                    value={repeatType}
+                    onChange={(e) => setRepeatType(e.target.value as 'NONE' | 'WEEKLY')}
+                    className="input"
+                  >
+                    <option value="NONE">Keine</option>
+                    <option value="WEEKLY">Wöchentlich</option>
+                  </select>
+                </div>
+                {repeatType !== 'NONE' && (
+                  <div>
+                    <label className="label">Wiederholen bis</label>
+                    <input
+                      type="date"
+                      value={repeatUntil}
+                      onChange={(e) => setRepeatUntil(e.target.value)}
+                      className="input"
+                      placeholder="Optional"
+                    />
+                  </div>
+                )}
+              </div>
+              {editingEvent?.isRecurringInstance && (
+                <p className="text-xs text-amber-400 flex items-center gap-1">
+                  <Repeat className="h-3 w-3" />
+                  Dies ist eine wiederkehrende Instanz. Änderungen betreffen alle Termine.
+                </p>
               )}
 
               {/* Actions */}

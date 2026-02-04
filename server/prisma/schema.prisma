@@ -29,7 +29,9 @@ model User {
   issuedSanctions      Sanction[]
   treasuryTransactions TreasuryTransaction[]
   notes                Note[]
+  iaNotes              IANote[] @relation("IANoteCreatedBy")
   announcements        Announcement[]
+  announcementTemplates AnnouncementTemplate[]
   storedEvidence       Evidence[] @relation("EvidenceStoredBy")
   releasedEvidence     Evidence[] @relation("EvidenceReleasedBy")
   submittedTuning      TuningInvoice[] @relation("TuningSubmittedBy")
@@ -60,6 +62,9 @@ model User {
   terminatedEmployees  TerminationArchive[] @relation("TerminationArchiveTerminatedBy")
   notifications        Notification[] @relation("NotificationUser")
   calendarEvents       CalendarEvent[] @relation("CalendarEventCreatedBy")
+  iaCheckLocks         IACheckLock[] @relation("IACheckLockCheckedBy")
+  leadershipTodo       LeadershipTodo? @relation("LeadershipTodoUser")
+  editedLeadershipTodos LeadershipTodo[] @relation("LeadershipTodoLastEditedBy")
 
   @@map("users")
 }
@@ -127,6 +132,8 @@ model Employee {
   promotionArchive       PromotionArchive[] @relation("PromotionArchiveEmployee")
   detectiveProfile       DetectiveProfile? @relation("DetectiveProfile")
   civilianServiceSessions CivilianServiceSession[] @relation("CivilianServiceSessions")
+  iaNotes                IANote[] @relation("IANotes")
+  iaCheckLocks           IACheckLock[] @relation("IACheckLocks")
 
   @@index([status])
   @@index([rankLevel])
@@ -301,15 +308,36 @@ model Note {
   @@map("notes")
 }
 
+// IA-Notizen (nur für IA & Leadership sichtbar)
+model IANote {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation("IANotes", fields: [employeeId], references: [id], onDelete: Cascade)
+  content     String                              // Notizinhalt
+  category    String    @default("GENERAL")       // GENERAL, WARNING, OBSERVATION, INCIDENT
+  createdById String
+  createdBy   User      @relation("IANoteCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@index([createdById])
+  @@index([category])
+  @@map("ia_notes")
+}
+
 // Discord Ankündigungen
 model Announcement {
   id          String    @id @default(cuid())
   title       String
   content     String
   channelId   String?
-  messageId   String?   // Discord Message ID nach dem Senden
-  status      String    @default("DRAFT") // DRAFT, SENT
+  channelName String?                             // Gespeicherter Kanalname
+  messageId   String?                             // Discord Message ID nach dem Senden
+  status      String    @default("DRAFT")         // DRAFT, SCHEDULED, SENT, FAILED
+  scheduledAt DateTime?                           // Geplanter Sendezeitpunkt
   sentAt      DateTime?
+  errorMessage String?                            // Fehlermeldung bei FAILED
   createdById String
   createdBy   User      @relation(fields: [createdById], references: [id])
   createdAt   DateTime  @default(now())
@@ -317,7 +345,26 @@ model Announcement {
 
   @@index([createdById])
   @@index([status])
+  @@index([scheduledAt])
   @@map("announcements")
+}
+
+// Ankündigungsvorlagen
+model AnnouncementTemplate {
+  id          String    @id @default(cuid())
+  name        String                              // Name der Vorlage
+  title       String                              // Vorgefertigter Titel
+  content     String                              // Vorgefertigter Inhalt
+  channelId   String?                             // Standard-Kanal (optional)
+  category    String    @default("GENERAL")       // GENERAL, IC, OOC
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([createdById])
+  @@index([category])
+  @@map("announcement_templates")
 }
 
 // ==================== ASSERVATE ====================
@@ -740,6 +787,22 @@ model InvestigationWitness {
   @@map("investigation_witnesses")
 }
 
+// IA-Prüfungssperre (verhindert mehrfache Prüfungen pro Woche)
+model IACheckLock {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation("IACheckLocks", fields: [employeeId], references: [id], onDelete: Cascade)
+  weekStart   DateTime                          // Start der Woche (Montag 00:00)
+  checkedById String
+  checkedBy   User      @relation("IACheckLockCheckedBy", fields: [checkedById], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@unique([employeeId, weekStart])
+  @@index([employeeId])
+  @@index([weekStart])
+  @@map("ia_check_locks")
+}
+
 // ==================== QUALITY ASSURANCE ====================
 
 // QA-Units (modular konfigurierbar)
@@ -1146,6 +1209,10 @@ model CalendarEvent {
   color           String    @default("#3b82f6")       // Farbe für die Anzeige
   category        String    @default("GENERAL")       // GENERAL, TRAINING, MEETING, EVENT, DEADLINE
 
+  // Wiederholung
+  repeatType      String    @default("NONE")          // NONE, WEEKLY
+  repeatUntil     DateTime?                           // Bis wann wiederholen (optional, null = unbegrenzt)
+
   // Discord Benachrichtigungen
   discordRoleIds    String?                             // JSON Array: Discord Role IDs für Benachrichtigung
   notifyEmployeeIds String?                             // JSON Array: Employee IDs für direkte Benachrichtigung
@@ -1161,6 +1228,7 @@ model CalendarEvent {
   @@index([startDate])
   @@index([category])
   @@index([createdById])
+  @@index([repeatType])
   @@map("calendar_events")
 }
 
@@ -1181,6 +1249,7 @@ model Unit {
 
   // Beziehungen
   roles         UnitRole[]                                    // Discord-Rollen die zu dieser Unit gehören
+  workLogs      UnitWorkLog[]                                 // Wöchentliche Arbeitsstatistiken
 
   @@index([isActive])
   @@index([sortOrder])
@@ -1204,4 +1273,69 @@ model UnitRole {
   @@index([unitId])
   @@index([discordRoleId])
   @@map("unit_roles")
+}
+
+// Unit-Arbeit Wochenstatistik (wird sonntags 23:59 zurückgesetzt)
+model UnitWorkLog {
+  id              String    @id @default(cuid())
+  unitId          String
+  unit            Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  weekStart       DateTime                                        // Montag 00:00 der Woche
+  weekEnd         DateTime                                        // Sonntag 23:59 der Woche
+
+  // Aktivitäten-Zähler
+  casesCompleted      Int       @default(0)                       // Abgeschlossene Fälle
+  tasksCompleted      Int       @default(0)                       // Abgeschlossene Aufgaben
+  trainingsCompleted  Int       @default(0)                       // Durchgeführte Ausbildungen
+  investigationsCompleted Int   @default(0)                       // Abgeschlossene Ermittlungen
+  applicationsProcessed Int     @default(0)                       // Bearbeitete Bewerbungen
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([unitId, weekStart])
+  @@index([unitId])
+  @@index([weekStart])
+  @@map("unit_work_logs")
+}
+
+// ==================== LEADERSHIP TODO LISTS ====================
+
+// Persönliche Todo-Listen für Leadership-Mitglieder
+model LeadershipTodo {
+  id          String    @id @default(cuid())
+  userId      String    @unique                       // Jeder User hat genau eine Todo-Liste
+  user        User      @relation("LeadershipTodoUser", fields: [userId], references: [id], onDelete: Cascade)
+  content     String                                  // Der Inhalt der Todo-Liste (großes Textfeld)
+  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime  @default(now())
+
+  // Bearbeitungshistorie
+  lastEditedById  String?                             // Wer hat zuletzt bearbeitet
+  lastEditedBy    User?     @relation("LeadershipTodoLastEditedBy", fields: [lastEditedById], references: [id])
+
+  @@index([userId])
+  @@map("leadership_todos")
+}
+
+// ==================== TWITCH STREAMER SYSTEM ====================
+
+// Twitch Streamer für Live-Benachrichtigungen
+model TwitchStreamer {
+  id              String    @id @default(cuid())
+  twitchUsername  String    @unique                   // Twitch Benutzername
+  displayName     String                              // Anzeigename
+  twitchUserId    String?                             // Twitch User ID (wird beim ersten Check gesetzt)
+  isActive        Boolean   @default(true)            // Aktiv für Benachrichtigungen
+  isLive          Boolean   @default(false)           // Aktueller Live-Status
+  lastLiveAt      DateTime?                           // Wann zuletzt live
+  lastCheckedAt   DateTime?                           // Wann zuletzt geprüft
+  lastNotifiedAt  DateTime?                           // Wann zuletzt Benachrichtigung gesendet
+  customMessage   String?                             // Optionale benutzerdefinierte Nachricht
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([isActive])
+  @@index([isLive])
+  @@map("twitch_streamers")
 }

@@ -4,9 +4,16 @@ import { authMiddleware, AuthRequest, requirePermission } from '../middleware/au
 import { notifyPromotion } from '../services/notificationService.js';
 import { announcePromotion, announceAcademyGraduation } from '../services/discordAnnouncements.js';
 import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
-import { updateDiscordNickname, syncDiscordMembers } from '../services/discordBot.js';
+import { updateDiscordNickname, syncDiscordMembers, getAllRankRoles, syncUserRole, getTeamConfigForLevel } from '../services/discordBot.js';
 
 const router = Router();
+
+// Team-Sperrdauer in Wochen (gleich wie in uprankLock.ts)
+const TEAM_LOCK_DURATION: Record<string, number> = {
+  'Green': 1,
+  'Silver': 2,
+  'Gold': 4,
+};
 
 // Rank-Level Mapping
 const RANK_TO_LEVEL: Record<string, number> = {
@@ -336,8 +343,55 @@ router.put('/:id/process', requirePermission('management.uprank'), async (req: A
         data: { displayName: newNickname },
       });
 
-      // Discord-Rollen synchronisieren (aktualisiert Rollen basierend auf neuem Rang)
+      // Discord Rang-Rolle aktualisieren
+      const allRankRoles = getAllRankRoles();
+
+      // Alte Rang-Rolle finden und entfernen
+      const oldRankRole = allRankRoles.find(r => r.rank === request.employee.rank);
+      if (oldRankRole) {
+        await syncUserRole(updatedEmployee.user.discordId, oldRankRole.id, 'remove');
+        console.log(`[Uprank] Alte Rang-Rolle entfernt: ${oldRankRole.rank}`);
+      }
+
+      // Neue Rang-Rolle finden und hinzufügen
+      const newRankRole = allRankRoles.find(r => r.rank === request.targetRank);
+      if (newRankRole) {
+        await syncUserRole(updatedEmployee.user.discordId, newRankRole.id, 'add');
+        console.log(`[Uprank] Neue Rang-Rolle hinzugefügt: ${newRankRole.rank}`);
+      } else {
+        console.warn(`[Uprank] Rang-Rolle für "${request.targetRank}" nicht gefunden!`);
+      }
+
+      // Discord-Rollen synchronisieren (aktualisiert System-Rollen in DB)
       await syncDiscordMembers();
+
+      // Automatische Uprank-Sperre basierend auf neuem Team setzen
+      const teamConfig = getTeamConfigForLevel(newRankLevel);
+      const lockWeeks = TEAM_LOCK_DURATION[teamConfig.team];
+
+      if (lockWeeks) {
+        // Alte Sperren deaktivieren
+        await prisma.uprankLock.updateMany({
+          where: { employeeId: request.employeeId, isActive: true },
+          data: { isActive: false },
+        });
+
+        // Neue Sperre erstellen
+        const lockedUntil = new Date();
+        lockedUntil.setDate(lockedUntil.getDate() + lockWeeks * 7);
+
+        await prisma.uprankLock.create({
+          data: {
+            employeeId: request.employeeId,
+            reason: `Beförderung zu ${request.targetRank} (Team ${teamConfig.team} - ${lockWeeks} Woche${lockWeeks > 1 ? 'n' : ''} Sperre)`,
+            team: `Team ${teamConfig.team}`,
+            lockedUntil,
+            createdById: userId,
+          },
+        });
+
+        console.log(`[Uprank] Automatische Sperre bis ${lockedUntil.toLocaleDateString('de-DE')} erstellt (Team ${teamConfig.team})`);
+      }
 
       // Benachrichtigung an den beförderten Mitarbeiter senden
       const promotedByName = updatedRequest.processedBy?.displayName || updatedRequest.processedBy?.username || 'Unbekannt';

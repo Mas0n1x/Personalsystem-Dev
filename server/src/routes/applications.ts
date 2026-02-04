@@ -4,6 +4,7 @@ import { authMiddleware, AuthRequest, requirePermission } from '../middleware/au
 import { createInviteLink, updateDiscordNickname, assignHireRoles, findFreeBadgeNumber, getTeamConfigForLevel, findDiscordMember } from '../services/discordBot.js';
 import { triggerApplicationCompleted, triggerApplicationOnboarding, triggerApplicationRejected, getEmployeeIdFromUserId } from '../services/bonusService.js';
 import { announceHire } from '../services/discordAnnouncements.js';
+import { trackActivityByUserId } from '../services/unitWorkService.js';
 import { broadcastCreate, broadcastUpdate, broadcastDelete, emitEmployeeHired } from '../services/socketService.js';
 import multer from 'multer';
 import path from 'path';
@@ -1127,6 +1128,9 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
         await triggerApplicationOnboarding(processorEmployeeIdReactivate, application.applicantName, id);
       }
 
+      // Unit-Arbeit tracken
+      await trackActivityByUserId(req.user!.id, 'applicationsProcessed');
+
       // Discord Announcement
       const hiredByNameReactivate = updatedApplicationReactivate.processedBy?.displayName || updatedApplicationReactivate.processedBy?.username || 'Unbekannt';
       await announceHire({
@@ -1244,6 +1248,9 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
       await triggerApplicationCompleted(processorEmployeeId, application.applicantName, id);
       await triggerApplicationOnboarding(processorEmployeeId, application.applicantName, id);
     }
+
+    // Unit-Arbeit tracken
+    await trackActivityByUserId(req.user!.id, 'applicationsProcessed');
 
     // Discord Announcement fuer Neueinstellung senden
     const hiredByName = updatedApplication.processedBy?.displayName || updatedApplication.processedBy?.username || 'Unbekannt';

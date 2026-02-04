@@ -33,7 +33,9 @@
       "Bash(docker-compose build:*)",
       "Bash(docker-compose up:*)",
       "Bash(docker compose build:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node_modules/.bin/tsc:*)"
     ]
   }
 }

@@ -15,6 +15,8 @@ const ANNOUNCEMENT_TYPES = [
   'ACADEMY_GRADUATION',
   'TERMINATION',
   'HIRE',
+  'MEMBER_JOIN',
+  'MEMBER_LEAVE',
 ] as const;
 
 // Beschreibungen für die Typen
@@ -27,6 +29,8 @@ const TYPE_DESCRIPTIONS: Record<string, string> = {
   ACADEMY_GRADUATION: 'Ausbildungsabschlüsse',
   TERMINATION: 'Kündigungen',
   HIRE: 'Neueinstellungen',
+  MEMBER_JOIN: 'Discord Beitritte',
+  MEMBER_LEAVE: 'Discord Austritte',
 };
 
 // Alle Kanal-Konfigurationen abrufen

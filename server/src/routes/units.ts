@@ -104,7 +104,10 @@ router.get('/overview', authMiddleware, requirePermission('employees.view'), asy
       }
     }
 
-    // Für jede Unit die Mitglieder zählen (jetzt O(unit.roles) statt O(employees))
+    // Erstelle eine Map von Employee-ID zu Employee-Daten für schnellen Zugriff
+    const employeeMap = new Map(employees.map(e => [e.id, e]));
+
+    // Für jede Unit die Mitglieder zählen und Leadership-Namen sammeln
     const unitsWithCounts = units.map((unit) => {
       const memberIds = new Set<string>();
       const leadershipIds = new Set<string>();
@@ -119,14 +122,64 @@ router.get('/overview', authMiddleware, requirePermission('employees.view'), asy
         }
       }
 
+      // Leadership-Namen sammeln (für Vorschau)
+      const leadershipMembers: Array<{ id: string; name: string }> = [];
+      for (const empId of leadershipIds) {
+        const emp = employeeMap.get(empId);
+        if (emp) {
+          // Wir brauchen noch den Namen - holen wir später aus der DB
+          leadershipMembers.push({
+            id: empId,
+            name: '', // Wird später befüllt
+          });
+        }
+      }
+
       return {
         ...unit,
         memberCount: memberIds.size,
         leadershipCount: leadershipIds.size,
+        leadershipIds: Array.from(leadershipIds),
       };
     });
 
-    res.json(unitsWithCounts);
+    // Hole alle Employee-Details für Leadership in einem Batch
+    const allLeadershipIds = new Set<string>();
+    for (const unit of unitsWithCounts) {
+      unit.leadershipIds.forEach((id: string) => allLeadershipIds.add(id));
+    }
+
+    const leadershipDetails = await prisma.employee.findMany({
+      where: { id: { in: Array.from(allLeadershipIds) } },
+      select: {
+        id: true,
+        rank: true,
+        user: {
+          select: {
+            displayName: true,
+            username: true,
+          },
+        },
+      },
+    });
+
+    const leadershipMap = new Map(leadershipDetails.map(l => [l.id, l]));
+
+    // Finales Ergebnis mit Leadership-Namen
+    const finalResult = unitsWithCounts.map(unit => ({
+      ...unit,
+      leadership: unit.leadershipIds.map((id: string) => {
+        const emp = leadershipMap.get(id);
+        return emp ? {
+          id,
+          name: emp.user.displayName || emp.user.username,
+          rank: emp.rank,
+        } : null;
+      }).filter(Boolean),
+      leadershipIds: undefined, // Entferne temporäres Feld
+    }));
+
+    res.json(finalResult);
   } catch (error) {
     console.error('Error fetching units overview:', error);
     res.status(500).json({ error: 'Fehler beim Laden der Units-Übersicht' });

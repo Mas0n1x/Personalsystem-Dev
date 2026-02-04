@@ -26,6 +26,7 @@ const BonusSettings = lazy(() => import('./pages/admin/BonusSettings'));
 const DiscordAnnouncements = lazy(() => import('./pages/admin/DiscordAnnouncements'));
 const UnitsAdmin = lazy(() => import('./pages/admin/UnitsAdmin'));
 const HRSettings = lazy(() => import('./pages/admin/HRSettings'));
+const TwitchStreamers = lazy(() => import('./pages/admin/TwitchStreamers'));
 
 // Leadership - Lazy Loading
 const UnitsOverview = lazy(() => import('./pages/UnitsOverview'));
@@ -41,6 +42,7 @@ const QualityAssurance = lazy(() => import('./pages/QualityAssurance'));
 const Teamleitung = lazy(() => import('./pages/Teamleitung'));
 const Management = lazy(() => import('./pages/Management'));
 const Calendar = lazy(() => import('./pages/Calendar'));
+const LeadershipTodos = lazy(() => import('./pages/LeadershipTodos'));
 
 // Suspense Fallback Komponente
 function PageLoader() {
@@ -112,6 +114,7 @@ function App() {
 
         {/* Leadership */}
         <Route path="leadership" element={<Suspense fallback={<PageLoader />}><Leadership /></Suspense>} />
+        <Route path="leadership-todos" element={<Suspense fallback={<PageLoader />}><LeadershipTodos /></Suspense>} />
 
         {/* Admin */}
         <Route path="admin/users" element={<Suspense fallback={<PageLoader />}><Users /></Suspense>} />
@@ -125,6 +128,7 @@ function App() {
         <Route path="admin/discord-announcements" element={<Suspense fallback={<PageLoader />}><DiscordAnnouncements /></Suspense>} />
         <Route path="admin/units" element={<Suspense fallback={<PageLoader />}><UnitsAdmin /></Suspense>} />
         <Route path="admin/hr-settings" element={<Suspense fallback={<PageLoader />}><HRSettings /></Suspense>} />
+        <Route path="admin/twitch-streamers" element={<Suspense fallback={<PageLoader />}><TwitchStreamers /></Suspense>} />
       </Route>
 
       {/* Fallback */}

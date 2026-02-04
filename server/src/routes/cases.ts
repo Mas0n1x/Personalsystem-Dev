@@ -3,6 +3,7 @@ import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { triggerCaseOpened, triggerCaseClosed, getEmployeeIdFromUserId } from '../services/bonusService.js';
 import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
+import { trackActivityByUserId } from '../services/unitWorkService.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -692,6 +693,8 @@ router.put('/:id', authMiddleware, requirePermission('detectives.manage'), async
       if (previousCase?.folder.detectiveId) {
         await triggerCaseClosed(previousCase.folder.detectiveId, previousCase.caseNumber, req.params.id);
       }
+      // Unit-Arbeit tracken
+      await trackActivityByUserId(req.user!.id, 'casesCompleted');
     }
 
     // Live-Update broadcast

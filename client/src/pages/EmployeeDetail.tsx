@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { employeesApi } from '../services/api';
+import { employeesApi, iaNotesApi } from '../services/api';
+import { usePermissions } from '../hooks/usePermissions';
+import toast from 'react-hot-toast';
 import { StatusBadge } from '../components/ui/Badge';
 import DutyTimeCard from '../components/DutyTimeCard';
 import {
@@ -19,6 +21,12 @@ import {
   ShieldAlert,
   Search,
   Users,
+  FileWarning,
+  Plus,
+  Trash2,
+  AlertTriangle,
+  Eye,
+  MessageSquare,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -121,6 +129,22 @@ interface UnitStats {
   };
 }
 
+interface IANote {
+  id: string;
+  employeeId: string;
+  content: string;
+  category: string;
+  createdById: string;
+  createdBy: {
+    id: string;
+    displayName: string | null;
+    username: string;
+    avatar: string | null;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
 const formatDate = (date: string) => {
   return format(new Date(date), 'dd.MM.yyyy', { locale: de });
 };
@@ -147,6 +171,10 @@ export default function EmployeeDetail() {
     }
   };
 
+  const permissions = usePermissions();
+  const canViewIANotes = permissions.hasAnyPermission('ia.view', 'leadership.view');
+  const canManageIANotes = permissions.hasPermission('ia.manage');
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [unitStatsPeriod, setUnitStatsPeriod] = useState<'week' | 'month' | 'all'>('all');
   const [editForm, setEditForm] = useState({
@@ -154,6 +182,10 @@ export default function EmployeeDetail() {
     displayName: '',
     status: '',
   });
+
+  // IA Notes State
+  const [showIANoteForm, setShowIANoteForm] = useState(false);
+  const [newIANote, setNewIANote] = useState({ content: '', category: 'GENERAL' });
 
   const { data, isLoading } = useQuery({
     queryKey: ['employee', id],
@@ -182,11 +214,19 @@ export default function EmployeeDetail() {
     enabled: !!id,
   });
 
+  // IA-Notizen (nur wenn berechtigt)
+  const { data: iaNotesData } = useQuery({
+    queryKey: ['ia-notes', id],
+    queryFn: () => iaNotesApi.getByEmployee(id!),
+    enabled: !!id && canViewIANotes,
+  });
+
   const employee = data?.data as EmployeeDetailData | undefined;
   const promotions = (promotionsData?.data || []) as PromotionData[];
   const bonusPayments = (bonusesData?.data?.payments || []) as BonusPaymentData[];
   const bonusStats = bonusesData?.data?.stats as BonusStats | undefined;
   const unitStats = unitStatsData?.data as UnitStats | undefined;
+  const iaNotes = (iaNotesData?.data || []) as IANote[];
 
   const updateMutation = useMutation({
     mutationFn: (data: typeof editForm) => employeesApi.update(id!, data),
@@ -196,6 +236,44 @@ export default function EmployeeDetail() {
       setIsEditModalOpen(false);
     },
   });
+
+  // IA-Notizen Mutations
+  const createIANoteMutation = useMutation({
+    mutationFn: (data: { employeeId: string; content: string; category: string }) =>
+      iaNotesApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ia-notes', id] });
+      setNewIANote({ content: '', category: 'GENERAL' });
+      setShowIANoteForm(false);
+      toast.success('IA-Notiz erstellt');
+    },
+    onError: () => {
+      toast.error('Fehler beim Erstellen der Notiz');
+    },
+  });
+
+  const deleteIANoteMutation = useMutation({
+    mutationFn: (noteId: string) => iaNotesApi.delete(noteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ia-notes', id] });
+      toast.success('IA-Notiz gelöscht');
+    },
+    onError: () => {
+      toast.error('Fehler beim Löschen der Notiz');
+    },
+  });
+
+  const handleCreateIANote = () => {
+    if (!newIANote.content.trim()) {
+      toast.error('Bitte Notizinhalt eingeben');
+      return;
+    }
+    createIANoteMutation.mutate({
+      employeeId: id!,
+      content: newIANote.content.trim(),
+      category: newIANote.category,
+    });
+  };
 
   // Namen ohne Badge-Prefix extrahieren
   const cleanDisplayName = (name: string | null | undefined) => {
@@ -252,7 +330,7 @@ export default function EmployeeDetail() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate(`/uprank-request?employeeId=${employee.id}`)}
+            onClick={() => navigate(`/teamleitung?employeeId=${employee.id}`)}
             className="btn-primary"
           >
             <TrendingUp className="h-4 w-4" />
@@ -659,6 +737,158 @@ export default function EmployeeDetail() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* IA-Notizen (nur für IA & Leadership sichtbar) */}
+      {canViewIANotes && (
+        <div className="card border-l-4 border-l-red-500">
+          <div className="card-header flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileWarning className="h-5 w-5 text-red-400" />
+              <h3 className="font-semibold text-white">IA-Notizen</h3>
+              <span className="text-xs text-slate-400">(nur IA & Leadership)</span>
+              {iaNotes.length > 0 && (
+                <span className="bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded-full">
+                  {iaNotes.length}
+                </span>
+              )}
+            </div>
+            {canManageIANotes && (
+              <button
+                onClick={() => setShowIANoteForm(!showIANoteForm)}
+                className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded flex items-center gap-1"
+              >
+                <Plus className="h-3 w-3" />
+                Notiz hinzufügen
+              </button>
+            )}
+          </div>
+          <div className="card-body">
+            {/* Neue Notiz Formular */}
+            {showIANoteForm && canManageIANotes && (
+              <div className="mb-4 p-4 bg-slate-700/50 rounded-lg border border-red-500/30">
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Kategorie</label>
+                    <div className="flex gap-2">
+                      {[
+                        { value: 'GENERAL', label: 'Allgemein', icon: MessageSquare },
+                        { value: 'WARNING', label: 'Warnung', icon: AlertTriangle },
+                        { value: 'OBSERVATION', label: 'Beobachtung', icon: Eye },
+                        { value: 'INCIDENT', label: 'Vorfall', icon: ShieldAlert },
+                      ].map(({ value, label, icon: Icon }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setNewIANote({ ...newIANote, category: value })}
+                          className={clsx(
+                            'flex-1 py-2 px-3 rounded text-xs font-medium flex items-center justify-center gap-1 transition-colors',
+                            newIANote.category === value
+                              ? 'bg-red-600/30 text-red-400 border border-red-500'
+                              : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                          )}
+                        >
+                          <Icon className="h-3 w-3" />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Notiz</label>
+                    <textarea
+                      value={newIANote.content}
+                      onChange={(e) => setNewIANote({ ...newIANote, content: e.target.value })}
+                      className="input w-full h-24 resize-none"
+                      placeholder="Notiz zur Personalakte..."
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => {
+                        setShowIANoteForm(false);
+                        setNewIANote({ content: '', category: 'GENERAL' });
+                      }}
+                      className="btn-ghost text-sm"
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      onClick={handleCreateIANote}
+                      disabled={createIANoteMutation.isPending || !newIANote.content.trim()}
+                      className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm"
+                    >
+                      {createIANoteMutation.isPending ? 'Speichert...' : 'Speichern'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Notizen Liste */}
+            {iaNotes.length === 0 ? (
+              <p className="text-slate-400 text-center py-4">Keine IA-Notizen vorhanden</p>
+            ) : (
+              <div className="space-y-3">
+                {iaNotes.map((note) => {
+                  const categoryConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+                    GENERAL: { label: 'Allgemein', color: 'bg-slate-500/20 text-slate-400', icon: MessageSquare },
+                    WARNING: { label: 'Warnung', color: 'bg-yellow-500/20 text-yellow-400', icon: AlertTriangle },
+                    OBSERVATION: { label: 'Beobachtung', color: 'bg-blue-500/20 text-blue-400', icon: Eye },
+                    INCIDENT: { label: 'Vorfall', color: 'bg-red-500/20 text-red-400', icon: ShieldAlert },
+                  };
+                  const config = categoryConfig[note.category] || categoryConfig.GENERAL;
+                  const CategoryIcon = config.icon;
+
+                  return (
+                    <div
+                      key={note.id}
+                      className="p-4 bg-slate-700/50 rounded-lg border border-slate-600 hover:border-slate-500 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className={clsx('text-xs px-2 py-0.5 rounded flex items-center gap-1', config.color)}>
+                              <CategoryIcon className="h-3 w-3" />
+                              {config.label}
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              {formatDateTime(note.createdAt)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-white whitespace-pre-wrap">{note.content}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <img
+                              src={note.createdBy.avatar || `https://ui-avatars.com/api/?name=${note.createdBy.username}&background=random`}
+                              alt={note.createdBy.username}
+                              className="h-5 w-5 rounded-full"
+                            />
+                            <span className="text-xs text-slate-400">
+                              {note.createdBy.displayName || note.createdBy.username}
+                            </span>
+                          </div>
+                        </div>
+                        {canManageIANotes && (
+                          <button
+                            onClick={() => {
+                              if (confirm('Notiz wirklich löschen?')) {
+                                deleteIANoteMutation.mutate(note.id);
+                              }
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded transition-colors"
+                            title="Löschen"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

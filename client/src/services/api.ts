@@ -253,6 +253,18 @@ export const announcementsApi = {
   sendDirect: (data: { title: string; content: string; channelId: string }) =>
     api.post('/announcements/send-direct', data),
   delete: (id: string) => api.delete(`/announcements/${id}`),
+  // Templates
+  getTemplates: () => api.get('/announcements/templates'),
+  createTemplate: (data: { name: string; title: string; content: string; channelId?: string; category?: string }) =>
+    api.post('/announcements/templates', data),
+  updateTemplate: (id: string, data: Record<string, unknown>) => api.put(`/announcements/templates/${id}`, data),
+  deleteTemplate: (id: string) => api.delete(`/announcements/templates/${id}`),
+  // Scheduled Announcements
+  getScheduled: () => api.get('/announcements/scheduled'),
+  schedule: (data: { title: string; content: string; channelId: string; channelName: string; scheduledAt: string }) =>
+    api.post('/announcements/schedule', data),
+  updateScheduled: (id: string, data: Record<string, unknown>) => api.put(`/announcements/scheduled/${id}`, data),
+  cancelScheduled: (id: string) => api.delete(`/announcements/scheduled/${id}`),
 };
 
 // Evidence API (Asservate)
@@ -678,6 +690,8 @@ export const calendarApi = {
     category?: string;
     discordRoleIds?: string[];
     reminderMinutes?: number;
+    repeatType?: 'NONE' | 'WEEKLY';
+    repeatUntil?: string;
   }) => api.post('/calendar', data),
   update: (id: string, data: Record<string, unknown>) => api.put(`/calendar/${id}`, data),
   delete: (id: string) => api.delete(`/calendar/${id}`),
@@ -766,4 +780,96 @@ export const detectiveProfilesApi = {
 
   // Profil löschen
   delete: (employeeId: string) => api.delete(`/detective-profiles/${employeeId}`),
+};
+
+// Unit-Arbeit Statistiken
+export const unitWorkApi = {
+  // Aktuelle Wochenstatistiken
+  getCurrentStats: () => api.get('/unit-work/current'),
+
+  // Historische Statistiken
+  getHistory: (weeks = 4) => api.get(`/unit-work/history?weeks=${weeks}`),
+};
+
+// IA-Notizen (nur für IA & Leadership)
+export const iaNotesApi = {
+  // Notizen für einen Mitarbeiter
+  getByEmployee: (employeeId: string) => api.get(`/ia-notes/employee/${employeeId}`),
+
+  // Anzahl der Notizen für einen Mitarbeiter
+  getCountByEmployee: (employeeId: string) => api.get(`/ia-notes/employee/${employeeId}/count`),
+
+  // Übersicht aller Mitarbeiter mit Notizen
+  getOverview: () => api.get('/ia-notes/overview'),
+
+  // Notiz erstellen
+  create: (data: { employeeId: string; content: string; category?: string }) =>
+    api.post('/ia-notes', data),
+
+  // Notiz bearbeiten
+  update: (id: string, data: { content?: string; category?: string }) =>
+    api.put(`/ia-notes/${id}`, data),
+
+  // Notiz löschen
+  delete: (id: string) => api.delete(`/ia-notes/${id}`),
+};
+
+// IA Check Locks API (Prüfungssperren)
+export const iaCheckLocksApi = {
+  // Alle aktiven Sperren für die aktuelle Woche
+  getCurrent: () => api.get('/ia-check-locks/current'),
+
+  // Sperre für einen bestimmten Mitarbeiter
+  getByEmployee: (employeeId: string) => api.get(`/ia-check-locks/employee/${employeeId}`),
+
+  // Neue Sperre erstellen
+  create: (employeeId: string) => api.post('/ia-check-locks', { employeeId }),
+
+  // Sperre löschen (nur Admin)
+  delete: (id: string) => api.delete(`/ia-check-locks/${id}`),
+};
+
+// Leadership Todos API
+export const leadershipTodosApi = {
+  // Alle Todo-Listen abrufen
+  getAll: () => api.get('/leadership-todos'),
+
+  // Eigene Todo-Liste
+  getMy: () => api.get('/leadership-todos/my'),
+
+  // Alle Leadership-User mit ihren Listen
+  getUsers: () => api.get('/leadership-todos/users'),
+
+  // Todo-Liste eines Users abrufen
+  getByUser: (userId: string) => api.get(`/leadership-todos/user/${userId}`),
+
+  // Todo-Liste aktualisieren
+  update: (userId: string, content: string) =>
+    api.put(`/leadership-todos/${userId}`, { content }),
+};
+
+// Twitch Streamers API
+export const twitchStreamersApi = {
+  // Alle Streamer abrufen
+  getAll: () => api.get('/twitch-streamers'),
+
+  // Einzelnen Streamer abrufen
+  getById: (id: string) => api.get(`/twitch-streamers/${id}`),
+
+  // Neuen Streamer hinzufügen
+  create: (data: { twitchUsername: string; displayName?: string; customMessage?: string }) =>
+    api.post('/twitch-streamers', data),
+
+  // Streamer aktualisieren
+  update: (id: string, data: { displayName?: string; isActive?: boolean; customMessage?: string }) =>
+    api.put(`/twitch-streamers/${id}`, data),
+
+  // Streamer löschen
+  delete: (id: string) => api.delete(`/twitch-streamers/${id}`),
+
+  // Manueller Check eines Streamers
+  checkOne: (id: string) => api.post(`/twitch-streamers/${id}/check`),
+
+  // Alle Streamer prüfen
+  check: () => api.post('/twitch-streamers/check-all'),
 };

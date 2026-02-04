@@ -3,6 +3,7 @@ import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { triggerInvestigationOpened, triggerInvestigationClosed, getEmployeeIdFromUserId } from '../services/bonusService.js';
 import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
+import { trackActivityByUserId } from '../services/unitWorkService.js';
 
 const router = Router();
 
@@ -80,17 +81,46 @@ router.get('/', requirePermission('ia.view'), async (req: AuthRequest, res: Resp
   }
 });
 
-// Get employees for selection
+// Hilfsfunktion: Berechnet Start der aktuellen Woche (Montag 00:00)
+function getCurrentWeekStart(): Date {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const adjustedDay = dayOfWeek === 0 ? 7 : dayOfWeek;
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - adjustedDay + 1);
+  weekStart.setHours(0, 0, 0, 0);
+  return weekStart;
+}
+
+// Get employees for selection (with IA check lock status)
 router.get('/employees', requirePermission('ia.view'), async (_req: AuthRequest, res: Response) => {
   try {
+    const weekStart = getCurrentWeekStart();
+
     const employees = await prisma.employee.findMany({
       where: { status: 'ACTIVE' },
       include: {
-        user: { select: { id: true, displayName: true, username: true } }
+        user: { select: { id: true, displayName: true, username: true } },
+        iaCheckLocks: {
+          where: { weekStart },
+          include: {
+            checkedBy: { select: { displayName: true, username: true } },
+          },
+        },
       },
       orderBy: { user: { displayName: 'asc' } }
     });
-    res.json(employees);
+
+    // Transform to include check lock info
+    const employeesWithLockStatus = employees.map(emp => ({
+      ...emp,
+      isCheckedThisWeek: emp.iaCheckLocks.length > 0,
+      checkedAt: emp.iaCheckLocks[0]?.createdAt || null,
+      checkedBy: emp.iaCheckLocks[0]?.checkedBy || null,
+      iaCheckLocks: undefined, // Remove from response
+    }));
+
+    res.json(employeesWithLockStatus);
   } catch (error) {
     console.error('Error fetching employees:', error);
     res.status(500).json({ error: 'Failed to fetch employees' });
@@ -243,6 +273,8 @@ router.put('/:id', requirePermission('ia.manage'), async (req: AuthRequest, res:
       if (leadEmployeeId && previousInvestigation) {
         await triggerInvestigationClosed(leadEmployeeId, previousInvestigation.caseNumber, id);
       }
+      // Unit-Arbeit tracken
+      await trackActivityByUserId(req.user!.id, 'investigationsCompleted');
     }
 
     // Live-Update broadcast

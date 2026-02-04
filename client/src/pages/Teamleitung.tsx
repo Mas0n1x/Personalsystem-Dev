@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { uprankRequestsApi, uprankLockApi, employeesApi, teamChangeReportsApi } from '../services/api';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { usePermissions } from '../hooks/usePermissions';
@@ -147,12 +148,25 @@ export default function Teamleitung() {
   const permissions = usePermissions();
   useLiveUpdates(); // Live-Updates für Teamleitung aktivieren
 
+  // URL Parameter
+  const [searchParams, setSearchParams] = useSearchParams();
+  const preselectedEmployeeId = searchParams.get('employeeId');
+
   // Tab State
   const [activeTab, setActiveTab] = useState<'requests' | 'locks' | 'teamchanges'>('requests');
 
   // Request State
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Auto-open modal when employeeId is in URL
+  useEffect(() => {
+    if (preselectedEmployeeId) {
+      setShowCreateModal(true);
+      // Clear URL parameter after opening modal
+      setSearchParams({});
+    }
+  }, [preselectedEmployeeId, setSearchParams]);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<UprankRequest | null>(null);
   const [showProcessModal, setShowProcessModal] = useState(false);
@@ -1060,7 +1074,7 @@ export default function Teamleitung() {
       )}
 
       {/* Create Request Modal */}
-      {showCreateModal && <CreateRequestModal employees={employees} onClose={() => setShowCreateModal(false)} onCreate={(data) => createMutation.mutate(data)} isLoading={createMutation.isPending} />}
+      {showCreateModal && <CreateRequestModal employees={employees} onClose={() => setShowCreateModal(false)} onCreate={(data) => createMutation.mutate(data)} isLoading={createMutation.isPending} preselectedEmployeeId={preselectedEmployeeId || undefined} />}
 
       {/* Detail Modal */}
       {showDetailModal && selectedRequest && (
@@ -1270,6 +1284,7 @@ function CreateRequestModal({
   onClose,
   onCreate,
   isLoading,
+  preselectedEmployeeId,
 }: {
   employees: Employee[];
   onClose: () => void;
@@ -1283,9 +1298,10 @@ function CreateRequestModal({
     interviewDate?: string;
   }) => void;
   isLoading: boolean;
+  preselectedEmployeeId?: string;
 }) {
   const [formData, setFormData] = useState({
-    employeeId: '',
+    employeeId: preselectedEmployeeId || '',
     targetRank: '',
     reason: '',
     achievements: '',

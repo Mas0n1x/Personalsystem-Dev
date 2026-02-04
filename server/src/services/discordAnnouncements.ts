@@ -28,7 +28,9 @@ export type AnnouncementType =
   | 'ACADEMY_GRADUATION'
   | 'ACADEMY_TRAINING'
   | 'TERMINATION'
-  | 'HIRE';
+  | 'HIRE'
+  | 'MEMBER_JOIN'
+  | 'MEMBER_LEAVE';
 
 // Farben für verschiedene Ankündigungstypen (Hex)
 const COLORS = {
@@ -41,6 +43,8 @@ const COLORS = {
   ACADEMY_TRAINING: 0x06b6d4,   // Cyan
   TERMINATION: 0x64748b,     // Grau
   HIRE: 0x10b981,            // Smaragd
+  MEMBER_JOIN: 0x22c55e,     // Grün
+  MEMBER_LEAVE: 0xef4444,    // Rot
 };
 
 // Emojis für verschiedene Ankündigungstypen
@@ -54,6 +58,8 @@ const EMOJIS = {
   ACADEMY_TRAINING: '📚',
   TERMINATION: '👋',
   HIRE: '🆕',
+  MEMBER_JOIN: '📥',
+  MEMBER_LEAVE: '📤',
 };
 
 // Titel für verschiedene Ankündigungstypen
@@ -67,6 +73,8 @@ const TITLES = {
   ACADEMY_TRAINING: 'Neue Schulung',
   TERMINATION: 'Kündigung',
   HIRE: 'Neueinstellung',
+  MEMBER_JOIN: 'Discord Beitritt',
+  MEMBER_LEAVE: 'Discord Austritt',
 };
 
 // Kanal für Ankündigung abrufen
@@ -720,4 +728,115 @@ export async function announceTraining(data: TrainingAnnouncementData): Promise<
   );
 
   return sendAnnouncementV2('ACADEMY_TRAINING', container);
+}
+
+// ==================== MEMBER JOIN/LEAVE ====================
+
+export interface MemberJoinData {
+  username: string;
+  displayName: string | null;
+  discordId: string;
+  avatarUrl: string | null;
+  accountCreatedAt?: Date;
+}
+
+export interface MemberLeaveData {
+  username: string;
+  displayName: string | null;
+  discordId: string;
+  avatarUrl: string | null;
+  wasEmployee?: boolean;
+  employeeName?: string | null;
+  employeeRank?: string | null;
+  employeeBadge?: string | null;
+}
+
+// Discord Beitritt ankündigen
+export async function announceMemberJoin(data: MemberJoinData): Promise<boolean> {
+  const container = new ContainerBuilder()
+    .setAccentColor(COLORS.MEMBER_JOIN);
+
+  container.addTextDisplayComponents(
+    (text) => text.setContent(`## ${EMOJIS.MEMBER_JOIN} ${TITLES.MEMBER_JOIN}`),
+  );
+
+  container.addSeparatorComponents((sep) => sep.setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+
+  // Avatar-Bereich
+  if (data.avatarUrl) {
+    container.addSectionComponents((section) =>
+      section
+        .addTextDisplayComponents((text) =>
+          text.setContent(
+            `**${data.displayName || data.username}** ist dem Discord beigetreten!\n\n` +
+            `👤 **Discord:** <@${data.discordId}>\n` +
+            `🏷️ **Username:** ${data.username}`
+          ),
+        )
+        .setThumbnailAccessory((thumb) => thumb.setURL(data.avatarUrl!))
+    );
+  } else {
+    container.addTextDisplayComponents(
+      (text) => text.setContent(
+        `**${data.displayName || data.username}** ist dem Discord beigetreten!\n\n` +
+        `👤 **Discord:** <@${data.discordId}>\n` +
+        `🏷️ **Username:** ${data.username}`
+      ),
+    );
+  }
+
+  container.addSeparatorComponents((sep) => sep.setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(
+    (text) => text.setContent(`> *Willkommen auf dem LSPD Discord Server!*`),
+  );
+
+  container.addSeparatorComponents((sep) => sep.setDivider(false).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(
+    (text) => text.setContent(`-# 🕐 ${getCurrentTimestamp()} • LSPD Personalsystem`),
+  );
+
+  return sendAnnouncementV2('MEMBER_JOIN', container);
+}
+
+// Discord Austritt ankündigen
+export async function announceMemberLeave(data: MemberLeaveData): Promise<boolean> {
+  const container = new ContainerBuilder()
+    .setAccentColor(COLORS.MEMBER_LEAVE);
+
+  container.addTextDisplayComponents(
+    (text) => text.setContent(`## ${EMOJIS.MEMBER_LEAVE} ${TITLES.MEMBER_LEAVE}`),
+  );
+
+  container.addSeparatorComponents((sep) => sep.setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+
+  // Basis-Info
+  let content = `**${data.displayName || data.username}** hat den Discord verlassen.\n\n` +
+    `👤 **Username:** ${data.username}\n` +
+    `🆔 **Discord ID:** ${data.discordId}`;
+
+  // Wenn es ein Mitarbeiter war, zusätzliche Infos anzeigen
+  if (data.wasEmployee && data.employeeName) {
+    content += `\n\n⚠️ **War Mitarbeiter:**\n` +
+      `├ **Name:** ${data.employeeName}\n` +
+      `├ **Rang:** ${data.employeeRank || 'Unbekannt'}\n` +
+      `└ **Dienstnummer:** ${data.employeeBadge || 'N/A'}`;
+  }
+
+  // Avatar-Bereich
+  if (data.avatarUrl) {
+    container.addSectionComponents((section) =>
+      section
+        .addTextDisplayComponents((text) => text.setContent(content))
+        .setThumbnailAccessory((thumb) => thumb.setURL(data.avatarUrl!))
+    );
+  } else {
+    container.addTextDisplayComponents((text) => text.setContent(content));
+  }
+
+  container.addSeparatorComponents((sep) => sep.setDivider(false).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(
+    (text) => text.setContent(`-# 🕐 ${getCurrentTimestamp()} • LSPD Personalsystem`),
+  );
+
+  return sendAnnouncementV2('MEMBER_LEAVE', container);
 }

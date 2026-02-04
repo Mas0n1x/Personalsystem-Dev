@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tasksApi, employeesApi, sanctionsApi, treasuryApi, announcementsApi, notificationsApi } from '../services/api';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
@@ -28,6 +28,11 @@ import {
   Users,
   Globe,
   History,
+  FileText,
+  Save,
+  Copy,
+  Clock,
+  AlertCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -375,11 +380,10 @@ function TreasuryWidget() {
 
 // ==================== ANNOUNCEMENTS WIDGET ====================
 
-// Hardcoded Discord Channels
-const ANNOUNCEMENT_CHANNELS = [
-  { id: '935022121468440626', name: 'IC Ankündigungen' },
-  { id: '1015781213669163008', name: 'OOC Ankündigungen' },
-];
+interface DiscordChannel {
+  id: string;
+  name: string;
+}
 
 interface DiscordRole {
   id: string;
@@ -387,19 +391,97 @@ interface DiscordRole {
   color: number;
 }
 
+interface AnnouncementTemplate {
+  id: string;
+  name: string;
+  title: string;
+  content: string;
+  channelId: string | null;
+  category: string;
+  createdBy: { displayName: string | null; username: string };
+  createdAt: string;
+}
+
+interface ScheduledAnnouncement {
+  id: string;
+  title: string;
+  content: string;
+  channelId: string | null;
+  channelName: string | null;
+  status: string;
+  scheduledAt: string;
+  errorMessage: string | null;
+  createdBy: { displayName: string | null; username: string; avatar: string | null };
+  createdAt: string;
+}
+
 function AnnouncementsWidget() {
-  const [activeTab, setActiveTab] = useState<'discord' | 'inapp'>('discord');
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<'discord' | 'inapp' | 'templates' | 'scheduled'>('discord');
 
   // Discord state
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [channelId, setChannelId] = useState(ANNOUNCEMENT_CHANNELS[0].id);
+  const [channelId, setChannelId] = useState('');
 
   // In-App state
   const [inAppTitle, setInAppTitle] = useState('');
   const [inAppMessage, setInAppMessage] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [broadcastToAll, setBroadcastToAll] = useState(false);
+
+  // Template state
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<AnnouncementTemplate | null>(null);
+  const [templateName, setTemplateName] = useState('');
+  const [templateTitle, setTemplateTitle] = useState('');
+  const [templateContent, setTemplateContent] = useState('');
+  const [templateChannelId, setTemplateChannelId] = useState('');
+  const [templateCategory, setTemplateCategory] = useState('GENERAL');
+
+  // Scheduling state
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('');
+
+  // Discord Kanäle laden
+  const { data: channelsData } = useQuery({
+    queryKey: ['announcement-channels'],
+    queryFn: async () => {
+      const res = await announcementsApi.getChannels();
+      return res.data as DiscordChannel[];
+    },
+  });
+
+  const channels = channelsData || [];
+
+  // Bei Kanälen laden: ersten Kanal auswählen
+  useEffect(() => {
+    if (channels.length > 0 && !channelId) {
+      setChannelId(channels[0].id);
+    }
+  }, [channels, channelId]);
+
+  // Templates laden
+  const { data: templatesData } = useQuery({
+    queryKey: ['announcement-templates'],
+    queryFn: async () => {
+      const res = await announcementsApi.getTemplates();
+      return res.data as AnnouncementTemplate[];
+    },
+  });
+
+  const templates = templatesData || [];
+
+  // Geplante Ankündigungen laden
+  const { data: scheduledData } = useQuery({
+    queryKey: ['scheduled-announcements'],
+    queryFn: async () => {
+      const res = await announcementsApi.getScheduled();
+      return res.data as ScheduledAnnouncement[];
+    },
+  });
+
+  const scheduledAnnouncements = scheduledData || [];
 
   // Discord Rollen laden
   const { data: rolesData, isLoading: rolesLoading } = useQuery({
@@ -441,6 +523,55 @@ function AnnouncementsWidget() {
     },
   });
 
+  // Template Mutations
+  const createTemplateMutation = useMutation({
+    mutationFn: announcementsApi.createTemplate,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['announcement-templates'] });
+      closeTemplateModal();
+      toast.success('Vorlage erstellt!');
+    },
+  });
+
+  const updateTemplateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      announcementsApi.updateTemplate(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['announcement-templates'] });
+      closeTemplateModal();
+      toast.success('Vorlage aktualisiert!');
+    },
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: announcementsApi.deleteTemplate,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['announcement-templates'] });
+      toast.success('Vorlage gelöscht!');
+    },
+  });
+
+  // Schedule Mutations
+  const scheduleMutation = useMutation({
+    mutationFn: announcementsApi.schedule,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scheduled-announcements'] });
+      setTitle('');
+      setContent('');
+      setScheduleDate('');
+      setScheduleTime('');
+      toast.success('Ankündigung geplant!');
+    },
+  });
+
+  const cancelScheduledMutation = useMutation({
+    mutationFn: announcementsApi.cancelScheduled,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scheduled-announcements'] });
+      toast.success('Geplante Ankündigung abgebrochen!');
+    },
+  });
+
   const handleDiscordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim() || !channelId) {
@@ -477,7 +608,117 @@ function AnnouncementsWidget() {
     setBroadcastToAll(false);
   };
 
-  const selectedChannel = ANNOUNCEMENT_CHANNELS.find(c => c.id === channelId);
+  const selectedChannel = channels.find(c => c.id === channelId);
+
+  // Schedule handler
+  const handleSchedule = () => {
+    if (!title.trim() || !content.trim() || !channelId) {
+      toast.error('Bitte alle Felder ausfüllen');
+      return;
+    }
+    if (!scheduleDate || !scheduleTime) {
+      toast.error('Bitte Datum und Uhrzeit auswählen');
+      return;
+    }
+
+    const scheduledAt = new Date(`${scheduleDate}T${scheduleTime}`);
+    if (scheduledAt <= new Date()) {
+      toast.error('Zeitpunkt muss in der Zukunft liegen');
+      return;
+    }
+
+    const channelName = selectedChannel?.name || '';
+    scheduleMutation.mutate({
+      title: title.trim(),
+      content: content.trim(),
+      channelId,
+      channelName,
+      scheduledAt: scheduledAt.toISOString(),
+    });
+  };
+
+  const formatScheduledDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  // Template Functions
+  const openCreateTemplateModal = () => {
+    setEditingTemplate(null);
+    setTemplateName('');
+    setTemplateTitle('');
+    setTemplateContent('');
+    setTemplateChannelId('');
+    setTemplateCategory('GENERAL');
+    setShowTemplateModal(true);
+  };
+
+  const openEditTemplateModal = (template: AnnouncementTemplate) => {
+    setEditingTemplate(template);
+    setTemplateName(template.name);
+    setTemplateTitle(template.title);
+    setTemplateContent(template.content);
+    setTemplateChannelId(template.channelId || '');
+    setTemplateCategory(template.category);
+    setShowTemplateModal(true);
+  };
+
+  const closeTemplateModal = () => {
+    setShowTemplateModal(false);
+    setEditingTemplate(null);
+  };
+
+  const handleTemplateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!templateName.trim() || !templateTitle.trim() || !templateContent.trim()) {
+      toast.error('Bitte alle Pflichtfelder ausfüllen');
+      return;
+    }
+
+    const data = {
+      name: templateName.trim(),
+      title: templateTitle.trim(),
+      content: templateContent.trim(),
+      channelId: templateChannelId || undefined,
+      category: templateCategory,
+    };
+
+    if (editingTemplate) {
+      updateTemplateMutation.mutate({ id: editingTemplate.id, data });
+    } else {
+      createTemplateMutation.mutate(data);
+    }
+  };
+
+  const loadTemplate = (template: AnnouncementTemplate) => {
+    setTitle(template.title);
+    setContent(template.content);
+    if (template.channelId) {
+      setChannelId(template.channelId);
+    }
+    setActiveTab('discord');
+    toast.success(`Vorlage "${template.name}" geladen`);
+  };
+
+  const saveCurrentAsTemplate = () => {
+    if (!title.trim() || !content.trim()) {
+      toast.error('Bitte zuerst Titel und Inhalt ausfüllen');
+      return;
+    }
+    setTemplateName('');
+    setTemplateTitle(title);
+    setTemplateContent(content);
+    setTemplateChannelId(channelId);
+    setTemplateCategory('GENERAL');
+    setEditingTemplate(null);
+    setShowTemplateModal(true);
+  };
 
   return (
     <div className="card">
@@ -510,21 +751,77 @@ function AnnouncementsWidget() {
           <Bell className="h-4 w-4" />
           In-App
         </button>
+        <button
+          onClick={() => setActiveTab('templates')}
+          className={`flex-1 py-3 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+            activeTab === 'templates'
+              ? 'text-primary-400 border-b-2 border-primary-400 bg-primary-500/5'
+              : 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/50'
+          }`}
+        >
+          <FileText className="h-4 w-4" />
+          Vorlagen
+        </button>
+        <button
+          onClick={() => setActiveTab('scheduled')}
+          className={`flex-1 py-3 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+            activeTab === 'scheduled'
+              ? 'text-primary-400 border-b-2 border-primary-400 bg-primary-500/5'
+              : 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/50'
+          }`}
+        >
+          <Clock className="h-4 w-4" />
+          Geplant
+          {scheduledAnnouncements.length > 0 && (
+            <span className="bg-primary-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+              {scheduledAnnouncements.length}
+            </span>
+          )}
+        </button>
       </div>
 
       <div className="p-4">
         {activeTab === 'discord' ? (
           // Discord Announcement Form
           <form onSubmit={handleDiscordSubmit} className="space-y-3">
+            {/* Template Selector */}
+            {templates.length > 0 && (
+              <div>
+                <label className="label">Vorlage laden</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {templates.slice(0, 6).map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => loadTemplate(t)}
+                      className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded flex items-center gap-1"
+                    >
+                      <Copy className="h-3 w-3" />
+                      {t.name}
+                    </button>
+                  ))}
+                  {templates.length > 6 && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('templates')}
+                      className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-slate-400 text-xs rounded"
+                    >
+                      +{templates.length - 6} mehr
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="label">Kanal</label>
-              <div className="flex gap-2">
-                {ANNOUNCEMENT_CHANNELS.map((c) => (
+              <div className="flex flex-wrap gap-2">
+                {channels.map((c) => (
                   <button
                     key={c.id}
                     type="button"
                     onClick={() => setChannelId(c.id)}
-                    className={`flex-1 py-2 px-3 rounded text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                    className={`py-2 px-3 rounded text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
                       channelId === c.id
                         ? 'bg-primary-600/30 text-primary-400 border border-primary-500'
                         : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
@@ -570,16 +867,60 @@ function AnnouncementsWidget() {
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={sendDiscordMutation.isPending || !title.trim() || !content.trim()}
-              className="w-full btn-primary flex items-center justify-center gap-2 py-2.5"
-            >
-              <Send className="h-4 w-4" />
-              {sendDiscordMutation.isPending ? 'Wird gesendet...' : `An #${selectedChannel?.name} senden`}
-            </button>
+            {/* Scheduling Section */}
+            <div className="bg-slate-700/30 rounded-lg p-3">
+              <label className="label mb-2">Planen (optional)</label>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  className="input text-sm"
+                  min={new Date().toISOString().split('T')[0]}
+                />
+                <input
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="input text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={sendDiscordMutation.isPending || !title.trim() || !content.trim()}
+                className="flex-1 btn-primary flex items-center justify-center gap-2 py-2.5"
+              >
+                <Send className="h-4 w-4" />
+                {sendDiscordMutation.isPending ? 'Wird gesendet...' : `An #${selectedChannel?.name || 'Kanal'} senden`}
+              </button>
+              {scheduleDate && scheduleTime && title.trim() && content.trim() && (
+                <button
+                  type="button"
+                  onClick={handleSchedule}
+                  disabled={scheduleMutation.isPending}
+                  className="px-3 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg flex items-center gap-2 text-sm"
+                  title="Ankündigung planen"
+                >
+                  <Clock className="h-4 w-4" />
+                  {scheduleMutation.isPending ? '...' : 'Planen'}
+                </button>
+              )}
+              {title.trim() && content.trim() && (
+                <button
+                  type="button"
+                  onClick={saveCurrentAsTemplate}
+                  className="px-3 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg flex items-center gap-2 text-sm"
+                  title="Als Vorlage speichern"
+                >
+                  <Save className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </form>
-        ) : (
+        ) : activeTab === 'inapp' ? (
           // In-App Notification Form
           <form onSubmit={handleInAppSubmit} className="space-y-3">
             <div>
@@ -682,8 +1023,252 @@ function AnnouncementsWidget() {
                   : `An ${selectedRoles.length} Rolle(n) senden`}
             </button>
           </form>
+        ) : activeTab === 'templates' ? (
+          // Templates Tab
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-400">Gespeicherte Vorlagen</p>
+              <button
+                onClick={openCreateTemplateModal}
+                className="text-xs bg-primary-600 hover:bg-primary-700 text-white px-2 py-1 rounded flex items-center gap-1"
+              >
+                <Plus className="h-3 w-3" /> Neue Vorlage
+              </button>
+            </div>
+
+            {templates.length === 0 ? (
+              <div className="text-center py-8">
+                <FileText className="h-10 w-10 text-slate-600 mx-auto mb-2" />
+                <p className="text-slate-500 text-sm">Keine Vorlagen vorhanden</p>
+                <p className="text-slate-600 text-xs mt-1">Erstelle eine neue Vorlage oder speichere eine Ankündigung als Vorlage</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                {templates.map((template) => (
+                  <div key={template.id} className="bg-slate-700/30 rounded-lg p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-white text-sm">{template.name}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                            template.category === 'IC' ? 'bg-green-600/20 text-green-400' :
+                            template.category === 'OOC' ? 'bg-blue-600/20 text-blue-400' :
+                            'bg-slate-600/50 text-slate-400'
+                          }`}>
+                            {template.category}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1 line-clamp-1">{template.title}</p>
+                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{template.content}</p>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => loadTemplate(template)}
+                          className="p-1.5 text-slate-400 hover:text-primary-400 hover:bg-slate-600 rounded"
+                          title="Vorlage verwenden"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => openEditTemplateModal(template)}
+                          className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-600 rounded"
+                          title="Bearbeiten"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => deleteTemplateMutation.mutate(template.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded"
+                          title="Löschen"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          // Scheduled Tab
+          <div className="space-y-3">
+            <p className="text-sm text-slate-400">Geplante Ankündigungen</p>
+
+            {scheduledAnnouncements.length === 0 ? (
+              <div className="text-center py-8">
+                <Clock className="h-10 w-10 text-slate-600 mx-auto mb-2" />
+                <p className="text-slate-500 text-sm">Keine geplanten Ankündigungen</p>
+                <p className="text-slate-600 text-xs mt-1">Plane eine Ankündigung im Discord-Tab</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                {scheduledAnnouncements.map((announcement) => (
+                  <div key={announcement.id} className={`bg-slate-700/30 rounded-lg p-3 ${announcement.status === 'FAILED' ? 'border border-red-500/50' : ''}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-white text-sm">{announcement.title}</span>
+                          {announcement.status === 'FAILED' && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-600/20 text-red-400 flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              Fehlgeschlagen
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1 line-clamp-1">{announcement.content}</p>
+                        <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-500">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatScheduledDate(announcement.scheduledAt)}
+                          </span>
+                          {announcement.channelName && (
+                            <span className="flex items-center gap-1">
+                              <Hash className="h-3 w-3" />
+                              {announcement.channelName}
+                            </span>
+                          )}
+                        </div>
+                        {announcement.errorMessage && (
+                          <p className="text-xs text-red-400 mt-1">{announcement.errorMessage}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => cancelScheduledMutation.mutate(announcement.id)}
+                        className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded flex-shrink-0"
+                        title="Abbrechen"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
+
+      {/* Template Modal */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-slate-800/95 backdrop-blur-xl rounded-2xl p-6 w-full max-w-md mx-4 border border-slate-700/50 shadow-2xl shadow-black/50 animate-scale-in">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-white">
+                {editingTemplate ? 'Vorlage bearbeiten' : 'Neue Vorlage'}
+              </h2>
+              <button onClick={closeTemplateModal} className="p-1 hover:bg-slate-700 rounded">
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+            <form onSubmit={handleTemplateSubmit} className="space-y-3">
+              <div>
+                <label className="label">Vorlagenname *</label>
+                <input
+                  type="text"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  className="input"
+                  placeholder="z.B. Wöchentliches Update"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="label">Kategorie</label>
+                <div className="flex gap-2">
+                  {['GENERAL', 'IC', 'OOC'].map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setTemplateCategory(cat)}
+                      className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
+                        templateCategory === cat
+                          ? 'bg-primary-600/30 text-primary-400 border border-primary-500'
+                          : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Standard-Kanal</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTemplateChannelId('')}
+                    className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
+                      !templateChannelId
+                        ? 'bg-primary-600/30 text-primary-400 border border-primary-500'
+                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                    }`}
+                  >
+                    Keiner
+                  </button>
+                  {channels.slice(0, 4).map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setTemplateChannelId(c.id)}
+                      className={`py-2 px-3 rounded text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
+                        templateChannelId === c.id
+                          ? 'bg-primary-600/30 text-primary-400 border border-primary-500'
+                          : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                      }`}
+                    >
+                      <Hash className="h-3 w-3" />
+                      {c.name.replace('Ankündigungen', '').trim()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Titel *</label>
+                <input
+                  type="text"
+                  value={templateTitle}
+                  onChange={(e) => setTemplateTitle(e.target.value)}
+                  className="input"
+                  placeholder="Ankündigungstitel..."
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="label">Inhalt *</label>
+                <textarea
+                  value={templateContent}
+                  onChange={(e) => setTemplateContent(e.target.value)}
+                  className="input h-24 resize-none"
+                  placeholder="Ankündigungstext..."
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={closeTemplateModal} className="btn-ghost">
+                  Abbrechen
+                </button>
+                <button
+                  type="submit"
+                  disabled={createTemplateMutation.isPending || updateTemplateMutation.isPending}
+                  className="btn-primary"
+                >
+                  {createTemplateMutation.isPending || updateTemplateMutation.isPending
+                    ? '...'
+                    : editingTemplate
+                      ? 'Speichern'
+                      : 'Erstellen'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

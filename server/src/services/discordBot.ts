@@ -1,6 +1,6 @@
 import { Client, GatewayIntentBits, EmbedBuilder, TextChannel, Guild, ChannelType, GuildMember } from 'discord.js';
 import { prisma } from '../prisma.js';
-import { setDiscordClient, announceTermination } from './discordAnnouncements.js';
+import { setDiscordClient, announceTermination, announceMemberJoin, announceMemberLeave } from './discordAnnouncements.js';
 import { emitEmployeeTerminated } from './socketService.js';
 
 let client: Client | null = null;
@@ -241,19 +241,65 @@ export async function initializeDiscordBot(): Promise<void> {
   });
 
   client.on('guildMemberAdd', async (member) => {
-    console.log(`Neues Mitglied: ${member.user.tag}`);
-    // Hier könnte eine Willkommensnachricht gesendet werden
+    console.log(`[Discord] Neues Mitglied: ${member.user.tag} (${member.id})`);
+
+    try {
+      // Discord Join-Ankündigung senden
+      const avatarUrl = member.user.avatar
+        ? `https://cdn.discordapp.com/avatars/${member.id}/${member.user.avatar}.png`
+        : null;
+
+      await announceMemberJoin({
+        username: member.user.username,
+        displayName: member.displayName || member.user.displayName || null,
+        discordId: member.id,
+        avatarUrl,
+        accountCreatedAt: member.user.createdAt,
+      });
+
+      console.log(`[Discord] Beitritts-Benachrichtigung für ${member.user.tag} gesendet`);
+    } catch (error) {
+      console.error('[Discord] Fehler bei Beitritts-Ankündigung:', error);
+    }
   });
 
   client.on('guildMemberRemove', async (member) => {
     console.log(`[Discord] Mitglied verlassen: ${member.user.tag} (${member.id})`);
 
     try {
+      // Avatar URL erstellen
+      const avatarUrl = member.user.avatar
+        ? `https://cdn.discordapp.com/avatars/${member.id}/${member.user.avatar}.png`
+        : null;
+
       // Finde den User und Employee
       const user = await prisma.user.findUnique({
         where: { discordId: member.id },
       });
 
+      // Finde aktiven Employee (falls vorhanden)
+      let employee = null;
+      if (user) {
+        employee = await prisma.employee.findUnique({
+          where: { userId: user.id },
+        });
+      }
+
+      // Leave-Ankündigung immer senden (für alle Mitglieder)
+      await announceMemberLeave({
+        username: member.user.username,
+        displayName: member.displayName || member.user.displayName || null,
+        discordId: member.id,
+        avatarUrl,
+        wasEmployee: !!(employee && employee.status === 'ACTIVE'),
+        employeeName: user?.displayName || user?.username,
+        employeeRank: employee?.rank,
+        employeeBadge: employee?.badgeNumber,
+      });
+
+      console.log(`[Discord] Austritts-Benachrichtigung für ${member.user.tag} gesendet`);
+
+      // Wenn kein User im System, hier beenden
       if (!user) {
         console.log(`[Discord] Kein User für Discord ID ${member.id} gefunden`);
         return;
@@ -263,11 +309,6 @@ export async function initializeDiscordBot(): Promise<void> {
       await prisma.user.update({
         where: { id: user.id },
         data: { isActive: false },
-      });
-
-      // Finde aktiven Employee
-      const employee = await prisma.employee.findUnique({
-        where: { userId: user.id },
       });
 
       if (!employee) {
@@ -1484,3 +1525,42 @@ export async function findDiscordMember(query: string): Promise<{ found: boolean
 
 // Exportiere getTeamConfigForLevel für externe Verwendung
 export { client, getTeamConfigForLevel };
+
+// Generische Nachricht an einen Kanal senden (mit Embeds)
+export async function sendMessage(
+  channelId: string,
+  options: { content?: string; embeds?: import('discord.js').EmbedBuilder[] }
+): Promise<boolean> {
+  try {
+    const guild = await getGuild();
+    if (!guild) {
+      console.error('[DiscordBot] sendMessage: Keine Guild gefunden');
+      return false;
+    }
+
+    const channel = await guild.channels.fetch(channelId).catch(() => null);
+    if (!channel || !channel.isTextBased()) {
+      console.error(`[DiscordBot] sendMessage: Kanal ${channelId} nicht gefunden oder kein Text-Kanal`);
+      return false;
+    }
+
+    await (channel as import('discord.js').TextChannel).send(options);
+    return true;
+  } catch (error) {
+    console.error('[DiscordBot] sendMessage Fehler:', error);
+    return false;
+  }
+}
+
+// System-Einstellung abrufen
+export async function getSystemSetting(key: string): Promise<string | null> {
+  try {
+    const setting = await prisma.systemSetting.findUnique({
+      where: { key },
+    });
+    return setting?.value || null;
+  } catch (error) {
+    console.error(`[DiscordBot] getSystemSetting(${key}) Fehler:`, error);
+    return null;
+  }
+}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../services/api';
-import { Settings as SettingsIcon, RefreshCw, Database, Bot, Save, UserPlus, X, Key, Copy, Eye, EyeOff } from 'lucide-react';
+import { Settings as SettingsIcon, RefreshCw, Database, Bot, Save, UserPlus, X, Key, Copy, Eye, EyeOff, Twitch } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface DiscordInfo {
@@ -341,6 +341,59 @@ export default function Settings() {
           >
             <Save className="h-4 w-4" />
             Rollen-Einstellungen speichern
+          </button>
+        </div>
+      </div>
+
+      {/* Twitch Benachrichtigungen */}
+      <div className="card">
+        <div className="card-header flex items-center gap-2">
+          <Twitch className="h-5 w-5 text-purple-400" />
+          <h2 className="font-semibold text-white">Twitch Benachrichtigungen</h2>
+        </div>
+        <div className="card-body space-y-4">
+          <p className="text-sm text-slate-400">
+            Konfiguriere den Discord-Kanal für Twitch-Live-Benachrichtigungen.
+          </p>
+
+          <div>
+            <label className="label">Benachrichtigungs-Kanal</label>
+            <select
+              className="input"
+              value={settings.twitch_notification_channel || ''}
+              onChange={(e) => setSettings({ ...settings, twitch_notification_channel: e.target.value })}
+            >
+              <option value="">-- Kanal auswählen --</option>
+              {discordInfo?.channels.map((channel) => (
+                <option key={channel.id} value={channel.id}>
+                  #{channel.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-500 mt-1">
+              In diesen Kanal werden Benachrichtigungen gesendet, wenn ein Streamer live geht.
+            </p>
+          </div>
+
+          {settings.twitch_notification_channel && (
+            <div className="p-3 bg-purple-900/20 border border-purple-700/30 rounded-lg">
+              <p className="text-xs text-purple-400">
+                Benachrichtigungen werden in{' '}
+                <span className="font-medium">
+                  #{discordInfo?.channels.find(c => c.id === settings.twitch_notification_channel)?.name || settings.twitch_notification_channel}
+                </span>{' '}
+                gesendet
+              </p>
+            </div>
+          )}
+
+          <button
+            onClick={handleSave}
+            disabled={updateSettingsMutation.isPending}
+            className="btn-primary w-full"
+          >
+            <Save className="h-4 w-4" />
+            Twitch-Einstellungen speichern
           </button>
         </div>
       </div>

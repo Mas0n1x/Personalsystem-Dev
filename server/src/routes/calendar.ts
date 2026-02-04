@@ -6,6 +6,57 @@ import { sendCalendarReminder } from '../services/calendarService.js';
 
 const router = Router();
 
+// Hilfsfunktion: Generiert virtuelle Instanzen für wiederkehrende Events
+function generateRecurringInstances(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  event: any,
+  viewStart: Date,
+  viewEnd: Date
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any[] {
+  const instances = [];
+  const eventStart = new Date(event.startDate);
+  const eventEnd = event.endDate ? new Date(event.endDate) : null;
+  const duration = eventEnd ? eventEnd.getTime() - eventStart.getTime() : 0;
+
+  // Wenn nicht wiederholend, nur das Original zurückgeben wenn im Bereich
+  if (event.repeatType !== 'WEEKLY') {
+    if (eventStart >= viewStart && eventStart <= viewEnd) {
+      return [event];
+    }
+    return [];
+  }
+
+  // Wöchentliche Wiederholung
+  const repeatUntil = event.repeatUntil ? new Date(event.repeatUntil) : viewEnd;
+  const effectiveEnd = repeatUntil < viewEnd ? repeatUntil : viewEnd;
+
+  let currentDate = new Date(eventStart);
+
+  // Wenn Event vor dem Viewstart beginnt, zum ersten relevanten Datum springen
+  while (currentDate < viewStart) {
+    currentDate.setDate(currentDate.getDate() + 7);
+  }
+
+  // Generiere Instanzen bis zum Ende des Bereichs
+  while (currentDate <= effectiveEnd) {
+    const instanceEnd = eventEnd ? new Date(currentDate.getTime() + duration) : null;
+
+    instances.push({
+      ...event,
+      id: `${event.id}_${currentDate.toISOString()}`, // Eindeutige ID für Instanz
+      originalEventId: event.id,
+      startDate: new Date(currentDate),
+      endDate: instanceEnd,
+      isRecurringInstance: currentDate.getTime() !== eventStart.getTime(),
+    });
+
+    currentDate.setDate(currentDate.getDate() + 7);
+  }
+
+  return instances;
+}
+
 // GET alle Kalender-Events (mit optionalem Datumsbereich)
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
@@ -17,18 +68,34 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 
     const { start, end, category } = req.query;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = {};
+    // Bestimme View-Bereich (Standard: aktueller Monat +/- 1 Monat)
+    const viewStart = start ? new Date(start as string) : new Date(new Date().setMonth(new Date().getMonth() - 1));
+    const viewEnd = end ? new Date(end as string) : new Date(new Date().setMonth(new Date().getMonth() + 2));
 
-    if (start || end) {
-      where.startDate = {};
-      if (start) {
-        where.startDate.gte = new Date(start as string);
-      }
-      if (end) {
-        where.startDate.lte = new Date(end as string);
-      }
-    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = {
+      OR: [
+        // Nicht-wiederkehrende Events im Bereich
+        {
+          repeatType: 'NONE',
+          startDate: {
+            gte: viewStart,
+            lte: viewEnd,
+          },
+        },
+        // Wiederkehrende Events, die vor oder während des Bereichs beginnen
+        {
+          repeatType: 'WEEKLY',
+          startDate: {
+            lte: viewEnd,
+          },
+          OR: [
+            { repeatUntil: null },
+            { repeatUntil: { gte: viewStart } },
+          ],
+        },
+      ],
+    };
 
     if (category && category !== 'ALL') {
       where.category = category as string;
@@ -48,7 +115,18 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       orderBy: { startDate: 'asc' },
     });
 
-    res.json(events);
+    // Generiere Instanzen für wiederkehrende Events
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const allEvents: any[] = [];
+    for (const event of events) {
+      const instances = generateRecurringInstances(event, viewStart, viewEnd);
+      allEvents.push(...instances);
+    }
+
+    // Sortiere nach Startdatum
+    allEvents.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+
+    res.json(allEvents);
   } catch (error) {
     console.error('Get calendar events error:', error);
     res.status(500).json({ error: 'Fehler beim Abrufen der Termine' });
@@ -137,6 +215,8 @@ router.post('/', authMiddleware, requirePermission('calendar.manage'), async (re
       discordRoleIds,
       notifyEmployeeIds,
       reminderMinutes,
+      repeatType,
+      repeatUntil,
     } = req.body;
 
     if (!title || !startDate) {
@@ -157,6 +237,8 @@ router.post('/', authMiddleware, requirePermission('calendar.manage'), async (re
         discordRoleIds: discordRoleIds ? JSON.stringify(discordRoleIds) : null,
         notifyEmployeeIds: notifyEmployeeIds ? JSON.stringify(notifyEmployeeIds) : null,
         reminderMinutes: reminderMinutes || null,
+        repeatType: repeatType || 'NONE',
+        repeatUntil: repeatUntil ? new Date(repeatUntil) : null,
         createdById: req.user!.id,
       },
       include: {
@@ -196,6 +278,8 @@ router.put('/:id', authMiddleware, requirePermission('calendar.manage'), async (
       discordRoleIds,
       notifyEmployeeIds,
       reminderMinutes,
+      repeatType,
+      repeatUntil,
     } = req.body;
 
     const event = await prisma.calendarEvent.update({
@@ -212,6 +296,8 @@ router.put('/:id', authMiddleware, requirePermission('calendar.manage'), async (
         discordRoleIds: discordRoleIds ? JSON.stringify(discordRoleIds) : null,
         notifyEmployeeIds: notifyEmployeeIds ? JSON.stringify(notifyEmployeeIds) : null,
         reminderMinutes,
+        repeatType,
+        repeatUntil: repeatUntil ? new Date(repeatUntil) : null,
         // Reset reminderSent wenn sich Startdatum oder Erinnerungszeit ändert
         reminderSent: false,
       },

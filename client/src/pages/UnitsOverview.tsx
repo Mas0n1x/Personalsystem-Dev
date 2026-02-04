@@ -70,6 +70,12 @@ interface UnitRole {
   isLeadership: boolean;
 }
 
+interface LeadershipMember {
+  id: string;
+  name: string;
+  rank: string;
+}
+
 interface Unit {
   id: string;
   name: string;
@@ -82,6 +88,7 @@ interface Unit {
   roles: UnitRole[];
   memberCount?: number;
   leadershipCount?: number;
+  leadership?: LeadershipMember[];
 }
 
 interface UnitMember {
@@ -253,6 +260,20 @@ export default function UnitsOverview() {
                     <p className="text-sm text-slate-400 truncate mt-0.5">
                       {unit.description}
                     </p>
+                  )}
+                  {/* Leadership Preview */}
+                  {unit.leadership && unit.leadership.length > 0 && (
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <Crown className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
+                      <span className="text-xs text-amber-400/80">
+                        {unit.leadership.map((leader, idx) => (
+                          <span key={leader.id}>
+                            {leader.name}
+                            {idx < unit.leadership!.length - 1 && ', '}
+                          </span>
+                        ))}
+                      </span>
+                    </div>
                   )}
                 </div>
                 <div className="flex items-center gap-6">
