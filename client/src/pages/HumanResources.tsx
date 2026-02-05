@@ -346,9 +346,8 @@ export default function HumanResources() {
       toast.success(response.data.message || 'Bewerbung abgeschlossen');
     },
     onError: (error: { response?: { data?: { error?: string; message?: string } } }) => {
-      if (error.response?.data?.error === 'BLACKLISTED') {
-        toast.error(error.response.data.message || 'Bewerber ist auf der Blacklist');
-      }
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || 'Fehler beim Abschließen der Bewerbung';
+      toast.error(errorMsg);
     },
   });
 
@@ -673,15 +672,27 @@ export default function HumanResources() {
     }
   }, [selectedApplication, updateOnboardingMutation, onboardingCompleted, detailDiscordId, detailDiscordUsername, discordInviteLink, discordRolesAssigned]);
 
-  const handleComplete = useCallback(() => {
+  const handleComplete = useCallback(async () => {
     if (selectedApplication) {
       if (!detailDiscordId) {
         toast.error('Discord ID ist erforderlich');
         return;
       }
-      completeApplicationMutation.mutate(selectedApplication.id);
+      // Erst Discord-Daten speichern, dann abschließen
+      try {
+        await applicationApi.updateOnboarding(selectedApplication.id, {
+          onboardingCompleted,
+          discordId: detailDiscordId,
+          discordUsername: detailDiscordUsername || undefined,
+          discordInviteLink: discordInviteLink || undefined,
+          discordRolesAssigned,
+        });
+        completeApplicationMutation.mutate(selectedApplication.id);
+      } catch (error) {
+        toast.error('Fehler beim Speichern der Discord-Daten');
+      }
     }
-  }, [selectedApplication, detailDiscordId, completeApplicationMutation]);
+  }, [selectedApplication, detailDiscordId, detailDiscordUsername, discordInviteLink, discordRolesAssigned, onboardingCompleted, completeApplicationMutation]);
 
   // Permission checks - memoized
   const canManageBlacklist = useMemo(() => hasAnyPermission('blacklist.manage', 'admin.full'), [hasAnyPermission]);

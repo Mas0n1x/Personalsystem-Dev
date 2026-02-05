@@ -1054,7 +1054,10 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
 
     if (existingEmployee) {
       if (existingEmployee.status === 'ACTIVE') {
-        res.status(400).json({ error: 'Diese Person ist bereits als aktiver Mitarbeiter registriert' });
+        res.status(400).json({
+          error: 'ALREADY_ACTIVE',
+          message: `Diese Discord ID gehört bereits zum aktiven Mitarbeiter: ${user.displayName || user.username} (Dienstnummer: ${existingEmployee.badgeNumber || 'N/A'})`
+        });
         return;
       }
 
@@ -1283,8 +1286,28 @@ router.put('/:id/complete', authMiddleware, requirePermission('hr.manage'), asyn
       employee,
       message: `${application.applicantName} wurde als ${startRank} eingestellt`,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Complete application error:', error);
+
+    // Prisma Unique Constraint Error behandeln
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+      const prismaError = error as { meta?: { target?: string[] } };
+      if (prismaError.meta?.target?.includes('userId')) {
+        res.status(400).json({
+          error: 'ALREADY_EXISTS',
+          message: 'Ein Mitarbeiter mit dieser Discord ID existiert bereits im System. Bitte prüfen Sie ob der Bewerber bereits eingestellt wurde.'
+        });
+        return;
+      }
+      if (prismaError.meta?.target?.includes('badgeNumber')) {
+        res.status(400).json({
+          error: 'BADGE_EXISTS',
+          message: 'Diese Dienstnummer ist bereits vergeben. Bitte versuchen Sie es erneut.'
+        });
+        return;
+      }
+    }
+
     res.status(500).json({ error: 'Fehler beim Abschließen der Bewerbung' });
   }
 });

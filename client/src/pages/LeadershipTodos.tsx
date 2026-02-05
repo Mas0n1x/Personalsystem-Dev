@@ -15,6 +15,7 @@ import clsx from 'clsx';
 
 interface LeadershipUser {
   id: string;
+  discordId: string;
   displayName: string | null;
   username: string;
   avatar: string | null;
@@ -96,6 +97,8 @@ export default function LeadershipTodos() {
 
   const getAvatarUrl = (discordId: string, avatar: string | null) => {
     if (!avatar) return null;
+    // Falls avatar bereits eine vollständige URL ist, direkt zurückgeben
+    if (avatar.startsWith('http')) return avatar;
     return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.png`;
   };
 
@@ -155,7 +158,7 @@ export default function LeadershipTodos() {
                 >
                   {user.avatar ? (
                     <img
-                      src={getAvatarUrl(user.id, user.avatar) || ''}
+                      src={getAvatarUrl(user.discordId, user.avatar) || ''}
                       alt={user.displayName || user.username}
                       className="w-10 h-10 rounded-full"
                     />

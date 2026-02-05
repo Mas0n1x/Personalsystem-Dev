@@ -22,6 +22,10 @@ import {
   Users,
   Award,
   X,
+  Radio,
+  FolderOpen,
+  BookOpen,
+  ExternalLink,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { formatDistanceToNow } from 'date-fns';
@@ -138,6 +142,40 @@ export default function Header() {
       {/* Left side - Breadcrumb / Title */}
       <div>
         <h2 className="text-lg font-semibold text-white">Willkommen zurück!</h2>
+      </div>
+
+      {/* Center - Quick Links */}
+      <div className="flex items-center gap-2">
+        <a
+          href="https://leitstelle-cc.de"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-red-600/20 to-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 hover:border-red-500/50 transition-all group"
+        >
+          <Radio className="h-4 w-4" />
+          <span className="text-sm font-medium">Leitstelle</span>
+          <ExternalLink className="h-3 w-3 opacity-50 group-hover:opacity-100 transition-opacity" />
+        </a>
+        <a
+          href="https://akten.corleonecity.de"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-600/20 to-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50 transition-all group"
+        >
+          <FolderOpen className="h-4 w-4" />
+          <span className="text-sm font-medium">Akten</span>
+          <ExternalLink className="h-3 w-3 opacity-50 group-hover:opacity-100 transition-opacity" />
+        </a>
+        <a
+          href="https://diensthandbuch.corleone-lspd.de"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600/20 to-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 hover:border-blue-500/50 transition-all group"
+        >
+          <BookOpen className="h-4 w-4" />
+          <span className="text-sm font-medium">Handbuch</span>
+          <ExternalLink className="h-3 w-3 opacity-50 group-hover:opacity-100 transition-opacity" />
+        </a>
       </div>
 
       {/* Right side - Actions */}

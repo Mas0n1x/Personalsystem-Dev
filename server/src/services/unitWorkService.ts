@@ -49,6 +49,46 @@ export async function getOrCreateWeeklyLog(unitId: string) {
   return log;
 }
 
+// Holt oder erstellt den Log-Eintrag für die aktuelle Woche eines Mitarbeiters
+export async function getOrCreateEmployeeWeeklyLog(employeeId: string) {
+  const { weekStart, weekEnd } = getCurrentWeekRange();
+
+  let log = await prisma.employeeWorkLog.findUnique({
+    where: {
+      employeeId_weekStart: {
+        employeeId,
+        weekStart,
+      },
+    },
+  });
+
+  if (!log) {
+    log = await prisma.employeeWorkLog.create({
+      data: {
+        employeeId,
+        weekStart,
+        weekEnd,
+      },
+    });
+  }
+
+  return log;
+}
+
+// Erhöht einen Aktivitäts-Zähler für einen Mitarbeiter
+export async function incrementEmployeeActivity(employeeId: string, activityType: ActivityType, count = 1) {
+  const log = await getOrCreateEmployeeWeeklyLog(employeeId);
+
+  return prisma.employeeWorkLog.update({
+    where: { id: log.id },
+    data: {
+      [activityType]: {
+        increment: count,
+      },
+    },
+  });
+}
+
 // Aktivitäts-Typen
 export type ActivityType =
   | 'casesCompleted'
@@ -139,12 +179,83 @@ export async function trackActivityByUserId(
   activityType: ActivityType,
   count = 1
 ): Promise<void> {
+  // Auch Mitarbeiter-Aktivität tracken
+  try {
+    const employee = await prisma.employee.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (employee) {
+      await incrementEmployeeActivity(employee.id, activityType, count);
+      console.log(`[UnitWorkService] ${activityType} +${count} für Mitarbeiter ${employee.id}`);
+    }
+  } catch (error) {
+    console.error('[UnitWorkService] Fehler beim Mitarbeiter-Tracking:', error);
+  }
+
+  // Unit-Aktivität tracken
   const discordId = await getDiscordIdByUserId(userId);
   if (!discordId) {
     console.log(`[UnitWorkService] Keine Discord-ID für User ${userId} gefunden`);
     return;
   }
   await trackUserActivity(discordId, activityType, count);
+}
+
+// Holt die Statistiken aller Mitarbeiter für die aktuelle Woche
+export async function getCurrentEmployeeWeekStats() {
+  const { weekStart, weekEnd } = getCurrentWeekRange();
+
+  // Alle Mitarbeiter-Logs für diese Woche mit Aktivität holen
+  const logs = await prisma.employeeWorkLog.findMany({
+    where: {
+      weekStart: weekStart,
+      OR: [
+        { casesCompleted: { gt: 0 } },
+        { tasksCompleted: { gt: 0 } },
+        { trainingsCompleted: { gt: 0 } },
+        { investigationsCompleted: { gt: 0 } },
+        { applicationsProcessed: { gt: 0 } },
+      ],
+    },
+    include: {
+      employee: {
+        include: {
+          user: {
+            select: {
+              displayName: true,
+              username: true,
+              avatar: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: [
+      { casesCompleted: 'desc' },
+      { tasksCompleted: 'desc' },
+      { applicationsProcessed: 'desc' },
+    ],
+  });
+
+  return logs.map(log => ({
+    employeeId: log.employeeId,
+    employeeName: log.employee.user.displayName || log.employee.user.username,
+    badgeNumber: log.employee.badgeNumber,
+    rank: log.employee.rank,
+    avatar: log.employee.user.avatar,
+    weekStart,
+    weekEnd,
+    stats: {
+      casesCompleted: log.casesCompleted,
+      tasksCompleted: log.tasksCompleted,
+      trainingsCompleted: log.trainingsCompleted,
+      investigationsCompleted: log.investigationsCompleted,
+      applicationsProcessed: log.applicationsProcessed,
+      total: log.casesCompleted + log.tasksCompleted + log.trainingsCompleted +
+             log.investigationsCompleted + log.applicationsProcessed,
+    },
+  }));
 }
 
 // Holt die Statistiken aller Units für die aktuelle Woche

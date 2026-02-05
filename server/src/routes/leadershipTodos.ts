@@ -205,22 +205,19 @@ router.put('/:userId', requirePermission('leadership.view'), async (req: AuthReq
 // GET alle Leadership-User (für die Übersicht, wer Listen haben kann)
 router.get('/users', requirePermission('leadership.view'), async (_req: AuthRequest, res: Response) => {
   try {
-    // Hole alle User mit leadership.view Permission
+    // Hole nur User mit der "Leadership" Rolle
     const users = await prisma.user.findMany({
       where: {
         isActive: true,
         roles: {
           some: {
-            permissions: {
-              some: {
-                name: { in: ['leadership.view', 'leadership.manage', 'admin.full'] },
-              },
-            },
+            name: 'Leadership',
           },
         },
       },
       select: {
         id: true,
+        discordId: true,
         displayName: true,
         username: true,
         avatar: true,

@@ -622,13 +622,13 @@ export default function Detectives() {
         </div>
 
         {/* Cases List */}
-        <div className="card">
+        <div className="card overflow-hidden">
           <div className="p-4 border-b border-slate-700">
             <h2 className="font-semibold text-white">
               Ermittlungsakten ({filteredCases.length})
             </h2>
           </div>
-          <div className="divide-y divide-slate-700">
+          <div className="divide-y divide-slate-700 overflow-hidden">
             {folderDetailLoading ? (
               <div className="p-12 text-center">
                 <RefreshCw className="h-8 w-8 text-slate-400 animate-spin mx-auto" />
@@ -640,15 +640,15 @@ export default function Detectives() {
               </div>
             ) : (
               filteredCases.map((caseItem) => (
-                <div key={caseItem.id} className="p-4 hover:bg-slate-750 transition-colors">
-                  <div className="flex items-center gap-4">
+                <div key={caseItem.id} className="p-4 hover:bg-slate-750 transition-colors overflow-hidden">
+                  <div className="flex items-center gap-4 overflow-hidden">
                     <div className="p-3 bg-purple-600/20 rounded-xl">
                       <FileText className="h-5 w-5 text-purple-400" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-mono text-sm text-purple-400">{caseItem.caseNumber}</span>
-                        <span className="font-medium text-white">{caseItem.title}</span>
+                        <span className="font-medium text-white truncate max-w-md">{caseItem.title}</span>
                         {getStatusBadge(caseItem.status)}
                         {getPriorityBadge(caseItem.priority)}
                         {caseItem._count && caseItem._count.images > 0 && (
@@ -659,7 +659,7 @@ export default function Detectives() {
                         )}
                       </div>
                       {caseItem.description && (
-                        <p className="text-sm text-slate-400 truncate">{caseItem.description}</p>
+                        <p className="text-sm text-slate-400 line-clamp-2 break-words">{caseItem.description}</p>
                       )}
                       <div className="flex items-center gap-4 text-xs text-slate-500 mt-1">
                         <span>Erstellt: {formatDate(caseItem.createdAt)}</span>

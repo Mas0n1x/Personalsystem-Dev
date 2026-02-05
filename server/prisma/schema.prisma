@@ -134,6 +134,7 @@ model Employee {
   civilianServiceSessions CivilianServiceSession[] @relation("CivilianServiceSessions")
   iaNotes                IANote[] @relation("IANotes")
   iaCheckLocks           IACheckLock[] @relation("IACheckLocks")
+  workLogs               EmployeeWorkLog[] @relation("EmployeeWorkLogs")
 
   @@index([status])
   @@index([rankLevel])
@@ -1297,6 +1298,30 @@ model UnitWorkLog {
   @@index([unitId])
   @@index([weekStart])
   @@map("unit_work_logs")
+}
+
+// Mitarbeiter-Aktivitäten Wochenstatistik (pro Mitarbeiter)
+model EmployeeWorkLog {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation("EmployeeWorkLogs", fields: [employeeId], references: [id], onDelete: Cascade)
+  weekStart       DateTime                                        // Montag 00:00 der Woche
+  weekEnd         DateTime                                        // Sonntag 23:59 der Woche
+
+  // Aktivitäten-Zähler
+  casesCompleted          Int       @default(0)                   // Abgeschlossene Fälle
+  tasksCompleted          Int       @default(0)                   // Abgeschlossene Aufgaben
+  trainingsCompleted      Int       @default(0)                   // Durchgeführte Ausbildungen
+  investigationsCompleted Int       @default(0)                   // Abgeschlossene Ermittlungen
+  applicationsProcessed   Int       @default(0)                   // Bearbeitete Bewerbungen
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([employeeId, weekStart])
+  @@index([employeeId])
+  @@index([weekStart])
+  @@map("employee_work_logs")
 }
 
 // ==================== LEADERSHIP TODO LISTS ====================

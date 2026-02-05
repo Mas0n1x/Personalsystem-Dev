@@ -978,19 +978,27 @@ router.post('/:id/terminate', authMiddleware, requirePermission('employees.delet
       },
     });
 
+    // WICHTIG: Erst Employee Status ändern, dann kicken!
+    // So erkennt das guildMemberRemove Event dass bereits gekündigt wurde
+    await prisma.employee.update({
+      where: { id: req.params.id },
+      data: { status: 'TERMINATED' },
+    });
+
+    await prisma.user.update({
+      where: { id: employee.userId },
+      data: { isActive: false },
+    });
+
     const kickResult = await kickMember(employee.user.discordId, reason || 'Kündigung');
 
     if (!kickResult.success) {
       console.warn(`Discord-Kick fehlgeschlagen: ${kickResult.error}`);
     }
 
+    // Jetzt erst löschen (nach dem Kick)
     await prisma.employee.delete({
       where: { id: req.params.id },
-    });
-
-    await prisma.user.update({
-      where: { id: employee.userId },
-      data: { isActive: false },
     });
 
     // Discord Announcement senden

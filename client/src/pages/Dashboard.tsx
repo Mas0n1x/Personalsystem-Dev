@@ -145,6 +145,24 @@ interface UnitWorkStats {
   };
 }
 
+interface EmployeeWorkStats {
+  employeeId: string;
+  employeeName: string;
+  badgeNumber: string | null;
+  rank: string;
+  avatar: string | null;
+  weekStart: string;
+  weekEnd: string;
+  stats: {
+    casesCompleted: number;
+    tasksCompleted: number;
+    trainingsCompleted: number;
+    investigationsCompleted: number;
+    applicationsProcessed: number;
+    total: number;
+  };
+}
+
 interface DashboardStats {
   stats: {
     totalEmployees: number;
@@ -430,12 +448,22 @@ export default function Dashboard() {
     refetchInterval: 60000,
   });
 
+  const { data: employeeWorkData } = useQuery({
+    queryKey: ['employee-work-stats'],
+    queryFn: async () => {
+      const res = await unitWorkApi.getEmployeeCurrentStats();
+      return res.data as EmployeeWorkStats[];
+    },
+    refetchInterval: 60000,
+  });
+
   const stats = statsData?.stats;
   const teamDistribution = statsData?.teamDistribution || [];
   const activeAbsences = activeAbsencesData?.data as ActiveAbsence[] | undefined;
   const myBonus = myBonusData;
   const upcomingEvents = upcomingEventsData || [];
   const unitWorkStats = unitWorkData || [];
+  const employeeWorkStats = employeeWorkData || [];
 
   // Team-Farben als stabile Referenz - MEMOIZED
   const getTeamColor = useCallback((team: string) => {
@@ -759,102 +787,100 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Unit-Arbeit Übersicht */}
-      {unitWorkStats.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="card-header flex items-center justify-between border-b border-slate-700/50">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-indigo-400" />
-              Unit-Arbeit diese Woche
-            </h2>
-            {unitWorkStats[0]?.weekStart && (
-              <span className="text-xs text-slate-400">
-                {new Date(unitWorkStats[0].weekStart).toLocaleDateString('de-DE')} - {new Date(unitWorkStats[0].weekEnd).toLocaleDateString('de-DE')}
-              </span>
-            )}
-          </div>
-          <div className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {unitWorkStats
-                .filter(unit => unit.stats.total > 0)
+      {/* Mitarbeiter-Arbeit Übersicht */}
+      <div className="card overflow-hidden">
+        <div className="card-header flex items-center justify-between border-b border-slate-700/50">
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <Users className="h-5 w-5 text-indigo-400" />
+            Mitarbeiter-Aktivität diese Woche
+          </h2>
+          {employeeWorkStats[0]?.weekStart && (
+            <span className="text-xs text-slate-400">
+              {new Date(employeeWorkStats[0].weekStart).toLocaleDateString('de-DE')} - {new Date(employeeWorkStats[0].weekEnd).toLocaleDateString('de-DE')}
+            </span>
+          )}
+        </div>
+        <div className="p-4">
+          {employeeWorkStats.length > 0 ? (
+            <div className="space-y-2">
+              {employeeWorkStats
                 .sort((a, b) => b.stats.total - a.stats.total)
-                .map((unit) => (
+                .map((emp) => (
                 <div
-                  key={unit.unitId}
-                  className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 transition-all"
+                  key={emp.employeeId}
+                  className="flex items-center gap-4 p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 transition-all"
                 >
-                  <div className="flex items-center gap-3 mb-3">
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: unit.color }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-white truncate">{unit.unitName}</p>
-                      {unit.shortName && (
-                        <p className="text-xs text-slate-400">{unit.shortName}</p>
-                      )}
-                    </div>
-                    <span className="text-xl font-bold text-indigo-400">{unit.stats.total}</span>
+                  {/* Avatar */}
+                  <div className="flex-shrink-0">
+                    {emp.avatar ? (
+                      <img
+                        src={emp.avatar}
+                        alt={emp.employeeName}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-medium">
+                        {emp.employeeName.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="space-y-1.5">
-                    {unit.stats.casesCompleted > 0 && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="flex items-center gap-1.5 text-slate-400">
-                          <FileSearch className="h-3 w-3" />
-                          Fälle
-                        </span>
-                        <span className="text-slate-300">{unit.stats.casesCompleted}</span>
+                  {/* Name & Badge */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-white truncate">{emp.employeeName}</p>
+                    <p className="text-xs text-slate-400">
+                      {emp.badgeNumber && `[${emp.badgeNumber}] `}{emp.rank}
+                    </p>
+                  </div>
+
+                  {/* Aktivitäten */}
+                  <div className="flex items-center gap-3 text-xs">
+                    {emp.stats.applicationsProcessed > 0 && (
+                      <div className="flex items-center gap-1 text-blue-400" title="Bewerbungen">
+                        <ClipboardList className="h-3.5 w-3.5" />
+                        <span>{emp.stats.applicationsProcessed}</span>
                       </div>
                     )}
-                    {unit.stats.tasksCompleted > 0 && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="flex items-center gap-1.5 text-slate-400">
-                          <CheckCircle className="h-3 w-3" />
-                          Aufgaben
-                        </span>
-                        <span className="text-slate-300">{unit.stats.tasksCompleted}</span>
+                    {emp.stats.trainingsCompleted > 0 && (
+                      <div className="flex items-center gap-1 text-amber-400" title="Ausbildungen">
+                        <GraduationCap className="h-3.5 w-3.5" />
+                        <span>{emp.stats.trainingsCompleted}</span>
                       </div>
                     )}
-                    {unit.stats.trainingsCompleted > 0 && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="flex items-center gap-1.5 text-slate-400">
-                          <GraduationCap className="h-3 w-3" />
-                          Ausbildungen
-                        </span>
-                        <span className="text-slate-300">{unit.stats.trainingsCompleted}</span>
+                    {emp.stats.casesCompleted > 0 && (
+                      <div className="flex items-center gap-1 text-emerald-400" title="Fälle">
+                        <FileSearch className="h-3.5 w-3.5" />
+                        <span>{emp.stats.casesCompleted}</span>
                       </div>
                     )}
-                    {unit.stats.investigationsCompleted > 0 && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="flex items-center gap-1.5 text-slate-400">
-                          <FileSearch className="h-3 w-3" />
-                          Ermittlungen
-                        </span>
-                        <span className="text-slate-300">{unit.stats.investigationsCompleted}</span>
+                    {emp.stats.tasksCompleted > 0 && (
+                      <div className="flex items-center gap-1 text-purple-400" title="Aufgaben">
+                        <CheckCircle className="h-3.5 w-3.5" />
+                        <span>{emp.stats.tasksCompleted}</span>
                       </div>
                     )}
-                    {unit.stats.applicationsProcessed > 0 && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="flex items-center gap-1.5 text-slate-400">
-                          <ClipboardList className="h-3 w-3" />
-                          Bewerbungen
-                        </span>
-                        <span className="text-slate-300">{unit.stats.applicationsProcessed}</span>
+                    {emp.stats.investigationsCompleted > 0 && (
+                      <div className="flex items-center gap-1 text-red-400" title="Ermittlungen">
+                        <FileSearch className="h-3.5 w-3.5" />
+                        <span>{emp.stats.investigationsCompleted}</span>
                       </div>
                     )}
+                  </div>
+
+                  {/* Total */}
+                  <div className="flex-shrink-0 text-right">
+                    <span className="text-lg font-bold text-indigo-400">{emp.stats.total}</span>
                   </div>
                 </div>
               ))}
-              {unitWorkStats.filter(unit => unit.stats.total > 0).length === 0 && (
-                <div className="col-span-full text-center py-8 text-slate-400">
-                  Noch keine Aktivitäten diese Woche
-                </div>
-              )}
             </div>
-          </div>
+          ) : (
+            <div className="text-center py-8 text-slate-400">
+              Noch keine Aktivitäten diese Woche
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Unterer Bereich: Sonderzahlungen & Abmeldungen */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

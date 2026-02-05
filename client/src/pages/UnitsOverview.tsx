@@ -133,6 +133,8 @@ export default function UnitsOverview() {
 
   const getAvatarUrl = (discordId: string, avatar: string | null) => {
     if (!avatar) return null;
+    // Falls avatar bereits eine vollständige URL ist, direkt zurückgeben
+    if (avatar.startsWith('http')) return avatar;
     return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.png`;
   };
 

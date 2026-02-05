@@ -423,6 +423,8 @@ function AnnouncementsWidget() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [channelId, setChannelId] = useState('');
+  const [channelSearch, setChannelSearch] = useState('');
+  const [showChannelDropdown, setShowChannelDropdown] = useState(false);
 
   // In-App state
   const [inAppTitle, setInAppTitle] = useState('');
@@ -438,6 +440,8 @@ function AnnouncementsWidget() {
   const [templateContent, setTemplateContent] = useState('');
   const [templateChannelId, setTemplateChannelId] = useState('');
   const [templateCategory, setTemplateCategory] = useState('GENERAL');
+  const [templateChannelSearch, setTemplateChannelSearch] = useState('');
+  const [showTemplateChannelDropdown, setShowTemplateChannelDropdown] = useState(false);
 
   // Scheduling state
   const [scheduleDate, setScheduleDate] = useState('');
@@ -813,25 +817,62 @@ function AnnouncementsWidget() {
               </div>
             )}
 
-            <div>
+            <div className="relative">
               <label className="label">Kanal</label>
-              <div className="flex flex-wrap gap-2">
-                {channels.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setChannelId(c.id)}
-                    className={`py-2 px-3 rounded text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
-                      channelId === c.id
-                        ? 'bg-primary-600/30 text-primary-400 border border-primary-500'
-                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                    }`}
-                  >
-                    <Hash className="h-4 w-4" />
-                    {c.name}
-                  </button>
-                ))}
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowChannelDropdown(!showChannelDropdown)}
+                className="input w-full flex items-center justify-between gap-2 text-left"
+              >
+                <span className="flex items-center gap-2">
+                  <Hash className="h-4 w-4 text-slate-400" />
+                  {channels.find(c => c.id === channelId)?.name || 'Kanal auswählen...'}
+                </span>
+                <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform ${showChannelDropdown ? 'rotate-90' : ''}`} />
+              </button>
+              {showChannelDropdown && (
+                <div className="absolute z-50 mt-1 w-full bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-64 overflow-hidden">
+                  <div className="p-2 border-b border-slate-700">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <input
+                        type="text"
+                        value={channelSearch}
+                        onChange={(e) => setChannelSearch(e.target.value)}
+                        placeholder="Kanal suchen..."
+                        className="input pl-9 py-2 text-sm w-full"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                  <div className="overflow-y-auto max-h-48">
+                    {channels
+                      .filter(c => c.name.toLowerCase().includes(channelSearch.toLowerCase()))
+                      .map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setChannelId(c.id);
+                            setShowChannelDropdown(false);
+                            setChannelSearch('');
+                          }}
+                          className={`w-full px-3 py-2 flex items-center gap-2 text-left text-sm transition-colors ${
+                            channelId === c.id
+                              ? 'bg-primary-600/20 text-primary-400'
+                              : 'text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          <Hash className="h-4 w-4 flex-shrink-0" />
+                          <span className="truncate">{c.name}</span>
+                        </button>
+                      ))}
+                    {channels.filter(c => c.name.toLowerCase().includes(channelSearch.toLowerCase())).length === 0 && (
+                      <p className="px-3 py-2 text-sm text-slate-500">Keine Kanäle gefunden</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
@@ -1194,36 +1235,71 @@ function AnnouncementsWidget() {
                 </div>
               </div>
 
-              <div>
-                <label className="label">Standard-Kanal</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setTemplateChannelId('')}
-                    className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
-                      !templateChannelId
-                        ? 'bg-primary-600/30 text-primary-400 border border-primary-500'
-                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                    }`}
-                  >
-                    Keiner
-                  </button>
-                  {channels.slice(0, 4).map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setTemplateChannelId(c.id)}
-                      className={`py-2 px-3 rounded text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
-                        templateChannelId === c.id
-                          ? 'bg-primary-600/30 text-primary-400 border border-primary-500'
-                          : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                      }`}
-                    >
-                      <Hash className="h-3 w-3" />
-                      {c.name.replace('Ankündigungen', '').trim()}
-                    </button>
-                  ))}
-                </div>
+              <div className="relative">
+                <label className="label">Standard-Kanal (optional)</label>
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateChannelDropdown(!showTemplateChannelDropdown)}
+                  className="input w-full flex items-center justify-between gap-2 text-left"
+                >
+                  <span className="flex items-center gap-2">
+                    <Hash className="h-4 w-4 text-slate-400" />
+                    {templateChannelId ? channels.find(c => c.id === templateChannelId)?.name : 'Keiner'}
+                  </span>
+                  <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform ${showTemplateChannelDropdown ? 'rotate-90' : ''}`} />
+                </button>
+                {showTemplateChannelDropdown && (
+                  <div className="absolute z-50 mt-1 w-full bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-64 overflow-hidden">
+                    <div className="p-2 border-b border-slate-700">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <input
+                          type="text"
+                          value={templateChannelSearch}
+                          onChange={(e) => setTemplateChannelSearch(e.target.value)}
+                          placeholder="Kanal suchen..."
+                          className="input pl-9 py-2 text-sm w-full"
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+                    <div className="overflow-y-auto max-h-48">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTemplateChannelId('');
+                          setShowTemplateChannelDropdown(false);
+                          setTemplateChannelSearch('');
+                        }}
+                        className={`w-full px-3 py-2 flex items-center gap-2 text-left text-sm transition-colors ${
+                          !templateChannelId ? 'bg-primary-600/20 text-primary-400' : 'text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        <X className="h-4 w-4 flex-shrink-0" />
+                        <span>Keiner</span>
+                      </button>
+                      {channels
+                        .filter(c => c.name.toLowerCase().includes(templateChannelSearch.toLowerCase()))
+                        .map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setTemplateChannelId(c.id);
+                              setShowTemplateChannelDropdown(false);
+                              setTemplateChannelSearch('');
+                            }}
+                            className={`w-full px-3 py-2 flex items-center gap-2 text-left text-sm transition-colors ${
+                              templateChannelId === c.id ? 'bg-primary-600/20 text-primary-400' : 'text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >
+                            <Hash className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{c.name}</span>
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

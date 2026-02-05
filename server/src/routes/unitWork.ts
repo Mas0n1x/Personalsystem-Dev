@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import {
   getCurrentWeekStats,
+  getCurrentEmployeeWeekStats,
   getHistoricalStats,
   incrementUnitActivity,
   ActivityType,
@@ -17,6 +18,17 @@ router.get('/current', authMiddleware, async (_req: AuthRequest, res: Response) 
   } catch (error) {
     console.error('Get current unit work stats error:', error);
     res.status(500).json({ error: 'Fehler beim Abrufen der Unit-Statistiken' });
+  }
+});
+
+// GET aktuelle Wochenstatistiken aller Mitarbeiter
+router.get('/employees/current', authMiddleware, async (_req: AuthRequest, res: Response) => {
+  try {
+    const stats = await getCurrentEmployeeWeekStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Get current employee work stats error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Mitarbeiter-Statistiken' });
   }
 });
 

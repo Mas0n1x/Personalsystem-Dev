@@ -35,7 +35,20 @@
       "Bash(docker compose build:*)",
       "Bash(docker compose:*)",
       "Bash(npx tsc:*)",
-      "Bash(node_modules/.bin/tsc:*)"
+      "Bash(node_modules/.bin/tsc:*)",
+      "Bash(curl:*)",
+      "Bash(git checkout:*)",
+      "Bash(docker start:*)",
+      "Bash(docker stop:*)",
+      "Bash(docker cp:*)",
+      "Bash(docker rm:*)",
+      "Bash(docker volume rm:*)",
+      "Bash(BACKUP=\"/var/lib/docker/volumes/personalsystem-dev_server_backups/_data/backup_2026-02-04T00-31-12-776Z.db\")",
+      "Bash(DB=\"/var/lib/docker/volumes/personalsystem-dev_server_data/_data/dev.db\")",
+      "Bash(pkill:*)",
+      "Bash(dmesg:*)",
+      "Bash(journalctl:*)",
+      "Bash(DOCKER_BUILDKIT=1 docker compose build:*)"
     ]
   }
 }

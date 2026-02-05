@@ -784,8 +784,11 @@ export const detectiveProfilesApi = {
 
 // Unit-Arbeit Statistiken
 export const unitWorkApi = {
-  // Aktuelle Wochenstatistiken
+  // Aktuelle Wochenstatistiken (Units)
   getCurrentStats: () => api.get('/unit-work/current'),
+
+  // Aktuelle Wochenstatistiken (Mitarbeiter)
+  getEmployeeCurrentStats: () => api.get('/unit-work/employees/current'),
 
   // Historische Statistiken
   getHistory: (weeks = 4) => api.get(`/unit-work/history?weeks=${weeks}`),
