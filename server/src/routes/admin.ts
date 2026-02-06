@@ -667,6 +667,16 @@ router.get('/audit-logs', authMiddleware, requirePermission('audit.view'), async
 
 // ==================== SYSTEM SETTINGS ====================
 
+// Öffentlicher Endpunkt für Site-Titel (kein Auth nötig)
+router.get('/settings/public', async (_req: AuthRequest, res: Response) => {
+  try {
+    const siteTitle = await prisma.systemSetting.findUnique({ where: { key: 'siteTitle' } });
+    res.json({ siteTitle: siteTitle?.value || 'LSPD Personalsystem' });
+  } catch (error) {
+    res.json({ siteTitle: 'LSPD Personalsystem' });
+  }
+});
+
 router.get('/settings', authMiddleware, requirePermission('admin.full'), async (_req: AuthRequest, res: Response) => {
   try {
     const settings = await prisma.systemSetting.findMany();

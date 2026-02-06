@@ -92,6 +92,7 @@ export const dashboardApi = {
   getActivity: (limit?: number) => api.get('/dashboard/activity', { params: { limit } }),
   getOnlineUsers: () => api.get('/dashboard/online-users'),
   getMyOverview: () => api.get('/dashboard/my-overview'),
+  getTeamLeaders: () => api.get('/dashboard/team-leaders'),
 };
 
 // Admin API

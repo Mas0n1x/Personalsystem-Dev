@@ -2,42 +2,49 @@ import { Router, Response } from 'express';
 import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
 import { triggerUnitReviewCompleted, getEmployeeIdFromUserId } from '../services/bonusService.js';
+import { trackActivityByUserId } from '../services/unitWorkService.js';
 
 const router = Router();
 
 router.use(authMiddleware);
 
-// Fallback Units (werden verwendet wenn keine in DB)
-const FALLBACK_UNITS = [
+// Team-Farben die immer verfügbar sein sollen
+const TEAM_NAMES = [
   'Team Green',
   'Team Silver',
   'Team Gold',
   'Team Red',
   'Team White',
-  'Human Resources',
-  'Internal Affairs',
-  'Police Academy',
-  'Quality Assurance',
-  'Detectives',
 ];
 
-// Get units list (dynamisch aus DB oder Fallback)
+// Get units list (QAUnit-Tabelle > dynamisch aus Unit-Tabelle + Teams)
 router.get('/units', requirePermission('qa.view'), async (_req: AuthRequest, res: Response) => {
   try {
-    const dbUnits = await prisma.qAUnit.findMany({
+    // Prüfe zuerst ob Admin QA-Units manuell konfiguriert hat
+    const qaUnits = await prisma.qAUnit.findMany({
       where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
       select: { name: true },
     });
 
-    if (dbUnits.length > 0) {
-      res.json(dbUnits.map(u => u.name));
-    } else {
-      res.json(FALLBACK_UNITS);
+    if (qaUnits.length > 0) {
+      res.json(qaUnits.map(u => u.name));
+      return;
     }
+
+    // Sonst: Dynamisch aus Unit-Tabelle laden + Team-Farben
+    const activeUnits = await prisma.unit.findMany({
+      where: { isActive: true },
+      orderBy: { name: 'asc' },
+      select: { name: true },
+    });
+
+    const unitNames = activeUnits.map(u => u.name);
+    const allUnits = [...TEAM_NAMES, ...unitNames];
+    res.json(allUnits);
   } catch (error) {
     console.error('Get units error:', error);
-    res.json(FALLBACK_UNITS);
+    res.json(TEAM_NAMES);
   }
 });
 
@@ -189,6 +196,11 @@ router.put('/:id', requirePermission('qa.manage'), async (req: AuthRequest, res:
       if (employeeId) {
         await triggerUnitReviewCompleted(employeeId, previousReview.unit, id);
       }
+    }
+
+    // Unit-Arbeit tracken wenn Review eingereicht oder abgeschlossen wird
+    if ((status === 'SUBMITTED' || status === 'REVIEWED') && previousReview?.status !== status) {
+      await trackActivityByUserId(review.reviewerId, 'tasksCompleted');
     }
 
     res.json(review);

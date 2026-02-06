@@ -4,7 +4,7 @@ import { authMiddleware, AuthRequest, requirePermission } from '../middleware/au
 import { notifyPromotion } from '../services/notificationService.js';
 import { announcePromotion, announceAcademyGraduation } from '../services/discordAnnouncements.js';
 import { broadcastCreate, broadcastUpdate, broadcastDelete } from '../services/socketService.js';
-import { updateDiscordNickname, syncDiscordMembers, getAllRankRoles, syncUserRole, getTeamConfigForLevel } from '../services/discordBot.js';
+import { updateDiscordNickname, getAllRankRoles, syncUserRole, getTeamConfigForLevel, updateTeamRolesForUser } from '../services/discordBot.js';
 
 const router = Router();
 
@@ -349,21 +349,28 @@ router.put('/:id/process', requirePermission('management.uprank'), async (req: A
       // Alte Rang-Rolle finden und entfernen
       const oldRankRole = allRankRoles.find(r => r.rank === request.employee.rank);
       if (oldRankRole) {
-        await syncUserRole(updatedEmployee.user.discordId, oldRankRole.id, 'remove');
-        console.log(`[Uprank] Alte Rang-Rolle entfernt: ${oldRankRole.rank}`);
+        const removed = await syncUserRole(updatedEmployee.user.discordId, oldRankRole.id, 'remove');
+        console.log(`[Uprank] Alte Rang-Rolle entfernt: ${oldRankRole.rank} (${removed ? 'OK' : 'FEHLER'})`);
+      } else {
+        console.warn(`[Uprank] Alte Rang-Rolle für "${request.employee.rank}" nicht in Discord gefunden!`);
       }
 
       // Neue Rang-Rolle finden und hinzufügen
       const newRankRole = allRankRoles.find(r => r.rank === request.targetRank);
       if (newRankRole) {
-        await syncUserRole(updatedEmployee.user.discordId, newRankRole.id, 'add');
-        console.log(`[Uprank] Neue Rang-Rolle hinzugefügt: ${newRankRole.rank}`);
+        const added = await syncUserRole(updatedEmployee.user.discordId, newRankRole.id, 'add');
+        console.log(`[Uprank] Neue Rang-Rolle hinzugefügt: ${newRankRole.rank} (${added ? 'OK' : 'FEHLER'})`);
       } else {
-        console.warn(`[Uprank] Rang-Rolle für "${request.targetRank}" nicht gefunden!`);
+        console.warn(`[Uprank] Rang-Rolle für "${request.targetRank}" nicht in Discord gefunden!`);
       }
 
-      // Discord-Rollen synchronisieren (aktualisiert System-Rollen in DB)
-      await syncDiscordMembers();
+      // Team-Rollen aktualisieren (z.B. Team Green → Team Silver)
+      const oldTeamConfig = getTeamConfigForLevel(request.employee.rankLevel);
+      const newTeamConfig = getTeamConfigForLevel(newRankLevel);
+      if (oldTeamConfig.team !== newTeamConfig.team) {
+        console.log(`[Uprank] Team-Wechsel: ${oldTeamConfig.team} → ${newTeamConfig.team}`);
+        await updateTeamRolesForUser(updatedEmployee.user.discordId, newRankLevel);
+      }
 
       // Automatische Uprank-Sperre basierend auf neuem Team setzen
       const teamConfig = getTeamConfigForLevel(newRankLevel);

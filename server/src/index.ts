@@ -62,6 +62,7 @@ import { initializeCalendarReminders } from './services/calendarService.js';
 import { startAnnouncementScheduler } from './services/scheduledAnnouncements.js';
 import { initializeWeeklyResetJob } from './services/unitWorkService.js';
 import { initializeTwitchService } from './services/twitchService.js';
+import { initializeAutoBackup } from './services/backupService.js';
 
 dotenv.config();
 
@@ -202,6 +203,9 @@ async function startServer() {
 
     // Initialize Twitch Service (checks every 2 minutes)
     initializeTwitchService();
+
+    // Initialize Auto Backup (daily, 7 days retention)
+    initializeAutoBackup();
 
     httpServer.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);

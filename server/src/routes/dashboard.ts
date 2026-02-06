@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/authMiddleware.js';
+import { getTeamLeaders } from '../services/discordBot.js';
 
 const router = Router();
 
@@ -279,6 +280,17 @@ router.get('/quick-stats', authMiddleware, async (_req: AuthRequest, res: Respon
   } catch (error) {
     console.error('Get quick stats error:', error);
     res.status(500).json({ error: 'Fehler beim Abrufen der Schnell-Statistiken' });
+  }
+});
+
+// Team-Leitungen (Red, Gold, Silver, Green)
+router.get('/team-leaders', authMiddleware, async (_req: AuthRequest, res: Response) => {
+  try {
+    const teamLeaders = await getTeamLeaders();
+    res.json(teamLeaders);
+  } catch (error) {
+    console.error('Get team leaders error:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Team-Leitungen' });
   }
 });
 

@@ -42,7 +42,11 @@ export default function Settings() {
     mutationFn: adminApi.updateSettings,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
+      queryClient.invalidateQueries({ queryKey: ['public-settings'] });
       toast.success('Einstellungen gespeichert');
+    },
+    onError: () => {
+      toast.error('Fehler beim Speichern der Einstellungen');
     },
   });
 

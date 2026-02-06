@@ -34,6 +34,7 @@ import {
   FileSearch,
   GraduationCap,
   ClipboardList,
+  Crown,
 } from 'lucide-react';
 
 interface ActiveAbsence {
@@ -161,6 +162,11 @@ interface EmployeeWorkStats {
     applicationsProcessed: number;
     total: number;
   };
+}
+
+interface TeamLeaderData {
+  team: string;
+  members: { discordId: string; name: string; rank: string }[];
 }
 
 interface DashboardStats {
@@ -457,13 +463,24 @@ export default function Dashboard() {
     refetchInterval: 60000,
   });
 
+  const { data: teamLeadersData } = useQuery({
+    queryKey: ['team-leaders'],
+    queryFn: async () => {
+      const res = await dashboardApi.getTeamLeaders();
+      return res.data as TeamLeaderData[];
+    },
+    refetchInterval: 120000,
+  });
+
   const stats = statsData?.stats;
   const teamDistribution = statsData?.teamDistribution || [];
   const activeAbsences = activeAbsencesData?.data as ActiveAbsence[] | undefined;
   const myBonus = myBonusData;
   const upcomingEvents = upcomingEventsData || [];
-  const unitWorkStats = unitWorkData || [];
+  const HIDDEN_UNITS = ['S.W.A.T.', 'Detectives', 'Highway Patrol', 'Air Support'];
+  const unitWorkStats = (unitWorkData || []).filter(u => !HIDDEN_UNITS.includes(u.unitName));
   const employeeWorkStats = employeeWorkData || [];
+  const teamLeaders = teamLeadersData || [];
 
   // Team-Farben als stabile Referenz - MEMOIZED
   const getTeamColor = useCallback((team: string) => {
@@ -685,7 +702,7 @@ export default function Dashboard() {
                   <p className="font-medium text-white">Abwesend</p>
                   <p className="text-sm text-slate-400">Mitarbeiter im Urlaub</p>
                 </div>
-                <span className="text-2xl font-bold text-yellow-400">{stats?.onLeaveEmployees || 0}</span>
+                <span className="text-2xl font-bold text-yellow-400">{stats?.activeAbsences || 0}</span>
               </div>
             </div>
 
@@ -787,100 +804,182 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Mitarbeiter-Arbeit Übersicht */}
+      {/* Gesamt Unit-Aktivität Übersicht */}
       <div className="card overflow-hidden">
         <div className="card-header flex items-center justify-between border-b border-slate-700/50">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Users className="h-5 w-5 text-indigo-400" />
-            Mitarbeiter-Aktivität diese Woche
+            <Building2 className="h-5 w-5 text-indigo-400" />
+            Unit-Aktivität diese Woche
           </h2>
-          {employeeWorkStats[0]?.weekStart && (
+          {unitWorkStats[0]?.weekStart && (
             <span className="text-xs text-slate-400">
-              {new Date(employeeWorkStats[0].weekStart).toLocaleDateString('de-DE')} - {new Date(employeeWorkStats[0].weekEnd).toLocaleDateString('de-DE')}
+              {new Date(unitWorkStats[0].weekStart).toLocaleDateString('de-DE')} - {new Date(unitWorkStats[0].weekEnd).toLocaleDateString('de-DE')}
             </span>
           )}
         </div>
         <div className="p-4">
-          {employeeWorkStats.length > 0 ? (
-            <div className="space-y-2">
-              {employeeWorkStats
-                .sort((a, b) => b.stats.total - a.stats.total)
-                .map((emp) => (
-                <div
-                  key={emp.employeeId}
-                  className="flex items-center gap-4 p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 transition-all"
-                >
-                  {/* Avatar */}
-                  <div className="flex-shrink-0">
-                    {emp.avatar ? (
-                      <img
-                        src={emp.avatar}
-                        alt={emp.employeeName}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-medium">
-                        {emp.employeeName.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Name & Badge */}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-white truncate">{emp.employeeName}</p>
-                    <p className="text-xs text-slate-400">
-                      {emp.badgeNumber && `[${emp.badgeNumber}] `}{emp.rank}
-                    </p>
-                  </div>
-
-                  {/* Aktivitäten */}
-                  <div className="flex items-center gap-3 text-xs">
-                    {emp.stats.applicationsProcessed > 0 && (
-                      <div className="flex items-center gap-1 text-blue-400" title="Bewerbungen">
-                        <ClipboardList className="h-3.5 w-3.5" />
-                        <span>{emp.stats.applicationsProcessed}</span>
-                      </div>
-                    )}
-                    {emp.stats.trainingsCompleted > 0 && (
-                      <div className="flex items-center gap-1 text-amber-400" title="Ausbildungen">
-                        <GraduationCap className="h-3.5 w-3.5" />
-                        <span>{emp.stats.trainingsCompleted}</span>
-                      </div>
-                    )}
-                    {emp.stats.casesCompleted > 0 && (
-                      <div className="flex items-center gap-1 text-emerald-400" title="Fälle">
-                        <FileSearch className="h-3.5 w-3.5" />
-                        <span>{emp.stats.casesCompleted}</span>
-                      </div>
-                    )}
-                    {emp.stats.tasksCompleted > 0 && (
-                      <div className="flex items-center gap-1 text-purple-400" title="Aufgaben">
-                        <CheckCircle className="h-3.5 w-3.5" />
-                        <span>{emp.stats.tasksCompleted}</span>
-                      </div>
-                    )}
-                    {emp.stats.investigationsCompleted > 0 && (
-                      <div className="flex items-center gap-1 text-red-400" title="Ermittlungen">
-                        <FileSearch className="h-3.5 w-3.5" />
-                        <span>{emp.stats.investigationsCompleted}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Total */}
-                  <div className="flex-shrink-0 text-right">
-                    <span className="text-lg font-bold text-indigo-400">{emp.stats.total}</span>
-                  </div>
+          {unitWorkStats.length > 0 ? (
+            <>
+              {/* Gesamt-Zusammenfassung */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+                <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-center">
+                  <ClipboardList className="h-5 w-5 text-blue-400 mx-auto mb-1" />
+                  <p className="text-xl font-bold text-blue-400">
+                    {unitWorkStats.reduce((sum, u) => sum + u.stats.applicationsProcessed, 0)}
+                  </p>
+                  <p className="text-xs text-slate-400">Bewerbungen</p>
                 </div>
-              ))}
-            </div>
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
+                  <GraduationCap className="h-5 w-5 text-amber-400 mx-auto mb-1" />
+                  <p className="text-xl font-bold text-amber-400">
+                    {unitWorkStats.reduce((sum, u) => sum + u.stats.trainingsCompleted, 0)}
+                  </p>
+                  <p className="text-xs text-slate-400">Ausbildungen</p>
+                </div>
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                  <FileSearch className="h-5 w-5 text-emerald-400 mx-auto mb-1" />
+                  <p className="text-xl font-bold text-emerald-400">
+                    {unitWorkStats.reduce((sum, u) => sum + u.stats.casesCompleted, 0)}
+                  </p>
+                  <p className="text-xs text-slate-400">Fälle</p>
+                </div>
+                <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center">
+                  <CheckCircle className="h-5 w-5 text-purple-400 mx-auto mb-1" />
+                  <p className="text-xl font-bold text-purple-400">
+                    {unitWorkStats.reduce((sum, u) => sum + u.stats.tasksCompleted, 0)}
+                  </p>
+                  <p className="text-xs text-slate-400">Berichte</p>
+                </div>
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
+                  <FileSearch className="h-5 w-5 text-red-400 mx-auto mb-1" />
+                  <p className="text-xl font-bold text-red-400">
+                    {unitWorkStats.reduce((sum, u) => sum + u.stats.investigationsCompleted, 0)}
+                  </p>
+                  <p className="text-xs text-slate-400">Ermittlungen</p>
+                </div>
+              </div>
+
+              {/* Pro Unit aufgeschlüsselt */}
+              <div className="space-y-2">
+                {unitWorkStats
+                  .sort((a, b) => b.stats.total - a.stats.total)
+                  .map((unit) => (
+                  <div
+                    key={unit.unitId}
+                    className="flex items-center gap-4 p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 transition-all"
+                  >
+                    {/* Unit Icon/Color */}
+                    <div
+                      className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                      style={{ backgroundColor: unit.color || '#6366f1' }}
+                    >
+                      {unit.shortName || unit.unitName.substring(0, 2).toUpperCase()}
+                    </div>
+
+                    {/* Unit Name */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-white truncate">{unit.unitName}</p>
+                    </div>
+
+                    {/* Aktivitäten Breakdown */}
+                    <div className="flex items-center gap-3 text-xs">
+                      {unit.stats.applicationsProcessed > 0 && (
+                        <div className="flex items-center gap-1 text-blue-400" title="Bewerbungen">
+                          <ClipboardList className="h-3.5 w-3.5" />
+                          <span>{unit.stats.applicationsProcessed}</span>
+                        </div>
+                      )}
+                      {unit.stats.trainingsCompleted > 0 && (
+                        <div className="flex items-center gap-1 text-amber-400" title="Ausbildungen">
+                          <GraduationCap className="h-3.5 w-3.5" />
+                          <span>{unit.stats.trainingsCompleted}</span>
+                        </div>
+                      )}
+                      {unit.stats.casesCompleted > 0 && (
+                        <div className="flex items-center gap-1 text-emerald-400" title="Fälle">
+                          <FileSearch className="h-3.5 w-3.5" />
+                          <span>{unit.stats.casesCompleted}</span>
+                        </div>
+                      )}
+                      {unit.stats.tasksCompleted > 0 && (
+                        <div className="flex items-center gap-1 text-purple-400" title="Berichte">
+                          <CheckCircle className="h-3.5 w-3.5" />
+                          <span>{unit.stats.tasksCompleted}</span>
+                        </div>
+                      )}
+                      {unit.stats.investigationsCompleted > 0 && (
+                        <div className="flex items-center gap-1 text-red-400" title="Ermittlungen">
+                          <FileSearch className="h-3.5 w-3.5" />
+                          <span>{unit.stats.investigationsCompleted}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Total */}
+                    <div className="flex-shrink-0 text-right">
+                      <span className="text-lg font-bold text-indigo-400">{unit.stats.total}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           ) : (
             <div className="text-center py-8 text-slate-400">
-              Noch keine Aktivitäten diese Woche
+              Noch keine Unit-Aktivitäten diese Woche
             </div>
           )}
         </div>
       </div>
+
+      {/* Teamleitungen (Team Red/Gold/Silver/Green) */}
+      {teamLeaders.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="card-header border-b border-slate-700/50">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Crown className="h-5 w-5 text-amber-400" />
+              Teamleitungen
+            </h2>
+          </div>
+          <div className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {teamLeaders.map((team) => {
+                const teamColors: Record<string, string> = {
+                  Green: 'bg-emerald-500',
+                  Silver: 'bg-slate-400',
+                  Gold: 'bg-amber-500',
+                  Red: 'bg-red-500',
+                };
+                const teamBorderColors: Record<string, string> = {
+                  Green: 'border-emerald-500/30',
+                  Silver: 'border-slate-400/30',
+                  Gold: 'border-amber-500/30',
+                  Red: 'border-red-500/30',
+                };
+                return (
+                  <div
+                    key={team.team}
+                    className={`p-4 rounded-xl bg-slate-800/50 border ${teamBorderColors[team.team] || 'border-slate-700/50'}`}
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`w-3 h-3 rounded-full ${teamColors[team.team] || 'bg-slate-500'}`} />
+                      <p className="font-medium text-white text-sm">Team {team.team}</p>
+                    </div>
+                    <div className="space-y-1.5">
+                      {team.members.map((leader) => (
+                        <div key={leader.discordId} className="flex items-center gap-2">
+                          <Crown className="h-3 w-3 text-amber-400 flex-shrink-0" />
+                          <span className="text-sm text-amber-200 truncate">{leader.name}</span>
+                          <span className="text-xs text-slate-500 ml-auto flex-shrink-0">{leader.rank}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Unterer Bereich: Sonderzahlungen & Abmeldungen */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -940,7 +1039,7 @@ export default function Dashboard() {
           </div>
           {canViewAllBonuses && weeklyBonusData?.byEmployee && weeklyBonusData.byEmployee.length > 10 && (
             <div className="p-3 border-t border-slate-700/50 text-center">
-              <Link to="/bonus" className="text-sm text-blue-400 hover:text-blue-300">
+              <Link to="/admin/bonus" className="text-sm text-blue-400 hover:text-blue-300">
                 Alle {weeklyBonusData.byEmployee.length} Mitarbeiter anzeigen →
               </Link>
             </div>

@@ -4,6 +4,7 @@ import { authMiddleware, AuthRequest, requirePermission } from '../middleware/au
 import { triggerExamConducted, triggerRetrainingCompleted, triggerAcademyModuleCompleted, getEmployeeIdFromUserId } from '../services/bonusService.js';
 import { assignHireRoles } from '../services/discordBot.js';
 import { announceAcademyGraduation } from '../services/discordAnnouncements.js';
+import { trackActivityByUserId } from '../services/unitWorkService.js';
 
 const router = Router();
 
@@ -353,6 +354,9 @@ router.post('/progress/toggle', requirePermission('academy.manage'), async (req:
           await triggerAcademyModuleCompleted(completedByEmployeeId, updated.module.name, updated.id);
         }
 
+        // Unit-Arbeit tracken (Ausbilder)
+        await trackActivityByUserId(userId, 'trainingsCompleted');
+
         // Discord-Ankündigung für abgeschlossenes Modul
         const employee = await prisma.employee.findUnique({
           where: { id: employeeId },
@@ -404,6 +408,9 @@ router.post('/progress/toggle', requirePermission('academy.manage'), async (req:
       if (completedByEmployeeId) {
         await triggerAcademyModuleCompleted(completedByEmployeeId, created.module.name, created.id);
       }
+
+      // Unit-Arbeit tracken (Ausbilder)
+      await trackActivityByUserId(userId, 'trainingsCompleted');
 
       // Discord-Ankündigung für abgeschlossenes Modul
       const employee = await prisma.employee.findUnique({
@@ -759,6 +766,9 @@ router.post('/exams', requirePermission('academy.manage'), async (req: AuthReque
       const candidateName = exam.employee.user.displayName || exam.employee.user.username;
       await triggerExamConducted(examinerEmployeeId, candidateName, exam.id);
     }
+
+    // Unit-Arbeit tracken (Prüfer)
+    await trackActivityByUserId(userId, 'trainingsCompleted');
 
     res.status(201).json(exam);
   } catch (error) {

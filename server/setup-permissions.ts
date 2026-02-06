@@ -76,41 +76,8 @@ async function setupPermissions() {
     );
 
     console.log('✅ All permissions created/updated!');
-
-    // Now add leadership.view to Officer roles (Level 2-4)
-    const leadershipViewPerm = await prisma.permission.findUnique({
-      where: { name: 'leadership.view' }
-    });
-
-    const officerRoles = await prisma.role.findMany({
-      where: {
-        discordRoleId: { not: null },
-        level: { gte: 2, lte: 4 }
-      },
-      include: { permissions: true }
-    });
-
-    console.log(`\n🔧 Adding leadership.view to ${officerRoles.length} Officer role(s)...\n`);
-
-    for (const role of officerRoles) {
-      const hasLeadership = role.permissions.some(p => p.name === 'leadership.view');
-      if (!hasLeadership) {
-        await prisma.role.update({
-          where: { id: role.id },
-          data: {
-            permissions: {
-              connect: { id: leadershipViewPerm!.id }
-            }
-          }
-        });
-        console.log(`  ✅ Added to: ${role.displayName} (Level ${role.level})`);
-      } else {
-        console.log(`  ⏭️  Skipped: ${role.displayName} (already has permission)`);
-      }
-    }
-
     console.log('\n✅ Setup complete!');
-    console.log('💡 Officers now have access to Leadership. Users need to re-login.');
+    console.log('💡 Permissions must be manually assigned to roles via Admin panel.');
 
   } catch (error) {
     console.error('❌ Error:', error);

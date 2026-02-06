@@ -689,34 +689,23 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
     if (systemRoles.length === 0) {
       console.log('[Discord-Sync] No rank roles found in database, auto-creating from Discord roles...');
 
-      // Get leadership.view permission (if it exists)
-      const leadershipPerm = await prisma.permission.findUnique({
-        where: { name: 'leadership.view' }
-      });
-
       const createdRoles: typeof systemRoles = [];
 
       // Scan all Discord roles and create rank roles (Level 1-17)
       for (const [, discordRole] of guild.roles.cache) {
         const extracted = extractRankFromRoleName(discordRole.name);
         if (extracted) {
-          const shouldHaveLeadership = extracted.level >= 2; // Officers and above
-
           const newRole = await prisma.role.create({
             data: {
               name: extracted.rank.replace(/\s+/g, '_').toUpperCase(),
               displayName: extracted.rank,
               level: extracted.level,
               discordRoleId: discordRole.id,
-              permissions: (leadershipPerm && shouldHaveLeadership) ? {
-                connect: { id: leadershipPerm.id }
-              } : undefined
             }
           });
 
           createdRoles.push(newRole);
-          const leadershipStatus = (leadershipPerm && shouldHaveLeadership) ? ' + leadership.view' : '';
-          console.log(`  ✅ Created rank role: ${extracted.rank} (Level ${extracted.level})${leadershipStatus}`);
+          console.log(`  ✅ Created rank role: ${extracted.rank} (Level ${extracted.level})`);
         }
       }
 
@@ -901,39 +890,6 @@ export async function syncDiscordMembers(): Promise<SyncResult> {
     result.errors.push(`Cleanup Fehler: ${error}`);
   }
 
-  // Leadership-Zugriff für Officers (Level 2+) automatisch gewähren
-  try {
-    const leadershipPerm = await prisma.permission.findUnique({
-      where: { name: 'leadership.view' },
-    });
-
-    if (leadershipPerm) {
-      // Alle Rang-Rollen mit Level >= 2 finden
-      const officerRoles = await prisma.role.findMany({
-        where: {
-          discordRoleId: { not: null },
-          level: { gte: 2 },
-        },
-        include: { permissions: { where: { name: 'leadership.view' } } },
-      });
-
-      // Rollen ohne leadership.view Permission updaten
-      for (const role of officerRoles) {
-        const hasLeadershipView = role.permissions.some(p => p.name === 'leadership.view');
-        if (!hasLeadershipView) {
-          await prisma.role.update({
-            where: { id: role.id },
-            data: {
-              permissions: { connect: { id: leadershipPerm.id } },
-            },
-          });
-        }
-      }
-    }
-  } catch (error) {
-    console.log(`[Discord-Sync] Warning: Could not grant leadership permissions: ${error}`);
-  }
-
   return result;
 }
 
@@ -1044,6 +1000,23 @@ export async function findFreeBadgeNumber(min: number, max: number, prefix: stri
   }
 
   return null; // Keine freie Nummer gefunden
+}
+
+// Team-Rollen für einen User aktualisieren (per Discord ID)
+export async function updateTeamRolesForUser(discordId: string, newLevel: number): Promise<boolean> {
+  if (!guild) return false;
+
+  try {
+    const member = await guild.members.fetch(discordId);
+    if (!member) return false;
+
+    const newTeamConfig = getTeamConfigForLevel(newLevel);
+    await updateTeamRoles(member, newTeamConfig);
+    return true;
+  } catch (error) {
+    console.error(`[Team-Rollen] Fehler beim Aktualisieren für ${discordId}:`, error);
+    return false;
+  }
 }
 
 // Team-Rollen aktualisieren
@@ -1328,6 +1301,63 @@ export async function getAllMembersWithRoles(): Promise<Map<string, { id: string
     memberRolesCacheTime = now;
   } catch (error) {
     console.error('[Discord] Fehler beim Batch-Abrufen der Member-Rollen:', error);
+  }
+
+  return result;
+}
+
+// Team-Leitungen (Team Red/Gold/Silver/Green) aus Discord abrufen
+export async function getTeamLeaders(): Promise<{ team: string; members: { discordId: string; name: string; rank: string }[] }[]> {
+  if (!guild) return [];
+
+  const leitungRoles: Record<string, string> = {
+    'Green': '» Team Green Leitung',
+    'Silver': '» Team Silver Leitung',
+    'Gold': '» Team Gold Leitung',
+    'Red': '» Team Red Leitung',
+  };
+
+  const result: { team: string; members: { discordId: string; name: string; rank: string }[] }[] = [];
+
+  try {
+    let members = guild.members.cache;
+    if (members.size === 0) {
+      members = await guild.members.fetch();
+    }
+
+    for (const [teamName, roleName] of Object.entries(leitungRoles)) {
+      const discordRole = guild.roles.cache.find(r => r.name === roleName);
+      if (!discordRole) continue;
+
+      const teamMembers: { discordId: string; name: string; rank: string }[] = [];
+
+      for (const [, member] of members) {
+        if (member.roles.cache.has(discordRole.id)) {
+          // Rang extrahieren
+          let rank = '';
+          let highestLevel = 0;
+          for (const [, role] of member.roles.cache) {
+            const extracted = extractRankFromRoleName(role.name);
+            if (extracted && extracted.level > highestLevel) {
+              highestLevel = extracted.level;
+              rank = extracted.rank;
+            }
+          }
+
+          teamMembers.push({
+            discordId: member.id,
+            name: member.displayName || member.user.username,
+            rank,
+          });
+        }
+      }
+
+      if (teamMembers.length > 0) {
+        result.push({ team: teamName, members: teamMembers });
+      }
+    }
+  } catch (error) {
+    console.error('[Discord] Fehler beim Abrufen der Team-Leitungen:', error);
   }
 
   return result;

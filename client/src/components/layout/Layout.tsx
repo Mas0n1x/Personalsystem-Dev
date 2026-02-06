@@ -1,8 +1,23 @@
+import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import api from '../../services/api';
 
 export default function Layout() {
+  const { data: publicSettings } = useQuery({
+    queryKey: ['public-settings'],
+    queryFn: () => api.get('/admin/settings/public').then(res => res.data),
+    staleTime: 300000,
+  });
+
+  useEffect(() => {
+    if (publicSettings?.siteTitle) {
+      document.title = publicSettings.siteTitle;
+    }
+  }, [publicSettings?.siteTitle]);
+
   return (
     <div className="min-h-screen bg-slate-900 flex">
       <Sidebar />
