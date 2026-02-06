@@ -8,6 +8,7 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+      - NODE_OPTIONS=--max-old-space-size=256
     env_file:
       - ./server/.env
     volumes:
@@ -18,8 +19,14 @@ services:
       - "3001:3001"
     networks:
       - personalsystem-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
 
-  # Frontend Client
+  # Frontend Client (nginx - braucht wenig RAM)
   client:
     build:
       context: ./client
@@ -32,6 +39,12 @@ services:
       - server
     networks:
       - personalsystem-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 32M
 
 networks:
   personalsystem-network:
