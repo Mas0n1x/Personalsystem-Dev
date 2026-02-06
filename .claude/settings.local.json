@@ -48,7 +48,12 @@
       "Bash(pkill:*)",
       "Bash(dmesg:*)",
       "Bash(journalctl:*)",
-      "Bash(DOCKER_BUILDKIT=1 docker compose build:*)"
+      "Bash(DOCKER_BUILDKIT=1 docker compose build:*)",
+      "Bash(ps:*)",
+      "Bash(# Prüfe ob zram konfiguriert ist und optimiere es echo \"\"=== Aktuelle Swap-Config ===\"\" swapon --show echo \"\"\"\" echo \"\"=== zram Konfiguration ===\"\" cat /etc/default/zramswap || cat /etc/systemd/zram-generator.conf || echo \"\"Keine zram config gefunden\"\" echo \"\"\"\" echo \"\"=== Systemd zram ===\"\" systemctl status zramswap | head -5 || systemctl status systemd-zram-setup@zram0)",
+      "Bash(systemctl status:*)",
+      "Bash(# Schaue wo zram konfiguriert ist cat /etc/zram* cat /usr/bin/zramctl-setup ls /etc/systemd/system/*zram* ls /usr/lib/systemd/system/*zram* cat /boot/firmware/cmdline.txt)",
+      "Bash(docker stats:*)"
     ]
   }
 }

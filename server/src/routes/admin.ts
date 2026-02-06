@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { prisma } from '../prisma.js';
-import { authMiddleware, AuthRequest, requirePermission } from '../middleware/authMiddleware.js';
+import { authMiddleware, AuthRequest, requirePermission, invalidateUserCache } from '../middleware/authMiddleware.js';
 import { getGuildInfo, syncAllRoles, syncDiscordMembers } from '../services/discordBot.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -70,6 +70,9 @@ router.put('/roles/:id', authMiddleware, requirePermission('admin.full'), async 
       include: { permissions: true },
     });
 
+    // Cache aller User invalidieren da sich Rollen-Permissions geändert haben
+    invalidateUserCache();
+
     res.json(role);
   } catch (error) {
     console.error('Update role error:', error);
@@ -80,6 +83,7 @@ router.put('/roles/:id', authMiddleware, requirePermission('admin.full'), async 
 router.delete('/roles/:id', authMiddleware, requirePermission('admin.full'), async (req: AuthRequest, res: Response) => {
   try {
     await prisma.role.delete({ where: { id: req.params.id } });
+    invalidateUserCache();
     res.json({ success: true });
   } catch (error) {
     console.error('Delete role error:', error);
@@ -113,6 +117,7 @@ router.post('/roles/:id/permissions', authMiddleware, requirePermission('admin.f
       include: { permissions: true },
     });
 
+    invalidateUserCache();
     res.json(role);
   } catch (error) {
     console.error('Add permission to role error:', error);
@@ -131,6 +136,7 @@ router.delete('/roles/:id/permissions/:permissionId', authMiddleware, requirePer
       include: { permissions: true },
     });
 
+    invalidateUserCache();
     res.json(role);
   } catch (error) {
     console.error('Remove permission from role error:', error);
@@ -182,6 +188,7 @@ router.post('/roles/by-name/:roleName/permissions', authMiddleware, requirePermi
       include: { permissions: true },
     });
 
+    invalidateUserCache();
     res.json({
       role: updatedRole,
       addedPermissions: permissions.map(p => p.name),

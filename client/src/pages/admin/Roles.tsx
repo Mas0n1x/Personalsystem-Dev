@@ -75,6 +75,9 @@ export default function Roles() {
       setSelectedRole(null);
       toast.success('Rolle aktualisiert');
     },
+    onError: () => {
+      toast.error('Fehler beim Aktualisieren der Rolle');
+    },
   });
 
   const deleteMutation = useMutation({

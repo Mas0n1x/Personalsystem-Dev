@@ -300,7 +300,10 @@ export default function Management() {
 
   const { data: bonusPayments = [], isLoading: isLoadingBonus } = useQuery<BonusPayment[]>({
     queryKey: ['bonus', 'payments', bonusFilter],
-    queryFn: () => bonusApi.getPayments(bonusFilter !== 'all' ? { status: bonusFilter } : {}).then(res => res.data),
+    queryFn: () => bonusApi.getPayments({
+      ...(bonusFilter !== 'all' ? { status: bonusFilter } : {}),
+      week: 'current',
+    }).then(res => res.data),
   });
 
   // Archive Queries
@@ -388,9 +391,10 @@ export default function Management() {
 
   const payAllBonuses = useMutation({
     mutationFn: () => bonusApi.payAll(),
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['bonus'] });
-      toast.success('Alle offenen Boni bezahlt');
+      const count = response?.data?.updated || 0;
+      toast.success(count > 0 ? `${count} Boni als bezahlt markiert` : 'Keine offenen Boni gefunden');
     },
     onError: () => {
       toast.error('Fehler beim Bezahlen');
